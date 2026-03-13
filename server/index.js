@@ -124,50 +124,112 @@ app.post("/api/register", async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password_hash, salt);
 
-        // Сохранение в БД (таблица users)
-        const newUser = await pool.query(
-            `INSERT INTO users (login, name, email, password_hash, role) 
-             VALUES ($1, $2, $3, $4, $5) 
-             RETURNING user_id, login, name, email, role`,
-            [login, name, email, hashedPassword, role]
-        );
-
-        const userId = newUser.rows[0].user_id;
-        console.log(`✅ Пользователь зарегистрирован с ID: ${userId}`);
-
-        // Разбиваем ФИО на составляющие для таблицы user_profiles
-        const nameParts = name.trim().split(' ');
-        let lastName = '';
-        let firstName = '';
-        let middleName = '';
-
-        if (nameParts.length >= 1) lastName = nameParts[0];
-        if (nameParts.length >= 2) firstName = nameParts[1];
-        if (nameParts.length >= 3) middleName = nameParts.slice(2).join(' '); // Объединяем оставшиеся части как отчество
-
-        // Создаем запись в таблице user_profiles
+        // Начинаем транзакцию для атомарности операций
+        const client = await pool.connect();
+        
         try {
-            await pool.query(
-                `INSERT INTO user_profiles 
-                 (user_id, last_name, first_name, middle_name) 
-                 VALUES ($1, $2, $3, $4)`,
-                [userId, lastName, firstName, middleName]
-            );
-            console.log(`✅ Профиль создан для пользователя ${userId}`);
-        } catch (profileErr) {
-            console.log(`⚠️ Не удалось создать профиль: ${profileErr.message}`);
-            // Не возвращаем ошибку, так как пользователь уже создан
-        }
+            await client.query('BEGIN');
 
-        res.status(201).json({
-            success: true,
-            message: "Регистрация прошла успешно!",
-            user: {
-                ...newUser.rows[0],
-                // Добавляем информацию о том, что профиль создан
-                profile_created: true
+            // 1. Сохранение в таблицу users
+            const newUser = await client.query(
+                `INSERT INTO users (login, name, email, password_hash, role) 
+                 VALUES ($1, $2, $3, $4, $5) 
+                 RETURNING user_id, login, name, email, role`,
+                [login, name, email, hashedPassword, role]
+            );
+
+            const userId = newUser.rows[0].user_id;
+            console.log(`✅ Пользователь зарегистрирован с ID: ${userId}`);
+
+            // 2. Получаем role_id из таблицы roles по названию роли
+            // Маппинг ролей из фронтенда в названия в таблице roles
+            const roleMapping = {
+                'admin': 'Администратор',
+                'organizer': 'Организатор',
+                'section_head': 'Руководитель секции',
+                'reviewer': 'Рецензент',
+                'author': 'Автор',
+                'participant': 'Участник'
+            };
+
+            const dbRoleName = roleMapping[role] || role;
+
+            const roleResult = await client.query(
+                `SELECT role_id FROM roles WHERE role_name = $1`,
+                [dbRoleName]
+            );
+
+            if (roleResult.rows.length === 0) {
+                // Если роль не найдена, пробуем найти по частичному совпадению
+                const fuzzyRoleResult = await client.query(
+                    `SELECT role_id FROM roles WHERE role_name ILIKE $1`,
+                    [`%${role}%`]
+                );
+                
+                if (fuzzyRoleResult.rows.length === 0) {
+                    throw new Error(`Роль "${dbRoleName}" не найдена в таблице roles`);
+                }
+                
+                var roleId = fuzzyRoleResult.rows[0].role_id;
+            } else {
+                var roleId = roleResult.rows[0].role_id;
             }
-        });
+
+            // 3. Создаем запись в таблице user_roles
+            await client.query(
+                `INSERT INTO user_roles (user_id, role_id) 
+                 VALUES ($1, $2)`,
+                [userId, roleId]
+            );
+            console.log(`✅ Запись в user_roles создана: user_id=${userId}, role_id=${roleId}`);
+
+            // 4. Разбиваем ФИО на составляющие для таблицы user_profiles
+            const nameParts = name.trim().split(' ');
+            let lastName = '';
+            let firstName = '';
+            let middleName = '';
+
+            if (nameParts.length >= 1) lastName = nameParts[0];
+            if (nameParts.length >= 2) firstName = nameParts[1];
+            if (nameParts.length >= 3) middleName = nameParts.slice(2).join(' ');
+
+            // 5. Создаем запись в таблице user_profiles
+            try {
+                await client.query(
+                    `INSERT INTO user_profiles 
+                     (user_id, last_name, first_name, middle_name) 
+                     VALUES ($1, $2, $3, $4)`,
+                    [userId, lastName, firstName, middleName]
+                );
+                console.log(`✅ Профиль создан для пользователя ${userId}`);
+            } catch (profileErr) {
+                console.log(`⚠️ Не удалось создать профиль: ${profileErr.message}`);
+                // Не прерываем транзакцию, так как профиль не критичен
+            }
+
+            // Подтверждаем транзакцию
+            await client.query('COMMIT');
+            
+            res.status(201).json({
+                success: true,
+                message: "Регистрация прошла успешно!",
+                user: {
+                    ...newUser.rows[0],
+                    profile_created: true,
+                    user_roles_created: true,
+                    role_id: roleId
+                }
+            });
+
+        } catch (transactionErr) {
+            // В случае ошибки откатываем транзакцию
+            await client.query('ROLLBACK');
+            console.error("❌ Ошибка в транзакции:", transactionErr);
+            throw transactionErr;
+        } finally {
+            // Освобождаем клиента
+            client.release();
+        }
 
     } catch (err) {
         console.error("❌ Ошибка при регистрации:", err);
@@ -179,6 +241,16 @@ app.post("/api/register", async (req, res) => {
                 error: "Ошибка при регистрации",
                 details: `Проверьте структуру таблицы: ${err.message}`,
                 hint: "В таблице должны быть поля: login, name, email, password_hash, role"
+            });
+        }
+
+        // Проверка на ошибку с таблицей roles или user_roles
+        if (err.message.includes("relation") && err.message.includes("does not exist")) {
+            return res.status(500).json({
+                success: false,
+                error: "Ошибка при регистрации",
+                details: "Таблица roles или user_roles не существует. Создайте их в базе данных.",
+                hint: "CREATE TABLE roles (role_id SERIAL PRIMARY KEY, role_name VARCHAR(50) UNIQUE); CREATE TABLE user_roles (user_id INTEGER REFERENCES users(user_id), role_id INTEGER REFERENCES roles(role_id), PRIMARY KEY (user_id, role_id));"
             });
         }
 
@@ -430,6 +502,9 @@ app.get('/api/user-full/:userId', async (req, res) => {
 // ============================================
 // СОЗДАНИЕ КОНФЕРЕНЦИИ - http://localhost:5000/api/conferences
 // ============================================
+// ============================================
+// СОЗДАНИЕ КОНФЕРЕНЦИИ - http://localhost:5000/api/conferences
+// ============================================
 app.post('/api/conferences', async (req, res) => {
   console.log("\n" + "=".repeat(60));
   console.log("🔥 POST /api/conferences ВЫЗВАН!");
@@ -572,6 +647,20 @@ app.post('/api/conferences', async (req, res) => {
 
     console.log(`✅ Конференция создана с ID: ${conferenceId}`);
     console.log(`👤 Создатель: ${userCheck.rows[0].login} (ID: ${created_by})`);
+
+
+  try {
+  for (const sectionName of nonEmptySections) {
+    await pool.query(
+      `INSERT INTO sections (conference_id, name_section, user_id) 
+       VALUES ($1, $2, $3)`,
+      [conferenceId, sectionName, created_by] // Передаем ID создателя
+    );
+  }
+  console.log(`✅ Секции сохранены в таблицу sections для конференции ${conferenceId}`);
+} catch (sectionErr) {
+  console.error('❌ Ошибка при сохранении секций:', sectionErr);
+}
 
     res.status(201).json({
       success: true,
@@ -837,9 +926,188 @@ app.delete('/api/conferences/:id', async (req, res) => {
   }
 });
 
+// ============================================
+// СОХРАНЕНИЕ СЕКЦИЙ КОНФЕРЕНЦИИ - http://localhost:5000/api/sections
+// ============================================
+app.post('/api/sections', async (req, res) => {
+  console.log("\n" + "=".repeat(60));
+  console.log("🔥 POST /api/sections ВЫЗВАН!");
+  console.log("📦 Тело запроса:", JSON.stringify(req.body, null, 2));
+  console.log("=".repeat(60) + "\n");
 
+  try {
+    const { conferenceId, sections } = req.body;
 
+    if (!conferenceId || !Array.isArray(sections) || sections.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Не указан ID конференции или список секций'
+      });
+    }
 
+    // Начинаем транзакцию
+    const client = await pool.connect();
+    
+    try {
+      await client.query('BEGIN');
+
+      // Удаляем старые секции для этой конференции
+      await client.query(
+        'DELETE FROM sections WHERE conference_id = $1',
+        [conferenceId]
+      );
+
+      // Вставляем новые секции
+      for (const sectionName of sections) {
+        if (sectionName && sectionName.trim() !== '') {
+          // Вставляем в name_section 
+          await client.query(
+            `INSERT INTO sections (conference_id, name_section) 
+             VALUES ($1, $2)`,
+            [conferenceId, sectionName.trim()]
+          );
+        }
+      }
+
+      await client.query('COMMIT');
+      
+      console.log(`✅ Секции сохранены для конференции ${conferenceId}`);
+
+      res.json({
+        success: true,
+        message: 'Секции успешно сохранены'
+      });
+
+    } catch (transactionErr) {
+      await client.query('ROLLBACK');
+      throw transactionErr;
+    } finally {
+      client.release();
+    }
+
+  } catch (error) {
+    console.error('❌ Ошибка при сохранении секций:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Ошибка при сохранении секций',
+      details: error.message
+    });
+  }
+});
+
+// ============================================
+// ПОЛУЧЕНИЕ СЕКЦИЙ КОНФЕРЕНЦИИ - http://localhost:5000/api/sections?conferenceId=1
+// ============================================
+app.get('/api/sections', async (req, res) => {
+  console.log("\n" + "=".repeat(60));
+  console.log("🔥 GET /api/sections ВЫЗВАН!");
+  console.log("=".repeat(60) + "\n");
+
+  try {
+    const { conferenceId } = req.query;
+
+    let query = `
+      SELECT 
+        id_sections as id,
+        conference_id,
+        name_section,
+        user_id,
+        creater
+      FROM sections
+    `;
+    
+    const params = [];
+    
+    if (conferenceId) {
+      query += ` WHERE conference_id = $1`;
+      params.push(conferenceId);
+    }
+    
+    query += ` ORDER BY id_sections`;
+
+    const result = await pool.query(query, params);
+
+    console.log(`✅ Загружено секций: ${result.rows.length}`);
+
+    // Преобразуем результат для удобства использования на фронтенде
+    const formattedSections = result.rows.map(row => ({
+      id: row.id,
+      conference_id: row.conference_id,
+      name: row.name_section, 
+      head_id: row.user_id,
+      creater: row.creater
+    }));
+
+    res.json({
+      success: true,
+      sections: formattedSections
+    });
+
+  } catch (error) {
+    console.error('❌ Ошибка при загрузке секций:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Ошибка при загрузке секций',
+      details: error.message
+    });
+  }
+});
+
+// ============================================
+// НАЗНАЧЕНИЕ РУКОВОДИТЕЛЯ СЕКЦИИ - http://localhost:5000/api/sections/:id/head
+// ============================================
+app.put('/api/sections/:id/head', async (req, res) => {
+  console.log("\n" + "=".repeat(60));
+  console.log("🔥 PUT /api/sections/:id/head ВЫЗВАН!");
+  console.log("=".repeat(60) + "\n");
+
+  try {
+    const { id } = req.params;
+    const { headId } = req.body;
+
+    // Проверяем, что секция существует
+    const sectionCheck = await pool.query(
+      'SELECT * FROM sections WHERE id_sections = $1',
+      [id]
+    );
+
+    if (sectionCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Секция не найдена'
+      });
+    }
+
+    // Обновляем руководителя секции
+    const result = await pool.query(
+      `UPDATE sections 
+       SET user_id = $1
+       WHERE id_sections = $2
+       RETURNING *`,
+      [headId, id]
+    );
+
+    console.log(`✅ Руководитель назначен для секции ${id}`);
+
+    res.json({
+      success: true,
+      message: 'Руководитель успешно назначен',
+      section: {
+        id: result.rows[0].id_sections,
+        name: result.rows[0].name_section,
+        head_id: result.rows[0].user_id
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Ошибка при назначении руководителя:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Ошибка при назначении руководителя',
+      details: error.message
+    });
+  }
+});
 // ============================================
 // ПОЛУЧЕНИЕ ПОЛЬЗОВАТЕЛЕЙ - http://localhost:5000/api/users/:id
 // ============================================
@@ -927,6 +1195,67 @@ app.put('/api/users/:id/role', async (req, res) => {
   }
 });
 
+// ============================================
+// ПОЛУЧЕНИЕ РУКОВОДИТЕЛЕЙ СЕКЦИЙ - http://localhost:5000/api/users/section-heads
+// ============================================
+app.get('/api/users/section-heads', async (req, res) => {
+  console.log("\n" + "=".repeat(60));
+  console.log("🔥 GET /api/users/section-heads ВЫЗВАН!");
+  console.log("=".repeat(60) + "\n");
+
+  try {
+    // Получаем пользователей с ролью 'section_head' из таблицы users
+    // или через user_roles, если роли хранятся там
+    
+    // Вариант 1: Если роль хранится в поле role таблицы users
+    // const query = `
+    //   SELECT 
+    //     user_id as id,
+    //     login,
+    //     email,
+    //     name,
+    //     role
+    //   FROM users 
+    //   WHERE role = 'section_head'
+    //   ORDER BY name
+    // `;
+    
+    // Вариант 2: Если роли хранятся в user_roles (более правильно)
+    
+    const query = `
+      SELECT 
+        u.user_id as id,
+        u.login,
+        u.email,
+        u.name,
+        u.role,
+        r.role_name
+      FROM users u
+      JOIN user_roles ur ON u.user_id = ur.user_id
+      JOIN roles r ON ur.role_id = r.role_id
+      WHERE r.role_name = 'Руководитель секции'
+      ORDER BY u.name
+    `;
+    
+
+    const result = await pool.query(query);
+
+    console.log(`✅ Загружено руководителей: ${result.rows.length}`);
+
+    res.json({
+      success: true,
+      users: result.rows
+    });
+
+  } catch (error) {
+    console.error('❌ Ошибка при загрузке руководителей:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Ошибка при загрузке руководителей',
+      details: error.message
+    });
+  }
+}); 
 
 // ============================================
 // ЗАПУСК СЕРВЕРА
@@ -951,3 +1280,5 @@ app.listen(PORT, () => {
     console.log(`   DELETE http://localhost:${PORT}/api/conferences/:id <- УДАЛЕНИЕ КОНФЕРЕНЦИИ (НОВЫЙ!)`);
     console.log("=".repeat(60) + "\n");
 });
+
+
