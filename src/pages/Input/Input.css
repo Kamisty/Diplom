@@ -1,0 +1,264 @@
+.login-page {
+  min-height: 100vh;
+   background: linear-gradient(135deg, #e58210 0%, #f1f1f1 100%);
+  display: flex;
+  flex-direction: column;
+  padding: 2rem 0;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 2rem;
+  width: 100%;
+}
+
+.container h1 {
+  color: #e27a02;
+  font-size: 55px;
+  text-transform: uppercase;
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.form-section {
+  background: white;
+  padding: 3rem;
+  border-radius: 25px;
+  box-shadow: 0 10px 30px rgba(101, 101, 101, 0.1);
+  margin-top: 2rem;
+  font-family: 'Futura PT', sans-serif;
+  font-weight: 500;
+  font-size: 20px;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Стили для полей ввода */
+.input-field {
+  margin-bottom: 1rem;
+  font-family: 'Futura PT', sans-serif;
+  font-weight: 500;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  font-size: 20px;
+  box-sizing: border-box;
+  background-color: #f5f5f5;
+  color: #292929;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: #e27a02;
+  box-shadow: 0 0 0 3px rgba(226, 122, 2, 0.1);
+}
+
+.input-field.error {
+  border-color: #dc3545;
+}
+
+.input-container {
+  margin-bottom: 25px;
+  position: relative;
+}
+
+.input-label {
+  display: block;
+  margin-bottom: 5px;
+  font-family: 'Futura PT', sans-serif;
+  font-weight: 500;
+  color: #292929;
+}
+
+.error-message {
+  color: #dc3545;
+  font-size: 16px;
+  margin-top: 5px;
+  font-family: 'Futura PT', sans-serif;
+}
+
+/* Поле с паролем и кнопкой показа */
+.password-field {
+  position: relative;
+  margin-bottom: 25px;
+}
+
+.password-field .input-field {
+  padding-right: 50px;
+  margin-bottom: 0;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 24px;
+  padding: 0;
+  color: #666;
+  transition: color 0.3s;
+}
+
+.password-toggle:hover {
+  color: #e27a02;
+}
+
+.password-toggle:focus {
+  outline: none;
+}
+
+/* Опции формы (запомнить меня и забыли пароль) */
+.form-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+  font-family: 'Futura PT', sans-serif;
+  font-size: 18px;
+}
+
+.remember-me {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #292929;
+  cursor: pointer;
+}
+
+.remember-me input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #e27a02;
+}
+
+.forgot-password {
+  color: #e27a02;
+  text-decoration: none;
+  transition: color 0.3s;
+}
+
+.forgot-password:hover {
+  color: #ff7700;
+  text-decoration: underline;
+}
+
+/* Сообщения */
+.message {
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  text-align: center;
+  font-weight: 500;
+  font-family: 'Futura PT', sans-serif;
+}
+
+.message.success {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.message.error {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.message.info {
+  background-color: #d1ecf1;
+  color: #0c5460;
+  border: 1px solid #bee5eb;
+}
+
+/* Ссылка на регистрацию */
+.register-link {
+  text-align: center;
+  margin-top: 2rem;
+  font-family: 'Futura PT', sans-serif;
+  font-weight: 500;
+  font-size: 20px;
+  color: #292929;
+}
+
+.register-link a {
+  color: #e27a02;
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.3s;
+}
+
+.register-link a:hover {
+  color: #ff7700;
+  text-decoration: underline;
+}
+
+/* Кнопка входа */
+.button {
+  width: 100%;
+  padding: 15px;
+  background-color: #e27a02;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 22px;
+  font-family: 'Futura PT', sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s, transform 0.1s;
+}
+
+.button:hover:not(:disabled) {
+  background-color: #ff7700;
+}
+
+.button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .container h1 {
+    font-size: 36px;
+  }
+
+  .form-section {
+    padding: 2rem;
+  }
+
+  .form-options {
+    flex-direction: column;
+    gap: 15px;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    padding: 0 1rem;
+  }
+
+  .container h1 {
+    font-size: 28px;
+  }
+
+  .form-section {
+    padding: 1.5rem;
+  }
+
+  .input-field {
+    font-size: 18px;
+  }
+}

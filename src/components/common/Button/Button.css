@@ -1,0 +1,15 @@
+/* src/components/common/Button.css */
+.my-button {
+  background-color: #e27a02;
+  color: white;
+  font-size: 20px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: 1px solid #ffffff;
+  font-family: 'Futura PT', sans-serif;
+  font-weight: 500; 
+}
+
+.my-button:hover {
+  background-color: #ee8e21;
+}

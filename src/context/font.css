@@ -1,0 +1,62 @@
+/* Futura PT Light */
+@font-face {
+  font-family: 'Futura PT';
+  src: url('./FuturaPT-Light.ttf') format('truetype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Futura PT Book (Regular) */
+@font-face {
+  font-family: 'Futura PT';
+  src: url('./FuturaPT-Book.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Futura PT Medium */
+@font-face {
+  font-family: 'Futura PT';
+  src: url('./FuturaPT-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Futura PT Demi (SemiBold) */
+@font-face {
+  font-family: 'Futura PT';
+  src: url('./FuturaPT-Demi.ttf') format('truetype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Futura PT Bold */
+@font-face {
+  font-family: 'Futura PT';
+  src: url('./FuturaPT-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Futura PT ExtraBold */
+@font-face {
+  font-family: 'Futura PT';
+  src: url('./FuturaPT-ExtraBold.ttf') format('truetype');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Futura PT Heavy */
+@font-face {
+  font-family: 'Futura PT';
+  src: url('./FuturaPT-Heavy.ttf') format('truetype');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}

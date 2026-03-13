@@ -1,0 +1,259 @@
+.header {
+  background-color: #ffffff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  padding: 1rem 0;
+}
+
+.header-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+/* Логотип */
+.logo {
+  text-decoration: none;
+  color: #e27a02;
+  transition: color 0.3s;
+}
+
+.logo h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  font-family: 'Futura PT', sans-serif;
+}
+
+.logo:hover {
+  color: #ff7700;
+}
+
+/* Навигационное меню */
+.nav-menu {
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+}
+
+.nav-link {
+  text-decoration: none;
+  color: #333;
+  font-family: 'Futura PT', sans-serif;
+  font-size: 18px;
+  font-weight: 500;
+  transition: color 0.3s;
+  position: relative;
+}
+
+.nav-link:hover {
+  color: #e27a02;
+}
+
+.nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background-color: #e27a02;
+  transition: width 0.3s;
+}
+
+.nav-link:hover::after {
+  width: 100%;
+}
+
+/* Секция авторизации */
+.auth-section {
+  display: flex;
+  align-items: center;
+}
+
+/* Кнопки для неавторизованных */
+.auth-buttons {
+  display: flex;
+  gap: 1rem;
+}
+
+.btn {
+  padding: 8px 20px;
+  border-radius: 8px;
+  font-family: 'Futura PT', sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.3s;
+  cursor: pointer;
+  border: none;
+}
+
+.btn-login {
+  background-color: transparent;
+  color: #e27a02;
+  border: 2px solid #e27a02;
+}
+
+.btn-login:hover {
+  background-color: #e27a02;
+  color: white;
+}
+
+.btn-register {
+  background-color: #e27a02;
+  color: white;
+}
+
+.btn-register:hover {
+  background-color: #ff7700;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(226, 122, 2, 0.3);
+}
+
+/* Меню пользователя */
+.user-menu {
+  position: relative;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  padding: 5px 10px;
+  border-radius: 30px;
+  transition: background-color 0.3s;
+}
+
+.user-info:hover {
+  background-color: #f5f5f5;
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #e27a02, #ff9900);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Futura PT', sans-serif;
+  font-weight: 600;
+  font-size: 18px;
+  box-shadow: 0 2px 5px rgba(226, 122, 2, 0.3);
+}
+
+.user-name {
+  font-family: 'Futura PT', sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+}
+
+.dropdown-arrow {
+  font-size: 12px;
+  color: #999;
+  transition: transform 0.3s;
+}
+
+.dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+/* Выпадающее меню */
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 10px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+  min-width: 220px;
+  overflow: hidden;
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  text-decoration: none;
+  color: #333;
+  font-family: 'Futura PT', sans-serif;
+  font-size: 16px;
+  transition: background-color 0.3s;
+  width: 100%;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.dropdown-item:hover {
+  background-color: #f8f9fa;
+  color: #e27a02;
+}
+
+.dropdown-item.logout {
+  color: #dc3545;
+}
+
+.dropdown-item.logout:hover {
+  background-color: #fff5f5;
+}
+
+.dropdown-icon {
+  font-size: 18px;
+  width: 24px;
+  text-align: center;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background-color: #e9ecef;
+  margin: 4px 0;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .nav-menu {
+    display: none;
+  }
+
+  .user-name {
+    display: none;
+  }
+
+  .auth-buttons {
+    gap: 0.5rem;
+  }
+
+  .btn {
+    padding: 6px 12px;
+    font-size: 14px;
+  }
+
+  .header-container {
+    padding: 0 1rem;
+  }
+}
