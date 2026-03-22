@@ -15,6 +15,43 @@ const Input = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [serverMessage, setServerMessage] = useState({ type: '', text: '' });
   const [showPassword, setShowPassword] = useState(false);
+  const [showRoleSelector, setShowRoleSelector] = useState(false);
+  const [userRoles, setUserRoles] = useState([]);
+  const [selectedRole, setSelectedRole] = useState('');
+  const [tempUserData, setTempUserData] = useState(null);
+
+  // Функция для получения отображаемого имени роли
+  const getRoleDisplayName = (role) => {
+    const roleNames = {
+      'Администратор конференции': 'Администратор конференции',
+      'Руководитель секции': 'Руководитель секции',
+      'Рецензент': 'Рецензент',
+      'Автор': 'Автор'
+    };
+    return roleNames[role] || role;
+  };
+
+  // Функция для получения описания роли
+  const getRoleDescription = (role) => {
+    const descriptions = {
+      'Администратор конференции': 'Полный доступ к управлению конференцией, настройка секций, управление пользователями',
+      'Руководитель секции': 'Управление своей секцией, модерация докладов, назначение рецензентов',
+      'Рецензент': 'Оценка и рецензирование докладов, оставление отзывов',
+      'Автор': 'Подача и управление своими докладами, участие в конференциях'
+    };
+    return descriptions[role] || 'Доступ к соответствующим функциям системы';
+  };
+
+  // Функция для получения иконки роли
+  const getRoleIcon = (role) => {
+    const icons = {
+      'Администратор конференции': '👑',
+      'Руководитель секции': '📋',
+      'Рецензент': '📝',
+      'Автор': '✍️'
+    };
+    return icons[role] || '👤';
+  };
 
   const validateForm = () => {
     const newErrors = {};
@@ -55,8 +92,6 @@ const Input = () => {
       password: formData.password
     };
 
-    console.log('📦 Отправка данных на сервер:', userData);
-
     try {
       const response = await fetch('http://localhost:5000/api/input', {
         method: 'POST',
@@ -67,65 +102,42 @@ const Input = () => {
       });
 
       const data = await response.json();
-      console.log('📦 ВЕСЬ ОТВЕТ СЕРВЕРА:', data);
-      console.log('📦 data.user:', data.user);
-      console.log('📦 data.user.roles:', data.user?.roles);
-      console.log('📦 data.user.role:', data.user?.role);
-      console.log('📦 Тип data.user.roles:', Array.isArray(data.user?.roles) ? 'массив' : typeof data.user?.roles);
-      
-      // Проверяем, что пришло от сервера
-      if (data.user && data.user.roles) {
-        console.log('✅ Сервер вернул roles (массив):', data.user.roles);
-      } else if (data.user && data.user.role) {
-        console.log('⚠️ Сервер вернул role (строка):', data.user.role);
-      } else {
-        console.log('❌ Сервер не вернул ни roles, ни role');
-      }
 
       if (response.ok && data.success) {
-        // Определяем, откуда брать роли
-        let userRoles = [];
+        // Определяем роли пользователя из ответа сервера
+        let roles = [];
         
+        // Предполагаем, что сервер возвращает роли в поле roles или role
         if (data.user.roles && Array.isArray(data.user.roles)) {
-          // Если сервер вернул массив roles
-          userRoles = data.user.roles;
-          console.log('✅ Используем roles (массив):', userRoles);
+          roles = data.user.roles;
         } else if (data.user.role) {
-          // Если сервер вернул строку role, преобразуем в массив
-          userRoles = [data.user.role];
-          console.log('⚠️ Преобразовали role в массив:', userRoles);
+          roles = [data.user.role];
+        } else if (data.user.role_name) {
+          roles = [data.user.role_name];
         }
         
-        const userWithRoles = {
-          ...data.user,
-          roles: userRoles
-        };
+        console.log('Полученные роли пользователя:', roles);
         
-        console.log('✅ Итоговый пользователь для сохранения:', userWithRoles);
-        console.log('✅ Роли для сохранения:', userWithRoles.roles);
+        // Сохраняем данные пользователя временно
+        setTempUserData(data.user);
+        setUserRoles(roles);
         
-        // Сохраняем в localStorage
-        localStorage.setItem('user', JSON.stringify(userWithRoles));
-        
-        // Проверяем, что сохранилось
-        const savedUser = JSON.parse(localStorage.getItem('user'));
-        console.log('✅ Проверка сохранения в localStorage:', savedUser);
-        console.log('✅ Роли в localStorage:', savedUser.roles);
-        
-        // Обновляем AuthContext
-        if (authLogin) {
-          authLogin(userWithRoles);
+        // Если у пользователя несколько ролей, показываем выбор
+        if (roles.length > 1) {
+          setShowRoleSelector(true);
+          setServerMessage({ 
+            type: 'info', 
+            text: 'У вас есть несколько ролей. Выберите, под какой ролью войти:' 
+          });
+        } else if (roles.length === 1) {
+          // Если только одна роль, входим сразу
+          completeLogin(data.user, roles);
+        } else {
+          setServerMessage({ 
+            type: 'error', 
+            text: 'У пользователя не найдены роли' 
+          });
         }
-        
-        setServerMessage({ 
-          type: 'success', 
-          text: 'Вход выполнен успешно! ✅' 
-        });
-
-        // Перенаправление
-        setTimeout(() => {
-          window.location.href = '/dashboard';
-        }, 1500);
       } else {
         setServerMessage({ 
           type: 'error', 
@@ -141,6 +153,73 @@ const Input = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const completeLogin = (userData, roles, selectedRoleName = null) => {
+    // Если выбрана конкретная роль, используем её
+    const activeRole = selectedRoleName || roles[0];
+    
+    const userWithRoles = {
+      ...userData,
+      roles: roles,
+      activeRole: activeRole,
+      availableRoles: roles, // Список всех доступных ролей
+      roleDisplayName: getRoleDisplayName(activeRole)
+    };
+    
+    // Сохраняем в localStorage
+    localStorage.setItem('user', JSON.stringify(userWithRoles));
+    
+    // Обновляем AuthContext
+    if (authLogin) {
+      authLogin(userWithRoles);
+    }
+    
+    setServerMessage({ 
+      type: 'success', 
+      text: `Вход выполнен успешно! Роль: ${getRoleDisplayName(activeRole)} ✅` 
+    });
+
+    // Перенаправление в зависимости от роли
+    setTimeout(() => {
+      redirectBasedOnRole(activeRole);
+    }, 1500);
+  };
+
+  const redirectBasedOnRole = (role) => {
+    const roleRoutes = {
+      'Администратор конференции': '/admin/dashboard',
+      'Руководитель секции': '/section-head/dashboard',
+      'Рецензент': '/reviewer/dashboard',
+      'Автор': '/author/dashboard'
+    };
+    
+    const redirectPath = roleRoutes[role] || '/dashboard';
+    window.location.href = redirectPath;
+  };
+
+  const handleRoleSelect = (role) => {
+    setSelectedRole(role);
+  };
+
+  const handleConfirmRole = () => {
+    if (!selectedRole) {
+      setServerMessage({ 
+        type: 'error', 
+        text: 'Пожалуйста, выберите роль' 
+      });
+      return;
+    }
+    
+    completeLogin(tempUserData, userRoles, selectedRole);
+    setShowRoleSelector(false);
+  };
+
+  const handleBackToLogin = () => {
+    setShowRoleSelector(false);
+    setUserRoles([]);
+    setTempUserData(null);
+    setSelectedRole('');
   };
 
   const handleInputChange = (event) => {
@@ -163,6 +242,76 @@ const Input = () => {
     setShowPassword(!showPassword);
   };
 
+  // Компонент выбора роли
+  if (showRoleSelector) {
+    return (
+      <div className="login-page">
+        <div className="container">
+          <h1>Выбор роли</h1>
+          
+          {serverMessage.text && (
+            <div className={`message ${serverMessage.type}`}>
+              {serverMessage.text}
+            </div>
+          )}
+          
+          <div className="role-selector">
+            <p className="role-selector-title">
+              Пользователь: <strong>{formData.login}</strong>
+            </p>
+            <p className="role-selector-subtitle">
+              У вас есть несколько ролей. Выберите, под какой ролью вы хотите войти:
+            </p>
+            
+            <div className="roles-list">
+              {userRoles.map((role, index) => (
+                <div 
+                  key={index}
+                  className={`role-card ${selectedRole === role ? 'selected' : ''}`}
+                  onClick={() => handleRoleSelect(role)}
+                >
+                  <div className="role-radio">
+                    <input
+                      type="radio"
+                      id={`role-${role}`}
+                      name="role"
+                      value={role}
+                      checked={selectedRole === role}
+                      onChange={() => handleRoleSelect(role)}
+                    />
+                    <label htmlFor={`role-${role}`}>
+                      <span className="role-icon">{getRoleIcon(role)}</span>
+                      <span className="role-name">{getRoleDisplayName(role)}</span>
+                    </label>
+                  </div>
+                  <div className="role-description">
+                    {getRoleDescription(role)}
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            <div className="role-actions">
+              <Button 
+                text="Подтвердить"
+                onClick={handleConfirmRole}
+                disabled={!selectedRole}
+              />
+              <button 
+                type="button"
+                className="back-button"
+                onClick={handleBackToLogin}
+              >
+                Назад к входу
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Основная форма входа
   return (
     <div className="login-page">
       <div className="container">

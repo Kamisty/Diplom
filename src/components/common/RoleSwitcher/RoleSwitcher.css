@@ -1,0 +1,241 @@
+/* src/components/common/RoleSwitcher/RoleSwitcher.css */
+.role-switcher-inline {
+  padding: 8px 0;
+  border-bottom: 1px solid #e0e0e0;
+  margin-bottom: 8px;
+}
+
+.role-switcher-header {
+  padding: 8px 16px;
+  font-size: 12px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 500;
+}
+
+.role-switcher-title {
+  display: block;
+}
+
+.role-switcher-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+  font-size: 14px;
+}
+
+.role-switcher-option:hover:not(:disabled) {
+  background: #fef5e8;
+}
+
+.role-switcher-option.active {
+  background: #fef5e8;
+  position: relative;
+}
+
+.role-switcher-option.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: #e27a02;
+}
+
+.role-switcher-option:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.role-switcher-option .role-icon {
+  font-size: 18px;
+  min-width: 24px;
+}
+
+.role-switcher-option .role-info {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.role-switcher-option .role-name {
+  font-weight: 500;
+  color: #333;
+}
+
+.active-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  background: #e27a02;
+  color: white;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+.switching-spinner {
+  font-size: 14px;
+  animation: spin 1s linear infinite;
+}
+
+
+/* Добавьте в конец файла RoleSwitcher.css */
+
+/* Разделитель */
+.role-divider {
+  height: 1px;
+  background: linear-gradient(to right, transparent, #e0e0e0, transparent);
+  margin: 8px 0;
+}
+
+/* Кнопка добавления роли */
+.add-role-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 16px;
+  background: #f8f9fa;
+  border: 1px dashed #e27a02;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #e27a02;
+  transition: all 0.2s;
+  margin-top: 8px;
+}
+
+.add-role-button:hover {
+  background: #fef5e8;
+  border-color: #e27a02;
+  border-style: solid;
+}
+
+.add-icon {
+  font-size: 14px;
+  font-weight: bold;
+}
+
+/* Форма добавления роли */
+.add-role-form {
+  margin-top: 12px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  animation: slideDown 0.2s ease;
+}
+
+.add-role-message {
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.add-role-message.success {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.add-role-message.error {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.add-role-select select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  background: white;
+  cursor: pointer;
+}
+
+.add-role-select select:focus {
+  outline: none;
+  border-color: #e27a02;
+}
+
+.add-role-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.confirm-add-role {
+  flex: 1;
+  padding: 8px 12px;
+  background: #e27a02;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.confirm-add-role:hover:not(:disabled) {
+  background: #ff7700;
+}
+
+.confirm-add-role:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.cancel-add-role {
+  flex: 1;
+  padding: 8px 12px;
+  background: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.cancel-add-role:hover:not(:disabled) {
+  background: #e0e0e0;
+}
+
+.cancel-add-role:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+
+
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

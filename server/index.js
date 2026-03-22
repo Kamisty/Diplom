@@ -416,6 +416,96 @@ app.post("/api/input", async (req, res) => {
   }
 });
 
+
+
+// ============================================
+// ПОЛУЧЕНИЕ РОЛЕЙ ПОЛЬЗОВАТЕЛЯ ПО ЛОГИНУ (НОВЫЙ!)
+// ============================================
+app.post('/api/user-roles', async (req, res) => {
+  console.log("\n" + "=".repeat(60));
+  console.log("🔥 POST /api/user-roles ВЫЗВАН!");
+  console.log("📦 Тело запроса:", JSON.stringify(req.body, null, 2));
+  console.log("=".repeat(60) + "\n");
+
+  try {
+    const { login } = req.body;
+
+    // Проверка обязательных полей
+    if (!login) {
+      return res.status(400).json({
+        success: false,
+        error: "Логин (email) обязателен"
+      });
+    }
+
+    console.log(`🔍 Поиск пользователя с логином: ${login}`);
+
+    // Поиск пользователя в БД (таблица users)
+    const userResult = await pool.query(
+      "SELECT user_id, login, name, email FROM users WHERE login = $1 OR email = $1",
+      [login]
+    );
+
+    if (userResult.rows.length === 0) {
+      console.log(`❌ Пользователь с логином ${login} не найден`);
+      return res.status(404).json({
+        success: false,
+        error: "Пользователь не найден"
+      });
+    }
+
+    const user = userResult.rows[0];
+    console.log(`✅ Пользователь найден: ID=${user.user_id}, Login=${user.login}`);
+
+    // Получаем роли пользователя из таблицы user_roles
+    let userRoles = [];
+    try {
+      const rolesResult = await pool.query(
+        `SELECT r.role_name 
+         FROM user_roles ur 
+         JOIN roles r ON ur.role_id = r.role_id 
+         WHERE ur.user_id = $1`,
+        [user.user_id]
+      );
+      userRoles = rolesResult.rows.map(row => row.role_name);
+      console.log(`✅ Роли пользователя:`, userRoles);
+    } catch (rolesErr) {
+      console.log("⚠️ Ошибка при загрузке ролей:", rolesErr.message);
+    }
+
+    if (userRoles.length === 0) {
+      console.log(`⚠️ У пользователя ${user.login} нет ролей`);
+      return res.status(404).json({
+        success: false,
+        error: "У пользователя не найдены роли"
+      });
+    }
+
+    // Отправляем ответ с ролями
+    res.json({
+      success: true,
+      roles: userRoles,
+      user: {
+        id: user.user_id,
+        login: user.login,
+        name: user.name,
+        email: user.email
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Ошибка при получении ролей пользователя:", error);
+    res.status(500).json({
+      success: false,
+      error: "Ошибка сервера при получении ролей",
+      details: error.message
+    });
+  }
+});
+
+
+
+
 // ============================================
 // ПОЛУЧЕНИЕ РОЛЕЙ ПОЛЬЗОВАТЕЛЯ
 // ============================================
@@ -448,8 +538,145 @@ app.get('/api/user/:userId/roles', async (req, res) => {
 });
 
 
+// ============================================
+// ДОБАВЛЕНИЕ РОЛИ ПОЛЬЗОВАТЕЛЮ
+// ============================================
+// server.js - эндпоинт добавления роли
+app.post('/api/user/add-role', async (req, res) => {
+  console.log("\n" + "=".repeat(60));
+  console.log("🔥 POST /api/user/add-role ВЫЗВАН!");
+  console.log("📦 Тело запроса:", JSON.stringify(req.body, null, 2));
+  console.log("=".repeat(60) + "\n");
 
+  try {
+    const { userId, role } = req.body;
 
+    if (!userId || !role) {
+      return res.status(400).json({
+        success: false,
+        error: "Не указан ID пользователя или роль"
+      });
+    }
+
+    console.log(`🔍 Получен role: ${role}`);
+
+    // Маппинг ID роли -> название в БД
+    const idToDbMapping = {
+      'author': 'Автор',
+      'reviewer': 'Рецензент',
+      'section_head': 'Руководитель секции',
+      'admin': 'Администратор конференции'
+    };
+
+    // Обратный маппинг (название БД -> ID)
+    const dbToIdMapping = {
+      'Автор': 'author',
+      'Рецензент': 'reviewer',
+      'Руководитель секции': 'section_head',
+      'Администратор конференции': 'admin'
+    };
+
+    let roleName; // Название роли для БД
+    let roleId;   // ID роли для фронтенда
+
+    // Проверяем, что пришло: ID или название
+    if (role in idToDbMapping) {
+      // Пришел ID (author, reviewer и т.д.)
+      roleName = idToDbMapping[role];
+      roleId = role;
+      console.log(`✅ Получен ID роли: ${role} -> преобразовано в название: ${roleName}`);
+    } else if (role in dbToIdMapping) {
+      // Пришло название (Автор, Рецензент и т.д.)
+      roleName = role;
+      roleId = dbToIdMapping[role];
+      console.log(`✅ Получено название роли: ${role} -> преобразовано в ID: ${roleId}`);
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: `Некорректное название роли: ${role}. Доступные роли: Автор, Рецензент, Руководитель секции, Администратор конференции`
+      });
+    }
+
+    // Проверяем, существует ли пользователь
+    const userCheck = await pool.query(
+      "SELECT user_id FROM users WHERE user_id = $1",
+      [userId]
+    );
+
+    if (userCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "Пользователь не найден"
+      });
+    }
+
+    // Находим ID роли в таблице roles по названию
+    const roleResult = await pool.query(
+      "SELECT role_id FROM roles WHERE role_name = $1",
+      [roleName]
+    );
+
+    if (roleResult.rows.length === 0) {
+      console.log(`❌ Роль "${roleName}" не найдена в таблице roles`);
+      return res.status(404).json({
+        success: false,
+        error: `Роль "${roleName}" не найдена в системе`
+      });
+    }
+
+    const roleDbId = roleResult.rows[0].role_id;
+
+    // Проверяем, есть ли уже такая роль у пользователя
+    const existingRole = await pool.query(
+      "SELECT * FROM user_roles WHERE user_id = $1 AND role_id = $2",
+      [userId, roleDbId]
+    );
+
+    if (existingRole.rows.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: "У пользователя уже есть эта роль"
+      });
+    }
+
+    // Добавляем роль пользователю
+    await pool.query(
+      "INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)",
+      [userId, roleDbId]
+    );
+
+    // Получаем обновленный список ролей пользователя (в ID формате для фронтенда)
+    const updatedRolesResult = await pool.query(
+      `SELECT r.role_name 
+       FROM user_roles ur 
+       JOIN roles r ON ur.role_id = r.role_id 
+       WHERE ur.user_id = $1`,
+      [userId]
+    );
+
+    // Преобразуем названия ролей в ID для фронтенда
+    const updatedRoles = updatedRolesResult.rows.map(row => {
+      return dbToIdMapping[row.role_name] || row.role_name;
+    });
+
+    console.log(`✅ Роль "${roleName}" добавлена пользователю ${userId}`);
+    console.log(`📋 Обновленный список ролей (ID):`, updatedRoles);
+
+    res.json({
+      success: true,
+      message: `Роль "${roleName}" успешно добавлена`,
+      userRoles: updatedRoles
+    });
+
+  } catch (error) {
+    console.error("❌ Ошибка при добавлении роли:", error);
+    res.status(500).json({
+      success: false,
+      error: "Ошибка сервера при добавлении роли",
+      details: error.message
+    });
+  }
+});
 // ============================================
 // РАБОТА С ПРОФИЛЕМ ПОЛЬЗОВАТЕЛЯ (user_profiles)
 // ============================================

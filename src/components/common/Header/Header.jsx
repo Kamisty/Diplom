@@ -3,6 +3,7 @@ import React, { useState, useContext, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../../context/AuthContext/Auth';
 import { hasPermission, getRoleName, getRoleIcon, ROLES } from '../../../config/roles';
+import RoleSwitcher from '../RoleSwitcher/RoleSwitcher'; // Импортируем RoleSwitcher
 import './Header.css';
 
 const Header = () => {
@@ -13,6 +14,7 @@ const Header = () => {
 
   // Получаем роли пользователя (массив)
   const userRoles = user?.roles || [];
+  const availableRoles = user?.availableRoles || userRoles; // Для совместимости
   
   // Функции для проверки ролей
   const isAdmin = () => userRoles.includes(ROLES.ADMIN);
@@ -51,15 +53,27 @@ const Header = () => {
     return user?.login?.[0]?.toUpperCase() || 'U';
   };
 
-  // Получение отображаемой роли (если несколько ролей, показываем первую)
+  // Получение отображаемой роли (теперь используем активную роль)
   const getDisplayRole = () => {
+    // Если есть активная роль, показываем её
+    if (user?.activeRole) {
+      return getRoleName(user.activeRole);
+    }
+    
+    // Если нет активной роли, показываем первую роль
     if (userRoles.length === 0) return 'Участник';
     if (userRoles.length === 1) return getRoleName(userRoles[0]);
     return `${userRoles.length} роли`;
   };
 
-  // Получение иконки для отображения (приоритет: админ > руководитель > рецензент > автор)
+  // Получение иконки для отображения (используем активную роль)
   const getDisplayRoleIcon = () => {
+    // Если есть активная роль, показываем её иконку
+    if (user?.activeRole) {
+      return getRoleIcon(user.activeRole);
+    }
+    
+    // Иначе определяем по приоритету
     if (isAdmin()) return '👑';
     if (isSectionHead()) return '🎯';
     if (isReviewer()) return '⭐';
@@ -80,21 +94,29 @@ const Header = () => {
             <Link to="/dashboard" className="nav-link">Дашборд</Link>
             <Link to="/profile" className="nav-link">Профиль</Link>
             
-            {/* Ссылки для авторов */}
-            {isAuthor() && (
+            {/* Ссылки для авторов - проверяем активную роль */}
+            {user?.activeRole === ROLES.AUTHOR && (
               <>
                 <Link to="/submit-report" className="nav-link">Подать доклад</Link>
                 <Link to="/my-reports" className="nav-link">Мои доклады</Link>
               </>
             )}
             
-            {/* Ссылки для рецензентов */}
-            {isReviewer() && (
+            {/* Ссылки для рецензентов - проверяем активную роль */}
+            {user?.activeRole === ROLES.REVIEWER && (
               <Link to="/review-reports" className="nav-link">Рецензирование</Link>
             )}
             
-            {/* Ссылки для администраторов */}
-            {isAdmin() && (
+            {/* Ссылки для руководителей секций */}
+            {user?.activeRole === ROLES.SECTION_HEAD && (
+              <>
+                <Link to="/section/manage" className="nav-link">Управление секцией</Link>
+                <Link to="/section/reports" className="nav-link">Доклады секции</Link>
+              </>
+            )}
+            
+            {/* Ссылки для администраторов - проверяем активную роль */}
+            {user?.activeRole === ROLES.ADMIN && (
               <>
                 <Link to="/admin/create-conference" className="nav-link">Создать конф.</Link>
                 <Link to="/admin/conferences" className="nav-link">Управление</Link>
@@ -132,6 +154,14 @@ const Header = () => {
 
               {isDropdownOpen && (
                 <div className="dropdown-menu">
+                  {/* ✅ ДОБАВЛЯЕМ RoleSwitcher ВНУТРИ ВЫПАДАЮЩЕГО МЕНЮ */}
+                  {availableRoles && availableRoles.length > 1 && (
+                    <>
+                      <RoleSwitcher closeDropdown={() => setIsDropdownOpen(false)} />
+                      <div className="dropdown-divider"></div>
+                    </>
+                  )}
+
                   <Link to="/profile" className="dropdown-item" onClick={() => setIsDropdownOpen(false)}>
                     <span className="dropdown-icon">👤</span>
                     Мой профиль
@@ -142,17 +172,19 @@ const Header = () => {
                     Дашборд
                   </Link>
 
-                  {/* Разделитель */}
                   <div className="dropdown-divider"></div>
 
-                  {/* Роль пользователя (не кликабельно) */}
-                  <div className="dropdown-item" style={{ cursor: 'default' }}>
+                  {/* Активная роль */}
+                  <div className="dropdown-item" style={{ cursor: 'default', background: '#f5f5f5' }}>
                     <span className="dropdown-icon">{getDisplayRoleIcon()}</span>
-                    {getDisplayRole()}
+                    <div>
+                      <div style={{ fontSize: '12px', color: '#666' }}>Текущая роль:</div>
+                      <div style={{ fontWeight: 'bold' }}>{getDisplayRole()}</div>
+                    </div>
                   </div>
 
-                  {/* Ссылки для авторов */}
-                  {isAuthor() && (
+                  {/* Ссылки для авторов - проверяем активную роль */}
+                  {user?.activeRole === ROLES.AUTHOR && (
                     <>
                       <Link to="/submit-report" className="dropdown-item" onClick={() => setIsDropdownOpen(false)}>
                         <span className="dropdown-icon">📝</span>
@@ -165,16 +197,30 @@ const Header = () => {
                     </>
                   )}
 
-                  {/* Ссылки для рецензентов */}
-                  {isReviewer() && (
+                  {/* Ссылки для рецензентов - проверяем активную роль */}
+                  {user?.activeRole === ROLES.REVIEWER && (
                     <Link to="/review-reports" className="dropdown-item" onClick={() => setIsDropdownOpen(false)}>
                       <span className="dropdown-icon">🔍</span>
                       Рецензирование
                     </Link>
                   )}
 
-                  {/* Ссылки для администраторов */}
-                  {isAdmin() && (
+                  {/* Ссылки для руководителей секций */}
+                  {user?.activeRole === ROLES.SECTION_HEAD && (
+                    <>
+                      <Link to="/section/manage" className="dropdown-item" onClick={() => setIsDropdownOpen(false)}>
+                        <span className="dropdown-icon">🎯</span>
+                        Управление секцией
+                      </Link>
+                      <Link to="/section/reports" className="dropdown-item" onClick={() => setIsDropdownOpen(false)}>
+                        <span className="dropdown-icon">📄</span>
+                        Доклады секции
+                      </Link>
+                    </>
+                  )}
+
+                  {/* Ссылки для администраторов - проверяем активную роль */}
+                  {user?.activeRole === ROLES.ADMIN && (
                     <>
                       <div className="dropdown-divider"></div>
                       <Link to="/admin/create-conference" className="dropdown-item" onClick={() => setIsDropdownOpen(false)}>
