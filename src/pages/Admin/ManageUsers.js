@@ -8,6 +8,28 @@ const ManageUsers = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [error, setError] = useState(null);
+  
+  // Состояния для модального окна изменения ролей
+  const [showRoleModal, setShowRoleModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [selectedRoles, setSelectedRoles] = useState([]);
+  const [availableRoles, setAvailableRoles] = useState([]);
+  const [savingRoles, setSavingRoles] = useState(false);
+  const [roleMessage, setRoleMessage] = useState({ type: '', text: '' });
+  
+  // Состояния для модального окна просмотра профиля
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [profileUser, setProfileUser] = useState(null);
+  const [profileData, setProfileData] = useState(null);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+
+  // Все доступные роли в системе
+  const allRoles = [
+    { id: 'author', name: 'Автор', dbName: 'Автор', description: 'Подача докладов' },
+    { id: 'reviewer', name: 'Рецензент', dbName: 'Рецензент', description: 'Рецензирование докладов' },
+    { id: 'section_head', name: 'Руководитель секции', dbName: 'Руководитель секции', description: 'Управление секцией' },
+    { id: 'admin', name: 'Администратор', dbName: 'Администратор конференции', description: 'Полный доступ к системе' }
+  ];
 
   // Загрузка пользователей с сервера
   useEffect(() => {
@@ -22,7 +44,7 @@ const ManageUsers = () => {
       const response = await fetch('http://localhost:5000/api/users');
       const data = await response.json();
 
-      console.log('Загруженные пользователи:', data); // Добавляем отладку
+      console.log('Загруженные пользователи:', data);
 
       if (response.ok && data.success) {
         setUsers(data.users);
@@ -69,7 +91,6 @@ const ManageUsers = () => {
     
     let matchesRole = true;
     if (roleFilter !== 'all') {
-      // Преобразуем фильтр в русское название
       const roleMap = {
         'admin': 'Администратор конференции',
         'section_head': 'Руководитель секции',
@@ -95,7 +116,6 @@ const ManageUsers = () => {
     return parts.length > 0 ? parts.join(' ') : 'Не указано';
   };
 
-  // CSS класс для роли (берем первую роль)
   const getRoleClass = (user) => {
     if (!user.roles || user.roles.length === 0) return 'role-default';
     
@@ -107,28 +127,136 @@ const ManageUsers = () => {
     return 'role-default';
   };
 
-  // Форматирование даты
-  const formatDate = (dateString) => {
-    if (!dateString) return 'Не указано';
+  // Функция для просмотра профиля пользователя
+  const handleViewProfile = async (userId) => {
+    console.log('Просмотр профиля пользователя:', userId);
+    
+    // Находим пользователя
+    const user = users.find(u => u.user_id === userId);
+    if (!user) return;
+    
+    setProfileUser(user);
+    setLoadingProfile(true);
+    setShowProfileModal(true);
+    
     try {
-      const options = { 
-        day: '2-digit', 
-        month: '2-digit', 
-        year: 'numeric'
-      };
-      return new Date(dateString).toLocaleDateString('ru-RU', options);
-    } catch {
-      return dateString;
+      // Загружаем дополнительные данные профиля
+      const response = await fetch(`http://localhost:5000/api/user-profile/${userId}`);
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        setProfileData(data.profile);
+      } else {
+        setProfileData(null);
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки профиля:', error);
+      setProfileData(null);
+    } finally {
+      setLoadingProfile(false);
     }
+  };
+
+  // Функция для открытия модального окна изменения ролей
+  const handleChangeRole = async (userId) => {
+    console.log('Изменение роли пользователя:', userId);
+    
+    // Находим пользователя
+    const user = users.find(u => u.user_id === userId);
+    if (!user) return;
+    
+    setSelectedUser(user);
+    setSelectedRoles(user.roles || []);
+    setRoleMessage({ type: '', text: '' });
+    setShowRoleModal(true);
+  };
+
+  // Функция для переключения роли (добавление/удаление)
+  const toggleRole = (roleId) => {
+    const role = allRoles.find(r => r.id === roleId);
+    if (!role) return;
+    
+    setSelectedRoles(prev => {
+      if (prev.includes(role.dbName)) {
+        return prev.filter(r => r !== role.dbName);
+      } else {
+        return [...prev, role.dbName];
+      }
+    });
+  };
+
+  // Функция для сохранения изменений ролей
+  const handleSaveRoles = async () => {
+    if (!selectedUser) return;
+    
+    setSavingRoles(true);
+    setRoleMessage({ type: '', text: '' });
+    
+    try {
+      const response = await fetch('http://localhost:5000/api/user/update-roles', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: selectedUser.user_id,
+          roles: selectedRoles
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        setUsers(prev => prev.map(u => 
+          u.user_id === selectedUser.user_id 
+            ? { ...u, roles: selectedRoles }
+            : u
+        ));
+        
+        setRoleMessage({ 
+          type: 'success', 
+          text: `Роли пользователя "${getFullName(selectedUser)}" успешно обновлены!` 
+        });
+        
+        setTimeout(() => {
+          setShowRoleModal(false);
+          setSelectedUser(null);
+          setSelectedRoles([]);
+        }, 1000);
+      } else {
+        setRoleMessage({ 
+          type: 'error', 
+          text: data.error || 'Ошибка при обновлении ролей' 
+        });
+      }
+    } catch (error) {
+      console.error('Ошибка при сохранении ролей:', error);
+      setRoleMessage({ 
+        type: 'error', 
+        text: 'Ошибка подключения к серверу' 
+      });
+    } finally {
+      setSavingRoles(false);
+    }
+  };
+
+  // Функция для закрытия модального окна ролей
+  const closeRoleModal = () => {
+    setShowRoleModal(false);
+    setSelectedUser(null);
+    setSelectedRoles([]);
+    setRoleMessage({ type: '', text: '' });
+  };
+
+  // Функция для закрытия модального окна профиля
+  const closeProfileModal = () => {
+    setShowProfileModal(false);
+    setProfileUser(null);
+    setProfileData(null);
   };
 
   const handleEditUser = async (userId) => {
     console.log('Редактирование пользователя:', userId);
-  };
-
-  const handleChangeRole = async (userId) => {
-    console.log('Изменение роли пользователя:', userId);
-    // Здесь можно добавить модальное окно для изменения ролей
   };
 
   const handleToggleStatus = async (userId, currentStatus) => {
@@ -184,19 +312,18 @@ const ManageUsers = () => {
             <table className="users-table">
               <thead>
                 <tr>
-                  <th>ID</th>
+                  <th>№</th>
                   <th>ФИО</th>
                   <th>Логин</th>
                   <th>Email</th>
                   <th>Роли</th>
-                  <th>Дата регистрации</th>
                   <th>Действия</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredUsers.map(user => (
+                {filteredUsers.map((user, index) => (
                   <tr key={user.user_id}>
-                    <td>{user.user_id}</td>
+                    <td>{index + 1}</td>
                     <td className="user-name">{getFullName(user)}</td>
                     <td>{user.login || '-'}</td>
                     <td>{user.email}</td>
@@ -205,21 +332,27 @@ const ManageUsers = () => {
                         {getUserRolesString(user)}
                       </span>
                     </td>
-                    <td>{formatDate(user.created_at)}</td>
                     <td className="actions">
+                      <button 
+                        className="btn-icon profile"
+                        onClick={() => handleViewProfile(user.user_id)}
+                        title="Просмотр профиля"
+                      >
+                        👤
+                      </button>
                       <button 
                         className="btn-icon edit"
                         onClick={() => handleEditUser(user.user_id)}
-                        title="Редактировать"
+                        title="Статус руководителя"
                       >
-                        ✏️
+                        ⚙️
                       </button>
                       <button 
                         className="btn-icon role"
                         onClick={() => handleChangeRole(user.user_id)}
                         title="Изменить роль"
                       >
-                        👥
+                        ✏️
                       </button>
                     </td>
                   </tr>
@@ -237,6 +370,183 @@ const ManageUsers = () => {
           </div>
         )}
       </div>
+
+      {/* Модальное окно для изменения ролей */}
+      {showRoleModal && selectedUser && (
+        <div className="modal-overlay" onClick={closeRoleModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Изменение ролей пользователя</h2>
+              <button className="modal-close" onClick={closeRoleModal}>×</button>
+            </div>
+            
+            <div className="modal-body">
+              <div className="user-info">
+                <p><strong>Пользователь:</strong> {getFullName(selectedUser)}</p>
+                <p><strong>Email:</strong> {selectedUser.email}</p>
+              </div>
+              
+              {roleMessage.text && (
+                <div className={`role-message ${roleMessage.type}`}>
+                  {roleMessage.text}
+                </div>
+              )}
+              
+              <div className="roles-selection">
+                <label>Выберите роли:</label>
+                <div className="roles-checkboxes">
+                  {allRoles.map(role => (
+                    <label key={role.id} className="role-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={selectedRoles.includes(role.dbName)}
+                        onChange={() => toggleRole(role.id)}
+                        disabled={savingRoles}
+                      />
+                      <div className="role-info">
+                        <span className="role-name">{role.name}</span>
+                        <span className="role-desc">{role.description}</span>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            <div className="modal-footer">
+              <button 
+                className="btn-cancel" 
+                onClick={closeRoleModal}
+                disabled={savingRoles}
+              >
+                Отмена
+              </button>
+              <button 
+                className="btn-save" 
+                onClick={handleSaveRoles}
+                disabled={savingRoles}
+              >
+                {savingRoles ? 'Сохранение...' : 'Сохранить'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модальное окно для просмотра профиля */}
+      {showProfileModal && profileUser && (
+        <div className="modal-overlay" onClick={closeProfileModal}>
+          <div className="modal-content profile-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Профиль пользователя</h2>
+              <button className="modal-close" onClick={closeProfileModal}>×</button>
+            </div>
+            
+            <div className="modal-body">
+              {loadingProfile ? (
+                <div className="loading-profile">Загрузка данных...</div>
+              ) : (
+                <>
+                  <div className="profile-avatar">
+                    {profileData?.avatar_url ? (
+                      <img src={profileData.avatar_url} alt="Avatar" className="profile-avatar-img" />
+                    ) : (
+                      <div className="profile-avatar-placeholder">
+                        {getFullName(profileUser).charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="profile-section">
+                    <h3>Основная информация</h3>
+                    <div className="profile-info-grid">
+                      <div className="profile-info-item">
+                        <label>ФИО:</label>
+                        <span>{getFullName(profileUser)}</span>
+                      </div>
+                      <div className="profile-info-item">
+                        <label>Логин:</label>
+                        <span>{profileUser.login}</span>
+                      </div>
+                      <div className="profile-info-item">
+                        <label>Email:</label>
+                        <span>{profileUser.email}</span>
+                      </div>
+                      <div className="profile-info-item">
+                        <label>Роли:</label>
+                        <span>{getUserRolesString(profileUser)}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="profile-section">
+                    <h3>Личная информация</h3>
+                    <div className="profile-info-grid">
+                      <div className="profile-info-item">
+                        <label>Фамилия:</label>
+                        <span>{profileData?.last_name || 'Не указано'}</span>
+                      </div>
+                      <div className="profile-info-item">
+                        <label>Имя:</label>
+                        <span>{profileData?.first_name || 'Не указано'}</span>
+                      </div>
+                      <div className="profile-info-item">
+                        <label>Отчество:</label>
+                        <span>{profileData?.middle_name || 'Не указано'}</span>
+                      </div>
+                      <div className="profile-info-item">
+                        <label>Телефон:</label>
+                        <span>{profileData?.phone || 'Не указано'}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="profile-section">
+                    <h3>Научная деятельность</h3>
+                    <div className="profile-info-grid">
+                      <div className="profile-info-item">
+                        <label>Ученая степень:</label>
+                        <span>{profileData?.academic_degree || 'Не указано'}</span>
+                      </div>
+                      <div className="profile-info-item">
+                        <label>Ученое звание:</label>
+                        <span>{profileData?.academic_title || 'Не указано'}</span>
+                      </div>
+                      <div className="profile-info-item">
+                        <label>Должность:</label>
+                        <span>{profileData?.position || 'Не указано'}</span>
+                      </div>
+                      <div className="profile-info-item">
+                        <label>Место работы:</label>
+                        <span>{profileData?.workplace || 'Не указано'}</span>
+                      </div>
+                      <div className="profile-info-item">
+                        <label>ORCID ID:</label>
+                        <span>{profileData?.orcid_id || 'Не указано'}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {profileData?.created_at && (
+                    <div className="profile-section">
+                      <h3>Дата регистрации</h3>
+                      <div className="profile-info-item">
+                        <span>{new Date(profileData.created_at).toLocaleDateString('ru-RU')}</span>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+            
+            <div className="modal-footer">
+              <button className="btn-cancel" onClick={closeProfileModal}>
+                Закрыть
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
