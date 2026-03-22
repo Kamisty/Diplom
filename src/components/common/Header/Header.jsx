@@ -2,7 +2,7 @@
 import React, { useState, useContext, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../../context/AuthContext/Auth';
-import { hasPermission, getRoleName, getRoleIcon } from '../../../config/roles';
+import { hasPermission, getRoleName, getRoleIcon, ROLES } from '../../../config/roles';
 import './Header.css';
 
 const Header = () => {
@@ -10,6 +10,15 @@ const Header = () => {
   const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+
+  // Получаем роли пользователя (массив)
+  const userRoles = user?.roles || [];
+  
+  // Функции для проверки ролей
+  const isAdmin = () => userRoles.includes(ROLES.ADMIN);
+  const isAuthor = () => userRoles.includes(ROLES.AUTHOR);
+  const isReviewer = () => userRoles.includes(ROLES.REVIEWER);
+  const isSectionHead = () => userRoles.includes(ROLES.SECTION_HEAD);
 
   // Закрытие дропдауна при клике вне его
   useEffect(() => {
@@ -42,6 +51,22 @@ const Header = () => {
     return user?.login?.[0]?.toUpperCase() || 'U';
   };
 
+  // Получение отображаемой роли (если несколько ролей, показываем первую)
+  const getDisplayRole = () => {
+    if (userRoles.length === 0) return 'Участник';
+    if (userRoles.length === 1) return getRoleName(userRoles[0]);
+    return `${userRoles.length} роли`;
+  };
+
+  // Получение иконки для отображения (приоритет: админ > руководитель > рецензент > автор)
+  const getDisplayRoleIcon = () => {
+    if (isAdmin()) return '👑';
+    if (isSectionHead()) return '🎯';
+    if (isReviewer()) return '⭐';
+    if (isAuthor()) return '✍️';
+    return '👤';
+  };
+
   return (
     <header className="header">
       <div className="header-container">
@@ -56,7 +81,7 @@ const Header = () => {
             <Link to="/profile" className="nav-link">Профиль</Link>
             
             {/* Ссылки для авторов */}
-            {hasPermission(user.role, 'submit_report') && (
+            {isAuthor() && (
               <>
                 <Link to="/submit-report" className="nav-link">Подать доклад</Link>
                 <Link to="/my-reports" className="nav-link">Мои доклады</Link>
@@ -64,16 +89,16 @@ const Header = () => {
             )}
             
             {/* Ссылки для рецензентов */}
-            {hasPermission(user.role, 'view_assigned_reports') && (
-              <Link to="/review/assigned" className="nav-link">Рецензирование</Link>
+            {isReviewer() && (
+              <Link to="/review-reports" className="nav-link">Рецензирование</Link>
             )}
             
             {/* Ссылки для администраторов */}
-            {hasPermission(user.role, 'create_conference') && (
+            {isAdmin() && (
               <>
                 <Link to="/admin/create-conference" className="nav-link">Создать конф.</Link>
-                <Link to="/admin/manage-conferences" className="nav-link">Управление</Link>
-                <Link to="/admin/manage-users" className="nav-link">Пользователи</Link>
+                <Link to="/admin/conferences" className="nav-link">Управление</Link>
+                <Link to="/admin/users" className="nav-link">Пользователи</Link>
                 <Link to="/admin/assign-section-heads" className="nav-link">Руководители</Link>
               </>
             )}
@@ -122,12 +147,12 @@ const Header = () => {
 
                   {/* Роль пользователя (не кликабельно) */}
                   <div className="dropdown-item" style={{ cursor: 'default' }}>
-                    <span className="dropdown-icon">{getRoleIcon(user.role)}</span>
-                    {getRoleName(user.role)}
+                    <span className="dropdown-icon">{getDisplayRoleIcon()}</span>
+                    {getDisplayRole()}
                   </div>
 
                   {/* Ссылки для авторов */}
-                  {hasPermission(user.role, 'submit_report') && (
+                  {isAuthor() && (
                     <>
                       <Link to="/submit-report" className="dropdown-item" onClick={() => setIsDropdownOpen(false)}>
                         <span className="dropdown-icon">📝</span>
@@ -141,26 +166,26 @@ const Header = () => {
                   )}
 
                   {/* Ссылки для рецензентов */}
-                  {hasPermission(user.role, 'view_assigned_reports') && (
-                    <Link to="/review/assigned" className="dropdown-item" onClick={() => setIsDropdownOpen(false)}>
+                  {isReviewer() && (
+                    <Link to="/review-reports" className="dropdown-item" onClick={() => setIsDropdownOpen(false)}>
                       <span className="dropdown-icon">🔍</span>
                       Рецензирование
                     </Link>
                   )}
 
                   {/* Ссылки для администраторов */}
-                  {hasPermission(user.role, 'create_conference') && (
+                  {isAdmin() && (
                     <>
                       <div className="dropdown-divider"></div>
                       <Link to="/admin/create-conference" className="dropdown-item" onClick={() => setIsDropdownOpen(false)}>
                         <span className="dropdown-icon">➕</span>
                         Создать конференцию
                       </Link>
-                      <Link to="/admin/manage-conferences" className="dropdown-item" onClick={() => setIsDropdownOpen(false)}>
+                      <Link to="/admin/conferences" className="dropdown-item" onClick={() => setIsDropdownOpen(false)}>
                         <span className="dropdown-icon">📋</span>
                         Управление конференциями
                       </Link>
-                      <Link to="/admin/manage-users" className="dropdown-item" onClick={() => setIsDropdownOpen(false)}>
+                      <Link to="/admin/users" className="dropdown-item" onClick={() => setIsDropdownOpen(false)}>
                         <span className="dropdown-icon">👥</span>
                         Управление пользователями
                       </Link>

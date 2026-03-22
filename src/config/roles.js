@@ -1,90 +1,85 @@
 // src/config/roles.js
 
+// Определение ролей (соответствуют таблице roles в БД)
 export const ROLES = {
-  ADMIN: 'admin',
-  SECTION_HEAD: 'section_head',  // Руководитель секции
-  AUTHOR: 'author',              // Автор доклада
-  REVIEWER: 'reviewer'           // Рецензент
+  ADMIN: 'Администратор конференции',
+  SECTION_HEAD: 'Руководитель секции',
+  REVIEWER: 'Рецензент',
+  AUTHOR: 'Автор'
 };
 
+// Права доступа для каждой роли
 export const PERMISSIONS = {
-  // Права администратора
   [ROLES.ADMIN]: [
     'create_conference',
     'edit_conference',
     'delete_conference',
     'manage_users',
-    'assign_roles',
     'assign_section_heads',
     'view_all_reports',
-    'manage_reviewers',
-    'create_sections',
-    'edit_sections',
-    'delete_sections',
-    'view_statistics',
-    'export_data'
+    'view_assigned_reports',
+    'submit_report',
+    'view_own_reports',
+    'edit_own_reports',
+    'delete_own_reports'
   ],
-
-  // Права руководителя секции
   [ROLES.SECTION_HEAD]: [
     'view_section_reports',
     'assign_reviewers',
-    'review_reports',
-    'manage_section_schedule',
-    'view_section_participants',
-    'communicate_with_authors'
-  ],
-
-  // Права автора доклада
-  [ROLES.AUTHOR]: [
+    'view_assigned_reports',
     'submit_report',
-    'edit_own_report',
-    'delete_own_report',
     'view_own_reports',
-    'view_conference_schedule',
-    'register_for_conference',
-    'upload_presentation',
-    'communicate_with_section_head'
+    'edit_own_reports',
+    'delete_own_reports'
   ],
-
-  // Права рецензента
   [ROLES.REVIEWER]: [
     'view_assigned_reports',
     'submit_review',
-    'view_review_deadlines',
-    'communicate_with_section_head'
+    'submit_report',
+    'view_own_reports',
+    'edit_own_reports',
+    'delete_own_reports'
+  ],
+  [ROLES.AUTHOR]: [
+    'submit_report',
+    'view_own_reports',
+    'edit_own_reports',
+    'delete_own_reports'
   ]
 };
 
-// Функция для проверки наличия права у пользователя
-export const hasPermission = (userRole, permission) => {
-  if (!userRole || !PERMISSIONS[userRole]) return false;
-  return PERMISSIONS[userRole].includes(permission);
-};
-
-// Функция для получения всех доступных прав роли
-export const getRolePermissions = (role) => {
-  return PERMISSIONS[role] || [];
-};
-
-// Функция для получения названия роли на русском
-export const getRoleName = (role) => {
+// Получить название роли для отображения
+export const getRoleName = (roleName) => {
   const roleNames = {
     [ROLES.ADMIN]: 'Администратор',
     [ROLES.SECTION_HEAD]: 'Руководитель секции',
-    [ROLES.AUTHOR]: 'Автор доклада',
-    [ROLES.REVIEWER]: 'Рецензент'
+    [ROLES.REVIEWER]: 'Рецензент',
+    [ROLES.AUTHOR]: 'Автор',
+    [ROLES.PARTICIPANT]: 'Участник'
   };
-  return roleNames[role] || role;
+  return roleNames[roleName] || roleName;
 };
 
-// Функция для получения иконки роли
-export const getRoleIcon = (role) => {
+// Получить иконку для роли
+export const getRoleIcon = (roleName) => {
   const roleIcons = {
     [ROLES.ADMIN]: '👑',
-    [ROLES.SECTION_HEAD]: '📋',
+    [ROLES.SECTION_HEAD]: '🎯',
+    [ROLES.REVIEWER]: '⭐',
     [ROLES.AUTHOR]: '✍️',
-    [ROLES.REVIEWER]: '🔍'
+    [ROLES.PARTICIPANT]: '👤'
   };
-  return roleIcons[role] || '👤';
+  return roleIcons[roleName] || '👤';
+};
+
+// Проверка наличия разрешения (если у пользователя есть хотя бы одна роль с этим правом)
+export const hasPermission = (userRoles, permission) => {
+  if (!userRoles || !Array.isArray(userRoles) || userRoles.length === 0) {
+    return false;
+  }
+  
+  return userRoles.some(role => {
+    const permissions = PERMISSIONS[role] || [];
+    return permissions.includes(permission);
+  });
 };

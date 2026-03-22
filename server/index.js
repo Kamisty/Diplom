@@ -53,6 +53,7 @@ app.post("/test-post", (req, res) => {
     });
 });
 
+
 // ============================================
 // РЕГИСТРАЦИЯ - http://localhost:5000/api/register
 // ============================================
@@ -65,125 +66,191 @@ app.post("/api/register", async (req, res) => {
     try {
         const {
             login,
-            name,              // ФИО из формы
+            name,
             email,
-            password_hash,      // Пароль из формы
-            password2,          // Подтверждение пароля
-            role                // Роль пользователя
+            password_hash,
+            password2,
+            role,
+            // УБЕРИТЕ roles из деструктуризации, если она не приходит!
+            // roles - удалите эту строку
         } = req.body;
 
+        console.log("🔍 ПРОВЕРКА ПОЛЕЙ:");
+        console.log(`   login: ${login ? '✅' : '❌'} (${login})`);
+        console.log(`   name: ${name ? '✅' : '❌'} (${name})`);
+        console.log(`   email: ${email ? '✅' : '❌'} (${email})`);
+        console.log(`   password_hash: ${password_hash ? '✅' : '❌'}`);
+        console.log(`   password2: ${password2 ? '✅' : '❌'}`);
+        console.log(`   role: ${role ? '✅' : '❌'} (${role})`);
+
         // Проверка обязательных полей
-        if (!login || !name || !email || !password_hash || !password2 || !role) {
+        if (!login || !name || !email || !password_hash || !password2) {
+            console.log("❌ Ошибка: Не все обязательные поля заполнены");
             return res.status(400).json({
                 success: false,
-                error: "Заполните все обязательные поля",
-                required: ["login", "name", "email", "password_hash", "password2", "role"],
-                received: req.body
+                error: "Заполните все обязательные поля"
             });
         }
 
+        // Проверка наличия роли
+        if (!role || typeof role !== 'string' || role.trim() === '') {
+            console.log("❌ Ошибка: Роль не выбрана");
+            return res.status(400).json({
+                success: false,
+                error: "Выберите роль"
+            });
+        }
+
+        // Преобразуем одиночную роль в массив
+        const rolesArray = [role];
+        console.log("📦 Роли для назначения:", rolesArray);
+
         // Проверка совпадения паролей
         if (password_hash !== password2) {
+            console.log("❌ Ошибка: Пароли не совпадают");
             return res.status(400).json({
                 success: false,
                 error: "Пароли не совпадают"
             });
         }
+        console.log("✅ Пароли совпадают");
 
         // Проверка email для логина
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(login)) {
+            console.log("❌ Ошибка: Логин не является корректным email");
             return res.status(400).json({
                 success: false,
                 error: "Логин должен быть корректным email"
             });
         }
+        console.log("✅ Логин - корректный email");
 
-        // Проверка пароля (минимум 6 символов)
-        if (password_hash.length < 6) {
+        // Проверка пароля
+        if (password_hash.length < 8) {
+            console.log("❌ Ошибка: Пароль слишком короткий");
             return res.status(400).json({
                 success: false,
-                error: "Пароль должен быть минимум 6 символов"
+                error: "Пароль должен быть минимум 8 символов"
             });
         }
+        
+        if (!/[A-Z]/.test(password_hash)) {
+            console.log("❌ Ошибка: Нет заглавной буквы в пароле");
+            return res.status(400).json({
+                success: false,
+                error: "Пароль должен содержать хотя бы одну заглавную букву"
+            });
+        }
+        
+        if (!/[0-9]/.test(password_hash)) {
+            console.log("❌ Ошибка: Нет цифры в пароле");
+            return res.status(400).json({
+                success: false,
+                error: "Пароль должен содержать хотя бы одну цифру"
+            });
+        }
+        console.log("✅ Пароль соответствует требованиям безопасности");
 
         // Проверка существования пользователя
+        console.log("🔍 Проверка существования пользователя...");
         const userExists = await pool.query(
             "SELECT * FROM users WHERE login = $1 OR email = $2",
             [login, email]
         );
 
         if (userExists.rows.length > 0) {
+            console.log("❌ Пользователь уже существует");
             return res.status(400).json({
                 success: false,
                 error: "Пользователь с таким логином или email уже существует"
             });
         }
+        console.log("✅ Пользователь не найден, можно регистрировать");
 
         // Хеширование пароля
+        console.log("🔐 Хеширование пароля...");
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password_hash, salt);
+        console.log("✅ Пароль захеширован");
 
-        // Начинаем транзакцию для атомарности операций
+        // Начинаем транзакцию
         const client = await pool.connect();
         
         try {
             await client.query('BEGIN');
+            console.log("📝 Начата транзакция");
 
-            // 1. Сохранение в таблицу users
+            // 1. Сохранение в таблицу users (без поля role!)
+            console.log("💾 Сохранение пользователя в таблицу users...");
             const newUser = await client.query(
-                `INSERT INTO users (login, name, email, password_hash, role) 
-                 VALUES ($1, $2, $3, $4, $5) 
-                 RETURNING user_id, login, name, email, role`,
-                [login, name, email, hashedPassword, role]
+                `INSERT INTO users (login, name, email, password_hash) 
+                 VALUES ($1, $2, $3, $4) 
+                 RETURNING user_id, login, name, email`,
+                [login, name, email, hashedPassword]
             );
 
             const userId = newUser.rows[0].user_id;
             console.log(`✅ Пользователь зарегистрирован с ID: ${userId}`);
 
-            // 2. Получаем role_id из таблицы roles по названию роли
-            // Маппинг ролей из фронтенда в названия в таблице roles
+            // 2. Маппинг ролей
             const roleMapping = {
-                'admin': 'Администратор',
-                'organizer': 'Организатор',
+                'admin': 'Администратор конференции',
                 'section_head': 'Руководитель секции',
                 'reviewer': 'Рецензент',
                 'author': 'Автор',
-                'participant': 'Участник'
             };
 
-            const dbRoleName = roleMapping[role] || role;
+            // 3. Для каждой выбранной роли создаем запись в user_roles
+            const assignedRoles = [];
 
-            const roleResult = await client.query(
-                `SELECT role_id FROM roles WHERE role_name = $1`,
-                [dbRoleName]
-            );
-
-            if (roleResult.rows.length === 0) {
-                // Если роль не найдена, пробуем найти по частичному совпадению
-                const fuzzyRoleResult = await client.query(
-                    `SELECT role_id FROM roles WHERE role_name ILIKE $1`,
-                    [`%${role}%`]
+            for (const userRole of rolesArray) {
+                const dbRoleName = roleMapping[userRole] || userRole;
+                
+                console.log(`🔍 Поиск роли: "${dbRoleName}" для пользователя ${userId}`);
+                
+                // Ищем роль в таблице roles
+                let roleResult = await client.query(
+                    `SELECT role_id, role_name FROM roles WHERE role_name = $1`,
+                    [dbRoleName]
                 );
                 
-                if (fuzzyRoleResult.rows.length === 0) {
-                    throw new Error(`Роль "${dbRoleName}" не найдена в таблице roles`);
+                if (roleResult.rows.length === 0) {
+                    console.log(`⚠️ Точное совпадение не найдено для "${dbRoleName}", ищем частичное...`);
+                    
+                    const fuzzyRoleResult = await client.query(
+                        `SELECT role_id, role_name FROM roles WHERE role_name ILIKE $1`,
+                        [`%${userRole}%`]
+                    );
+                    
+                    if (fuzzyRoleResult.rows.length === 0) {
+                        console.log(`❌ Роль "${dbRoleName}" не найдена в БД`);
+                        throw new Error(`Роль "${dbRoleName}" не найдена в базе данных`);
+                    }
+                    
+                    roleResult = fuzzyRoleResult;
                 }
                 
-                var roleId = fuzzyRoleResult.rows[0].role_id;
-            } else {
-                var roleId = roleResult.rows[0].role_id;
+                const roleId = roleResult.rows[0].role_id;
+                const roleName = roleResult.rows[0].role_name;
+                
+                console.log(`✅ Найдена роль: "${roleName}" (ID: ${roleId})`);
+                
+                // Создаем запись в таблице user_roles
+                await client.query(
+                    `INSERT INTO user_roles (user_id, role_id) 
+                     VALUES ($1, $2)`,
+                    [userId, roleId]
+                );
+                assignedRoles.push(roleName);
+                console.log(`✅ Назначена роль "${roleName}" (ID: ${roleId}) пользователю ${userId}`);
             }
 
-            // 3. Создаем запись в таблице user_roles
-            await client.query(
-                `INSERT INTO user_roles (user_id, role_id) 
-                 VALUES ($1, $2)`,
-                [userId, roleId]
-            );
-            console.log(`✅ Запись в user_roles создана: user_id=${userId}, role_id=${roleId}`);
+            if (assignedRoles.length === 0) {
+                throw new Error(`Не удалось назначить ни одной роли`);
+            }
 
-            // 4. Разбиваем ФИО на составляющие для таблицы user_profiles
+            // 4. Разбиваем ФИО для профиля
             const nameParts = name.trim().split(' ');
             let lastName = '';
             let firstName = '';
@@ -204,56 +271,36 @@ app.post("/api/register", async (req, res) => {
                 console.log(`✅ Профиль создан для пользователя ${userId}`);
             } catch (profileErr) {
                 console.log(`⚠️ Не удалось создать профиль: ${profileErr.message}`);
-                // Не прерываем транзакцию, так как профиль не критичен
+                // Не прерываем транзакцию, профиль не критичен
             }
 
-            // Подтверждаем транзакцию
             await client.query('COMMIT');
+            console.log("✅ Транзакция завершена успешно");
             
             res.status(201).json({
                 success: true,
                 message: "Регистрация прошла успешно!",
                 user: {
-                    ...newUser.rows[0],
-                    profile_created: true,
-                    user_roles_created: true,
-                    role_id: roleId
+                    user_id: userId,
+                    login: newUser.rows[0].login,
+                    name: newUser.rows[0].name,
+                    email: newUser.rows[0].email,
+                    roles: assignedRoles
                 }
             });
 
         } catch (transactionErr) {
-            // В случае ошибки откатываем транзакцию
             await client.query('ROLLBACK');
             console.error("❌ Ошибка в транзакции:", transactionErr);
             throw transactionErr;
         } finally {
-            // Освобождаем клиента
             client.release();
         }
 
     } catch (err) {
         console.error("❌ Ошибка при регистрации:", err);
+        console.error("❌ Стек ошибки:", err.stack);
         
-        // Проверка на ошибку структуры таблицы
-        if (err.message.includes("column") && err.message.includes("does not exist")) {
-            return res.status(500).json({
-                success: false,
-                error: "Ошибка при регистрации",
-                details: `Проверьте структуру таблицы: ${err.message}`,
-                hint: "В таблице должны быть поля: login, name, email, password_hash, role"
-            });
-        }
-
-        // Проверка на ошибку с таблицей roles или user_roles
-        if (err.message.includes("relation") && err.message.includes("does not exist")) {
-            return res.status(500).json({
-                success: false,
-                error: "Ошибка при регистрации",
-                details: "Таблица roles или user_roles не существует. Создайте их в базе данных.",
-                hint: "CREATE TABLE roles (role_id SERIAL PRIMARY KEY, role_name VARCHAR(50) UNIQUE); CREATE TABLE user_roles (user_id INTEGER REFERENCES users(user_id), role_id INTEGER REFERENCES roles(role_id), PRIMARY KEY (user_id, role_id));"
-            });
-        }
-
         res.status(500).json({
             success: false,
             error: "Ошибка при регистрации",
@@ -262,8 +309,10 @@ app.post("/api/register", async (req, res) => {
     }
 });
 
+
+
 // ============================================
-// ВХОД - http://localhost:5000/api/login (исправлено с /api/input)
+// ВХОД - http://localhost:5000/api/input
 // ============================================
 app.post("/api/input", async (req, res) => {
   console.log("\n" + "=".repeat(60));
@@ -309,6 +358,22 @@ app.post("/api/input", async (req, res) => {
       });
     }
 
+    // ========== ВАЖНО: Получаем роли пользователя из таблицы user_roles ==========
+    let userRoles = [];
+    try {
+      const rolesResult = await pool.query(
+        `SELECT r.role_name 
+         FROM user_roles ur 
+         JOIN roles r ON ur.role_id = r.role_id 
+         WHERE ur.user_id = $1`,
+        [user.user_id]
+      );
+      userRoles = rolesResult.rows.map(row => row.role_name);
+      console.log(`✅ Загружены роли для пользователя ${user.login}:`, userRoles);
+    } catch (rolesErr) {
+      console.log("Ошибка при загрузке ролей:", rolesErr.message);
+    }
+
     // Получаем данные из профиля, если они есть
     let profileData = {};
     try {
@@ -325,7 +390,7 @@ app.post("/api/input", async (req, res) => {
 
     console.log(`✅ Пользователь вошел: ${user.login}`);
 
-    // Отправляем данные пользователя вместе с профилем
+    // Отправляем данные пользователя вместе с ролями и профилем
     res.json({
       success: true,
       message: "Вход выполнен успешно!",
@@ -335,7 +400,7 @@ app.post("/api/input", async (req, res) => {
         login: user.login,
         name: user.name,
         email: user.email,
-        role: user.role,
+        roles: userRoles,  // ВАЖНО: добавляем роли в ответ
         // Данные из профиля
         ...profileData
       }
@@ -350,6 +415,40 @@ app.post("/api/input", async (req, res) => {
     });
   }
 });
+
+// ============================================
+// ПОЛУЧЕНИЕ РОЛЕЙ ПОЛЬЗОВАТЕЛЯ
+// ============================================
+app.get('/api/user/:userId/roles', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    const result = await pool.query(
+      `SELECT r.role_name 
+       FROM user_roles ur 
+       JOIN roles r ON ur.role_id = r.role_id 
+       WHERE ur.user_id = $1`,
+      [userId]
+    );
+    
+    const roles = result.rows.map(row => row.role_name);
+    
+    res.json({
+      success: true,
+      roles: roles
+    });
+    
+  } catch (error) {
+    console.error('❌ Ошибка при получении ролей:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Ошибка сервера'
+    });
+  }
+});
+
+
+
 
 // ============================================
 // РАБОТА С ПРОФИЛЕМ ПОЛЬЗОВАТЕЛЯ (user_profiles)
@@ -502,9 +601,7 @@ app.get('/api/user-full/:userId', async (req, res) => {
 // ============================================
 // СОЗДАНИЕ КОНФЕРЕНЦИИ - http://localhost:5000/api/conferences
 // ============================================
-// ============================================
-// СОЗДАНИЕ КОНФЕРЕНЦИИ - http://localhost:5000/api/conferences
-// ============================================
+
 app.post('/api/conferences', async (req, res) => {
   console.log("\n" + "=".repeat(60));
   console.log("🔥 POST /api/conferences ВЫЗВАН!");
@@ -1108,9 +1205,12 @@ app.put('/api/sections/:id/head', async (req, res) => {
     });
   }
 });
+
+
 // ============================================
 // ПОЛУЧЕНИЕ ПОЛЬЗОВАТЕЛЕЙ - http://localhost:5000/api/users/:id
 // ============================================
+
 
 app.get('/api/users', async (req, res) => {
   console.log("\n" + "=".repeat(60));
@@ -1119,24 +1219,44 @@ app.get('/api/users', async (req, res) => {
 
   try {
     
-    const query = `
+    // Сначала получаем пользователей
+    const usersQuery = `
       SELECT 
         user_id,
         login,
         email,
-        name,
-        role
+        name
       FROM users
       ORDER BY user_id DESC
     `;
+    
+    const usersResult = await pool.query(usersQuery);
+    
+    // Для каждого пользователя получаем его роли
+    const usersWithRoles = [];
+    
+    for (const user of usersResult.rows) {
+      const rolesQuery = `
+        SELECT r.role_name
+        FROM user_roles ur
+        JOIN roles r ON ur.role_id = r.role_id
+        WHERE ur.user_id = $1
+      `;
+      
+      const rolesResult = await pool.query(rolesQuery, [user.user_id]);
+      const roles = rolesResult.rows.map(row => row.role_name);
+      
+      usersWithRoles.push({
+        ...user,
+        roles: roles
+      });
+    }
 
-    const result = await pool.query(query);
-
-    console.log(`✅ Загружено пользователей: ${result.rows.length}`);
+    console.log(`✅ Загружено пользователей: ${usersWithRoles.length}`);
 
     res.json({
       success: true,
-      users: result.rows
+      users: usersWithRoles
     });
 
   } catch (error) {
@@ -1148,6 +1268,10 @@ app.get('/api/users', async (req, res) => {
     });
   }
 });
+
+
+
+
 // ============================================
 // ОБНОВЛЕНИЕ РОЛИ ПОЛЬЗОВАТЕЛЯ - http://localhost:5000/api/users/:id/role
 // ============================================
@@ -1204,39 +1328,19 @@ app.get('/api/users/section-heads', async (req, res) => {
   console.log("=".repeat(60) + "\n");
 
   try {
-    // Получаем пользователей с ролью 'section_head' из таблицы users
-    // или через user_roles, если роли хранятся там
-    
-    // Вариант 1: Если роль хранится в поле role таблицы users
-    // const query = `
-    //   SELECT 
-    //     user_id as id,
-    //     login,
-    //     email,
-    //     name,
-    //     role
-    //   FROM users 
-    //   WHERE role = 'section_head'
-    //   ORDER BY name
-    // `;
-    
-    // Вариант 2: Если роли хранятся в user_roles (более правильно)
-    
+    // ИСПРАВЛЕНО: получаем пользователей с ролью "Руководитель секции" через user_roles
     const query = `
       SELECT 
         u.user_id as id,
         u.login,
         u.email,
-        u.name,
-        u.role,
-        r.role_name
+        u.name
       FROM users u
       JOIN user_roles ur ON u.user_id = ur.user_id
       JOIN roles r ON ur.role_id = r.role_id
       WHERE r.role_name = 'Руководитель секции'
       ORDER BY u.name
     `;
-    
 
     const result = await pool.query(query);
 
@@ -1255,7 +1359,352 @@ app.get('/api/users/section-heads', async (req, res) => {
       details: error.message
     });
   }
-}); 
+});
+
+// ============================================
+// ПОЛУЧЕНИЕ СПИСКА КОНФЕРЕНЦИЙ
+// ============================================
+app.get('/api/conferences', async (req, res) => {
+  try {
+    console.log('📥 Запрос на получение конференций');
+    
+    const result = await pool.query(`
+      SELECT  
+        name, 
+        description
+      FROM conferences 
+      ORDER BY deadline DESC
+    `);
+    
+    console.log(`📦 Найдено конференций: ${result.rows.length}`);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('❌ Ошибка при получении конференций:', error);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+
+
+
+
+
+// ============================================
+// СМЕНА EMAIL ПОЛЬЗОВАТЕЛЯ
+// ============================================
+app.post('/api/user/change-email', async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    const { userId, newEmail, password } = req.body;
+    
+    console.log('📦 Запрос на смену email для пользователя ID:', userId);
+    console.log('📧 Новый email:', newEmail);
+    
+    // Валидация
+    if (!userId || !newEmail || !password) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Все поля обязательны' 
+      });
+    }
+
+    // Проверка формата email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newEmail)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Введите корректный email' 
+      });
+    }
+    
+    // Получаем данные пользователя
+    const userResult = await client.query(
+      'SELECT user_id, login, email, name, password_hash FROM users WHERE user_id = $1',
+      [userId]
+    );
+    
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Пользователь не найден' 
+      });
+    }
+
+    const user = userResult.rows[0];
+    
+    // Проверяем пароль (с bcrypt)
+    const validPassword = await bcrypt.compare(password, user.password_hash);
+    if (!validPassword) {
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Неверный пароль' 
+      });
+    }
+    
+    // Проверяем, не занят ли новый email другим пользователем
+    const emailCheck = await client.query(
+      'SELECT user_id FROM users WHERE email = $1 AND user_id != $2',
+      [newEmail, userId]
+    );
+    
+    if (emailCheck.rows.length > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Этот email уже используется другим пользователем' 
+      });
+    }
+
+    // Проверяем, не совпадает ли новый email со старым
+    if (user.email === newEmail) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Новый email совпадает с текущим' 
+      });
+    }
+    
+    // Обновляем email в базе данных (только email)
+    const updateResult = await client.query(
+      `UPDATE users 
+       SET email = $1
+       WHERE user_id = $2 
+       RETURNING user_id, login, email, name`,
+      [newEmail, userId]
+    );
+
+    console.log('✅ Email успешно обновлен в БД для пользователя:', userId);
+    console.log('📧 Старый email:', user.email);
+    console.log('📧 Новый email:', newEmail);
+    console.log('👤 Обновленные данные:', updateResult.rows[0]);
+    
+    res.json({ 
+      success: true, 
+      message: 'Email успешно изменен',
+      user: updateResult.rows[0]
+    });
+    
+  } catch (error) {
+    console.error('❌ Ошибка при смене email:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Ошибка сервера при смене email' 
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// ============================================
+// ПРОВЕРКА ТЕКУЩЕГО EMAIL (для отладки)
+// ============================================
+app.get('/api/user/:userId/check-email', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    const result = await client.query(
+      'SELECT user_id, login, email FROM users WHERE user_id = $1',
+      [userId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Пользователь не найден' 
+      });
+    }
+    
+    res.json({ 
+      success: true, 
+      user: result.rows[0]
+    });
+    
+  } catch (error) {
+    console.error('❌ Ошибка при проверке email:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Ошибка сервера' 
+    });
+  }
+});
+
+
+
+
+
+
+// ============================================
+// СМЕНА ПАРОЛЯ ПОЛЬЗОВАТЕЛЯ
+// ============================================
+app.post('/api/user/change-password', async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    const { userId, currentPassword, newPassword } = req.body;
+    
+    console.log('📦 Запрос на смену пароля для пользователя ID:', userId);
+    console.log('📦 Полученные данные:', { 
+      userId, 
+      currentPassword: currentPassword ? '***' : 'не указан', 
+      newPassword: newPassword ? '***' : 'не указан' 
+    });
+    
+    // Валидация
+    if (!userId) {
+      console.log('❌ userId не указан');
+      return res.status(400).json({ 
+        success: false, 
+        error: 'ID пользователя не указан' 
+      });
+    }
+    
+    if (!currentPassword) {
+      console.log('❌ currentPassword не указан');
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Введите текущий пароль' 
+      });
+    }
+    
+    if (!newPassword) {
+      console.log('❌ newPassword не указан');
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Введите новый пароль' 
+      });
+    }
+
+    // Проверка сложности пароля
+    if (newPassword.length < 8) {
+      console.log('❌ Пароль слишком короткий');
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Пароль должен содержать минимум 8 символов' 
+      });
+    }
+    
+    if (!/[A-Z]/.test(newPassword)) {
+      console.log('❌ Нет заглавной буквы');
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Пароль должен содержать хотя бы одну заглавную букву' 
+      });
+    }
+    
+    if (!/[0-9]/.test(newPassword)) {
+      console.log('❌ Нет цифры');
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Пароль должен содержать хотя бы одну цифру' 
+      });
+    }
+    
+    // Проверяем, что новый пароль отличается от старого
+    if (currentPassword === newPassword) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Новый пароль должен отличаться от текущего' 
+      });
+    }
+    
+    // Получаем данные пользователя
+    console.log('🔍 Поиск пользователя с ID:', userId);
+    const userResult = await client.query(
+      'SELECT user_id, password_hash FROM users WHERE user_id = $1',
+      [userId]
+    );
+    
+    console.log('📊 Результат запроса:', userResult.rows.length ? 'Пользователь найден' : 'Пользователь не найден');
+    
+    if (userResult.rows.length === 0) {
+      console.log('❌ Пользователь не найден');
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Пользователь не найден' 
+      });
+    }
+
+    const user = userResult.rows[0];
+    console.log('👤 Найден пользователь:', { userId: user.user_id });
+    
+    // Проверяем текущий пароль
+    console.log('🔐 Проверка текущего пароля...');
+    let validPassword = false;
+    
+    try {
+      validPassword = await bcrypt.compare(currentPassword, user.password_hash);
+      console.log('✅ Результат проверки пароля:', validPassword ? 'верный' : 'неверный');
+    } catch (bcryptError) {
+      console.error('❌ Ошибка при сравнении паролей:', bcryptError);
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Ошибка при проверке пароля' 
+      });
+    }
+    
+    if (!validPassword) {
+      console.log('❌ Неверный текущий пароль');
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Неверный текущий пароль' 
+      });
+    }
+    
+    // Хешируем новый пароль
+    console.log('🔐 Хеширование нового пароля...');
+    const saltRounds = 10;
+    let newPasswordHash;
+    
+    try {
+      newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
+      console.log('✅ Новый пароль захеширован');
+    } catch (hashError) {
+      console.error('❌ Ошибка при хешировании пароля:', hashError);
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Ошибка при обработке пароля' 
+      });
+    }
+    
+    // Обновляем пароль в базе данных
+    console.log('💾 Обновление пароля в БД...');
+    try {
+      await client.query(
+        `UPDATE users 
+         SET password_hash = $1
+         WHERE user_id = $2`,
+        [newPasswordHash, userId]
+      );
+      console.log('✅ Пароль обновлен в БД');
+    } catch (dbError) {
+      console.error('❌ Ошибка при обновлении БД:', dbError);
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Ошибка при сохранении нового пароля' 
+      });
+    }
+
+    console.log('✅ Пароль успешно изменен для пользователя:', userId);
+    
+    res.json({ 
+      success: true, 
+      message: 'Пароль успешно изменен'
+    });
+    
+  } catch (error) {
+    console.error('❌ Общая ошибка при смене пароля:', error);
+    console.error('❌ Стек ошибки:', error.stack);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Ошибка сервера при смене пароля',
+      details: error.message 
+    });
+  } finally {
+    client.release();
+    console.log('📌 Соединение с БД освобождено');
+  }
+});
+
 
 // ============================================
 // ЗАПУСК СЕРВЕРА

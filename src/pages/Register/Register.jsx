@@ -210,7 +210,7 @@ const Register = () => {
   };
 
   const roleOptions = [
-    { value: 'admin', label: 'Администратор' },
+    { value: 'admin', label: 'Администратор конференции' },
     { value: 'author', label: 'Автор доклада' },
     { value: 'section_head', label: 'Руководитель секции' },
     { value: 'reviewer', label: 'Рецензент' }

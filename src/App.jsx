@@ -60,15 +60,15 @@ function App() {
                 </RoleBasedRoute>
               } />
               
-              <Route path="/admin/manage-conferences" element={
-                <RoleBasedRoute requiredPermission="edit_conference">
-                  <ManageConferences />
-                </RoleBasedRoute>
-              } />
-              
-              <Route path="/admin/manage-users" element={
+              <Route path="/admin/users" element={
                 <RoleBasedRoute requiredPermission="manage_users">
                   <ManageUsers />
+                </RoleBasedRoute>
+              } />
+
+              <Route path="/admin/conferences" element={
+                <RoleBasedRoute requiredPermission="edit_conference">
+                  <ManageConferences />
                 </RoleBasedRoute>
               } />
               

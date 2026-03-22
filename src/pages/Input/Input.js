@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import Button from '../../components/common/Button/Button';
 import InputField from '../../components/common/InputField/InputField';
+import { AuthContext } from '../../context/AuthContext/Auth';
 import './Input.css';
 
 const Input = () => {
+  const { login: authLogin } = useContext(AuthContext);
   const [formData, setFormData] = useState({
     login: '',
     password: ''
@@ -14,19 +16,16 @@ const Input = () => {
   const [serverMessage, setServerMessage] = useState({ type: '', text: '' });
   const [showPassword, setShowPassword] = useState(false);
 
-  // Валидация формы
   const validateForm = () => {
     const newErrors = {};
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-    // Логин
     if (!formData.login) {
       newErrors.login = 'Логин (email) обязателен';
     } else if (!emailRegex.test(formData.login)) {
       newErrors.login = 'Введите корректный email';
     }
 
-    // Пароль
     if (!formData.password) {
       newErrors.password = 'Пароль обязателен';
     } else if (formData.password.length < 6) {
@@ -37,7 +36,6 @@ const Input = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  // Отправка формы
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -69,24 +67,64 @@ const Input = () => {
       });
 
       const data = await response.json();
-      console.log('📦 Ответ сервера:', data);
+      console.log('📦 ВЕСЬ ОТВЕТ СЕРВЕРА:', data);
+      console.log('📦 data.user:', data.user);
+      console.log('📦 data.user.roles:', data.user?.roles);
+      console.log('📦 data.user.role:', data.user?.role);
+      console.log('📦 Тип data.user.roles:', Array.isArray(data.user?.roles) ? 'массив' : typeof data.user?.roles);
+      
+      // Проверяем, что пришло от сервера
+      if (data.user && data.user.roles) {
+        console.log('✅ Сервер вернул roles (массив):', data.user.roles);
+      } else if (data.user && data.user.role) {
+        console.log('⚠️ Сервер вернул role (строка):', data.user.role);
+      } else {
+        console.log('❌ Сервер не вернул ни roles, ни role');
+      }
 
       if (response.ok && data.success) {
+        // Определяем, откуда брать роли
+        let userRoles = [];
+        
+        if (data.user.roles && Array.isArray(data.user.roles)) {
+          // Если сервер вернул массив roles
+          userRoles = data.user.roles;
+          console.log('✅ Используем roles (массив):', userRoles);
+        } else if (data.user.role) {
+          // Если сервер вернул строку role, преобразуем в массив
+          userRoles = [data.user.role];
+          console.log('⚠️ Преобразовали role в массив:', userRoles);
+        }
+        
+        const userWithRoles = {
+          ...data.user,
+          roles: userRoles
+        };
+        
+        console.log('✅ Итоговый пользователь для сохранения:', userWithRoles);
+        console.log('✅ Роли для сохранения:', userWithRoles.roles);
+        
+        // Сохраняем в localStorage
+        localStorage.setItem('user', JSON.stringify(userWithRoles));
+        
+        // Проверяем, что сохранилось
+        const savedUser = JSON.parse(localStorage.getItem('user'));
+        console.log('✅ Проверка сохранения в localStorage:', savedUser);
+        console.log('✅ Роли в localStorage:', savedUser.roles);
+        
+        // Обновляем AuthContext
+        if (authLogin) {
+          authLogin(userWithRoles);
+        }
+        
         setServerMessage({ 
           type: 'success', 
           text: 'Вход выполнен успешно! ✅' 
         });
-        
-        // Сохраняем токен/данные пользователя
-        if (data.token) {
-          localStorage.setItem('token', data.token);
-        }
-        if (data.user) {
-          localStorage.setItem('user', JSON.stringify(data.user));
-        }
 
+        // Перенаправление
         setTimeout(() => {
-          window.location.href = '/Profile'; // или другая страница после входа
+          window.location.href = '/dashboard';
         }, 1500);
       } else {
         setServerMessage({ 
@@ -179,7 +217,6 @@ const Input = () => {
             text={isLoading ? 'Вход...' : 'Войти'}
             onClick={handleSubmit}
             disabled={isLoading}
-            
           />
           
           <p className="register-link">

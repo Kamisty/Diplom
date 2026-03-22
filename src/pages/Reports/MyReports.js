@@ -7,78 +7,83 @@ const MyReports = () => {
   const navigate = useNavigate();
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     loadReports();
   }, []);
 
-  const loadReports = () => {
+  const loadReports = async () => {
     setLoading(true);
-    // Имитация загрузки данных
-    setTimeout(() => {
-      setReports([
-        {
-          id: 1,
-          title: 'Искусственный интеллект в медицине',
-          conference: 'Международная конференция по IT',
-          status: 'approved',
-          submittedDate: '2024-03-15',
-          reviewers: 2
-        },
-        {
-          id: 2,
-          title: 'Блокчейн технологии в образовании',
-          conference: 'Научно-практическая конференция',
-          status: 'pending',
-          submittedDate: '2024-03-20',
-          reviewers: 1
-        },
-        {
-          id: 3,
-          title: 'Анализ больших данных',
-          conference: 'Всероссийский форум',
-          status: 'rejected',
-          submittedDate: '2024-03-10',
-          reviewers: 3,
-          comment: 'Требуется доработка'
-        }
-      ]);
+    setError(null);
+    
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      
+      if (!user.id) {
+        navigate('/input');
+        return;
+      }
+
+      console.log('Загрузка докладов для пользователя:', user.id);
+      
+      const response = await fetch(`http://localhost:5000/api/reports/user/${user.id}`);
+      const data = await response.json();
+      
+      console.log('Получены доклады:', data);
+      
+      if (response.ok && data.success) {
+        setReports(data.reports || []);
+      } else {
+        setError(data.error || 'Ошибка при загрузке докладов');
+      }
+    } catch (error) {
+      console.error('Ошибка:', error);
+      setError('Ошибка подключения к серверу');
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   const getStatusLabel = (status) => {
     const statusMap = {
-      'pending': 'На рассмотрении',
-      'approved': 'Принят',
+      'draft': 'Черновик',
+      'submitted': 'На рассмотрении',
+      'under_review': 'На рецензировании',
+      'revision_required': 'Требуется доработка',
+      'accepted': 'Принят',
       'rejected': 'Отклонен',
-      'revision': 'На доработке'
+      'withdrawn': 'Отозван'
     };
     return statusMap[status] || status;
   };
 
   const getStatusClass = (status) => {
     const classMap = {
-      'pending': 'status-pending',
-      'approved': 'status-approved',
+      'draft': 'status-draft',
+      'submitted': 'status-pending',
+      'under_review': 'status-review',
+      'revision_required': 'status-revision',
+      'accepted': 'status-approved',
       'rejected': 'status-rejected',
-      'revision': 'status-revision'
+      'withdrawn': 'status-withdrawn'
     };
     return classMap[status] || '';
   };
 
-  const handleEdit = (id) => {
-    navigate(`/edit-report/${id}`);
-  };
-
-  const handleDelete = (id) => {
-    if (window.confirm('Вы уверены, что хотите удалить этот доклад?')) {
-      setReports(reports.filter(report => report.id !== id));
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Дата не указана';
+    try {
+      return new Date(dateString).toLocaleDateString('ru-RU', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return dateString;
     }
-  };
-
-  const handleView = (id) => {
-    navigate(`/report/${id}`);
   };
 
   return (
@@ -94,8 +99,24 @@ const MyReports = () => {
           </button>
         </div>
 
+        {error && (
+          <div className="error-message">
+            {error}
+          </div>
+        )}
+
         {loading ? (
           <div className="loading">Загрузка докладов...</div>
+        ) : reports.length === 0 ? (
+          <div className="no-data">
+            <p>У вас пока нет поданных докладов</p>
+            <button 
+              className="btn-primary"
+              onClick={() => navigate('/submit-report')}
+            >
+              Подать первый доклад
+            </button>
+          </div>
         ) : (
           <div className="reports-grid">
             {reports.map(report => (
@@ -108,55 +129,40 @@ const MyReports = () => {
                 </div>
                 
                 <div className="report-details">
-                  <p><strong>Конференция:</strong> {report.conference}</p>
-                  <p><strong>Дата подачи:</strong> {report.submittedDate}</p>
-                  <p><strong>Рецензентов:</strong> {report.reviewers}</p>
-                  {report.comment && (
-                    <p className="review-comment">
-                      <strong>Комментарий:</strong> {report.comment}
-                    </p>
-                  )}
+                  <p>
+                    <strong>Конференция:</strong> {report.conference_name || 'Не указана'}
+                  </p>
+                  <p>
+                    <strong>Авторы:</strong> {report.authors?.join(', ') || 'Не указаны'}
+                  </p>
+                  <p>
+                    <strong>Дата подачи:</strong> {formatDate(report.created_at)}
+                  </p>
+                  <p>
+                    <strong>Версия:</strong> {report.version || 1}
+                  </p>
                 </div>
 
                 <div className="report-actions">
                   <button 
                     className="btn-icon view"
-                    onClick={() => handleView(report.id)}
+                    onClick={() => navigate(`/report/${report.id}`)}
                     title="Просмотр"
                   >
                     👁️
                   </button>
-                  {report.status !== 'approved' && (
+                  {report.status === 'draft' && (
                     <button 
                       className="btn-icon edit"
-                      onClick={() => handleEdit(report.id)}
+                      onClick={() => navigate(`/edit-report/${report.id}`)}
                       title="Редактировать"
                     >
                       ✏️
                     </button>
                   )}
-                  <button 
-                    className="btn-icon delete"
-                    onClick={() => handleDelete(report.id)}
-                    title="Удалить"
-                  >
-                    🗑️
-                  </button>
                 </div>
               </div>
             ))}
-
-            {reports.length === 0 && (
-              <div className="no-data">
-                <p>У вас пока нет поданных докладов</p>
-                <button 
-                  className="btn-primary"
-                  onClick={() => navigate('/submit-report')}
-                >
-                  Подать первый доклад
-                </button>
-              </div>
-            )}
           </div>
         )}
       </div>

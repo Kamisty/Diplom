@@ -26,6 +26,8 @@ const Profile = () => {
 
       const parsedUser = JSON.parse(userData);
       setUser(parsedUser);
+      console.log('Загружен пользователь:', parsedUser);
+      console.log('Роли пользователя:', parsedUser.roles);
 
       // Загружаем дополнительные данные из таблицы user_profiles
       await loadUserProfile(parsedUser.user_id || parsedUser.id);
@@ -48,14 +50,13 @@ const Profile = () => {
 
       if (response.ok && data.success) {
         setProfile(data.profile);
-        // Объединяем данные из users и user_profiles для формы редактирования
         setEditFormData({
           ...data.profile,
+          user_id: userId,
           email: user?.email,
           login: user?.login
         });
       } else {
-        // Если профиля нет, создаем пустой объект
         setProfile(null);
         setEditFormData({
           user_id: userId,
@@ -68,6 +69,16 @@ const Profile = () => {
     }
   };
 
+  // Функции для проверки ролей (используем массив roles)
+  const hasRole = (roleName) => {
+    return user?.roles?.includes(roleName) || false;
+  };
+
+  const isAuthor = () => hasRole('Автор');
+  const isReviewer = () => hasRole('Рецензент');
+  const isSectionHead = () => hasRole('Руководитель секции');
+  const isAdmin = () => hasRole('Администратор конференции');
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setEditFormData(prev => ({
@@ -79,7 +90,6 @@ const Profile = () => {
   const handleEditToggle = () => {
     setIsEditing(!isEditing);
     if (!isEditing) {
-      // При начале редактирования объединяем данные
       setEditFormData({
         ...profile,
         user_id: user?.user_id || user?.id,
@@ -95,7 +105,6 @@ const Profile = () => {
       
       const userId = user?.user_id || user?.id;
       
-      // Подготавливаем данные для отправки
       const profileData = {
         user_id: userId,
         last_name: editFormData.last_name || '',
@@ -149,7 +158,6 @@ const Profile = () => {
     window.location.href = '/login';
   };
 
-  // Формируем ФИО из отдельных полей
   const getFullName = () => {
     if (!profile) return user?.name || 'Не указано';
     
@@ -159,6 +167,34 @@ const Profile = () => {
     if (profile.middle_name) parts.push(profile.middle_name);
     
     return parts.length > 0 ? parts.join(' ') : (user?.name || 'Не указано');
+  };
+
+  // Получение отображаемого названия роли
+  const getRoleDisplayName = (roleName) => {
+    const roleMap = {
+      'Администратор конференции': 'Администратор',
+      'Руководитель секции': 'Руководитель секции',
+      'Рецензент': 'Рецензент',
+      'Автор': 'Автор',
+    };
+    return roleMap[roleName] || roleName;
+  };
+
+  // Получение CSS класса для роли
+  const getRoleClass = (roleName) => {
+    if (roleName.includes('Администратор')) return 'role-admin';
+    if (roleName.includes('Руководитель')) return 'role-section_head';
+    if (roleName.includes('Рецензент')) return 'role-reviewer';
+    if (roleName.includes('Автор')) return 'role-author';
+    return 'role-participant';
+  };
+
+  // Формирование строки с ролями для отображения
+  const getDisplayRoles = () => {
+    const roles = user?.roles || [];
+    if (roles.length === 0) return 'Участник';
+    if (roles.length === 1) return getRoleDisplayName(roles[0]);
+    return roles.map(r => getRoleDisplayName(r)).join(', ');
   };
 
   if (loading) {
@@ -183,7 +219,6 @@ const Profile = () => {
 
         <div className="profile-content">
           {!isEditing ? (
-            // Режим просмотра
             <div className="profile-view">
               <div className="profile-section">
                 <h3>Основная информация</h3>
@@ -202,17 +237,26 @@ const Profile = () => {
                   </div>
                   <div className="info-item">
                     <label>Роль в системе:</label>
-                    <span className={`role-badge role-${user?.role || 'user'}`}>
-                      {user?.role === 'student' ? 'Студент' : 
-                       user?.role === 'teacher' ? 'Преподаватель' : 
-                       user?.role === 'admin' ? 'Администратор' : 
-                      user?.role === 'section_head' ? 'Руководитель секции' : 
-                       user?.role === 'reviewer' ? 'Рецензент' : 'Участник'}
-                    </span>
+                    <div className="role-container">
+                      {user?.roles && user.roles.length > 0 ? (
+                        user.roles.map((role, index) => (
+                          <span key={index} className={`role-badge ${getRoleClass(role)}`}>
+                            {getRoleDisplayName(role)}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="role-badge role-participant">Участник</span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
 
+             
+              
+           
+          
+              {/* Личная информация */}
               <div className="profile-section">
                 <h3>Личная информация</h3>
                 <div className="info-grid">
@@ -283,7 +327,7 @@ const Profile = () => {
               </div>
             </div>
           ) : (
-            // Режим редактирования
+            // Режим редактирования (без изменений)
             <div className="profile-edit">
               <div className="profile-section">
                 <h3>Основная информация</h3>
