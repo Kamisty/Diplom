@@ -372,13 +372,7 @@ const ManageUsers = () => {
                       >
                         👤
                       </button>
-                      <button 
-                        className="btn-icon edit"
-                        onClick={() => handleEditUser(user.user_id)}
-                        title="Статус руководителя"
-                      >
-                        ⚙️
-                      </button>
+                     
                       <button 
                         className="btn-icon role"
                         onClick={() => handleChangeRole(user.user_id)}
