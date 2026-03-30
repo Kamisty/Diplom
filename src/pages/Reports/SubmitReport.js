@@ -240,14 +240,15 @@ const SubmitReport = () => {
     }
   };
 
-  // Получение краткого описания (обрезаем если длинное)
-  const getShortDescription = (description) => {
-    if (!description) return '';
-    if (description.length > 100) {
-      return description.substring(0, 100) + '...';
-    }
-    return description;
-  };
+  // Если функция getShortDescription не используется, удаляем её
+  // Или, если планируется использовать позже, комментируем
+  // const getShortDescription = (description) => {
+  //   if (!description) return '';
+  //   if (description.length > 100) {
+  //     return description.substring(0, 100) + '...';
+  //   }
+  //   return description;
+  // };
 
   return (
     <div className="reports-page">
@@ -332,7 +333,6 @@ const SubmitReport = () => {
             )}
           </div>
 
-          {/* Остальные поля формы... */}
           {/* Название доклада */}
           <div className="form-group">
             <label htmlFor="title">Название доклада *</label>

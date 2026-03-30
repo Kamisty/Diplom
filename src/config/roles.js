@@ -1,6 +1,6 @@
 // src/config/roles.js
 
-// Определение ролей (соответствуют таблице roles в БД)
+// ✅ Определение ролей — ТОЧНОЕ СОВПАДЕНИЕ с таблицей roles в БД
 export const ROLES = {
   ADMIN: 'Администратор конференции',
   SECTION_HEAD: 'Руководитель секции',
@@ -8,7 +8,7 @@ export const ROLES = {
   AUTHOR: 'Автор'
 };
 
-// ID ролей для фронтенда (используются в API запросах)
+// ID ролей для использования в интерфейсе (опционально)
 export const ROLE_IDS = {
   ADMIN: 'admin',
   SECTION_HEAD: 'section_head',
@@ -16,7 +16,7 @@ export const ROLE_IDS = {
   AUTHOR: 'author'
 };
 
-// Маппинг между ID роли (для фронтенда) и названием (для БД)
+// Маппинг: ID фронтенда → Название в БД
 export const ROLE_MAPPING = {
   [ROLE_IDS.ADMIN]: ROLES.ADMIN,
   [ROLE_IDS.SECTION_HEAD]: ROLES.SECTION_HEAD,
@@ -24,7 +24,7 @@ export const ROLE_MAPPING = {
   [ROLE_IDS.AUTHOR]: ROLES.AUTHOR
 };
 
-// Обратный маппинг (из названия в ID)
+// Обратный маппинг: Название в БД → ID фронтенда
 export const REVERSE_ROLE_MAPPING = {
   [ROLES.ADMIN]: ROLE_IDS.ADMIN,
   [ROLES.SECTION_HEAD]: ROLE_IDS.SECTION_HEAD,
@@ -32,7 +32,7 @@ export const REVERSE_ROLE_MAPPING = {
   [ROLES.AUTHOR]: ROLE_IDS.AUTHOR
 };
 
-// Права доступа для каждой роли
+// ✅ Права доступа для каждой роли (ключи — названия из БД!)
 export const PERMISSIONS = {
   [ROLES.ADMIN]: [
     'create_conference',
@@ -72,95 +72,106 @@ export const PERMISSIONS = {
   ]
 };
 
-// Получить название роли для отображения (принимает ID роли или название)
+// ✅ Получить отображаемое название роли (поддерживает и ID, и название БД)
 export const getRoleName = (role) => {
-  // Если передан ID роли (admin, author и т.д.)
-  if (role === ROLE_IDS.ADMIN) return 'Администратор';
-  if (role === ROLE_IDS.SECTION_HEAD) return 'Руководитель секции';
-  if (role === ROLE_IDS.REVIEWER) return 'Рецензент';
-  if (role === ROLE_IDS.AUTHOR) return 'Автор';
-  
-  // Если передано название роли из БД
-  if (role === ROLES.ADMIN) return 'Администратор';
-  if (role === ROLES.SECTION_HEAD) return 'Руководитель секции';
-  if (role === ROLES.REVIEWER) return 'Рецензент';
-  if (role === ROLES.AUTHOR) return 'Автор';
-  
-  return role;
+  const nameMap = {
+    // ID → Отображаемое имя
+    [ROLE_IDS.ADMIN]: 'Администратор конференции',
+    [ROLE_IDS.SECTION_HEAD]: 'Руководитель секции',
+    [ROLE_IDS.REVIEWER]: 'Рецензент',
+    [ROLE_IDS.AUTHOR]: 'Автор',
+    // Название БД → Отображаемое имя
+    [ROLES.ADMIN]: 'Администратор конференции',
+    [ROLES.SECTION_HEAD]: 'Руководитель секции',
+    [ROLES.REVIEWER]: 'Рецензент',
+    [ROLES.AUTHOR]: 'Автор'
+  };
+  return nameMap[role] || role;
 };
 
-// Получить иконку для роли (принимает ID роли или название)
+// ✅ Получить иконку для роли (поддерживает оба формата)
 export const getRoleIcon = (role) => {
-  // Если передан ID роли (admin, author и т.д.)
-  if (role === ROLE_IDS.ADMIN) return '👑';
-  if (role === ROLE_IDS.SECTION_HEAD) return '🎯';
-  if (role === ROLE_IDS.REVIEWER) return '⭐';
-  if (role === ROLE_IDS.AUTHOR) return '✍️';
-  
-  // Если передано название роли из БД
-  if (role === ROLES.ADMIN) return '👑';
-  if (role === ROLES.SECTION_HEAD) return '🎯';
-  if (role === ROLES.REVIEWER) return '⭐';
-  if (role === ROLES.AUTHOR) return '✍️';
-  
-  return '👤';
+  const iconMap = {
+    [ROLE_IDS.ADMIN]: '👑',
+    [ROLE_IDS.SECTION_HEAD]: '🎯',
+    [ROLE_IDS.REVIEWER]: '⭐',
+    [ROLE_IDS.AUTHOR]: '✍️',
+    [ROLES.ADMIN]: '👑',
+    [ROLES.SECTION_HEAD]: '🎯',
+    [ROLES.REVIEWER]: '⭐',
+    [ROLES.AUTHOR]: '✍️'
+  };
+  return iconMap[role] || '👤';
 };
 
-// Получить ID роли для API (из названия)
+// ✅ Получить ID роли из названия БД (для отправки на сервер)
 export const getRoleId = (roleName) => {
   return REVERSE_ROLE_MAPPING[roleName] || roleName;
 };
 
-// Получить название роли для БД (из ID)
+// ✅ Получить название БД из ID роли (для сравнения)
 export const getRoleDbName = (roleId) => {
   return ROLE_MAPPING[roleId] || roleId;
 };
 
-// Проверка наличия разрешения (если у пользователя есть хотя бы одна роль с этим правом)
+// ✅ Проверка наличия разрешения у пользователя
 export const hasPermission = (userRoles, permission) => {
   if (!userRoles || !Array.isArray(userRoles) || userRoles.length === 0) {
     return false;
   }
   
   return userRoles.some(role => {
-    // Проверяем, что role может быть как ID, так и названием
+    // role может быть как ID, так и названием БД — нормализуем
     const roleName = ROLE_MAPPING[role] || role;
     const permissions = PERMISSIONS[roleName] || [];
     return permissions.includes(permission);
   });
 };
 
-// Получить все доступные для добавления роли (кроме уже имеющихся)
+// ✅ Получить список ролей, доступных для добавления
 export const getAvailableRolesToAdd = (currentRoles) => {
   const allRoles = [
+    { id: ROLE_IDS.ADMIN, name: 'Администратор конференции', dbName: ROLES.ADMIN },
+    { id: ROLE_IDS.SECTION_HEAD, name: 'Руководитель секции', dbName: ROLES.SECTION_HEAD },
+    { id: ROLE_IDS.REVIEWER, name: 'Рецензент', dbName: ROLES.REVIEWER },
+    { id: ROLE_IDS.AUTHOR, name: 'Автор', dbName: ROLES.AUTHOR }
+  ];
+  
+  return allRoles.filter(role => 
+    !currentRoles.includes(role.dbName) && !currentRoles.includes(role.id)
+  );
+};
+
+// ✅ Получить все роли для отображения в интерфейсе
+export const getAllRoles = () => {
+  return [
     { 
       id: ROLE_IDS.ADMIN, 
-      name: 'Администратор'
+      name: 'Администратор конференции', 
+      dbName: ROLES.ADMIN, 
+      icon: '👑', 
+      description: 'Полный доступ к системе' 
     },
     { 
       id: ROLE_IDS.SECTION_HEAD, 
-      name: 'Руководитель секции'
+      name: 'Руководитель секции', 
+      dbName: ROLES.SECTION_HEAD, 
+      icon: '🎯', 
+      description: 'Управление секцией' 
     },
     { 
       id: ROLE_IDS.REVIEWER, 
-      name: 'Рецензент'
+      name: 'Рецензент', 
+      dbName: ROLES.REVIEWER, 
+      icon: '⭐', 
+      description: 'Рецензирование докладов' 
     },
     { 
       id: ROLE_IDS.AUTHOR, 
-      name: 'Автор'
+      name: 'Автор', 
+      dbName: ROLES.AUTHOR, 
+      icon: '✍️', 
+      description: 'Подача докладов' 
     }
-  ];
-  
-  // Фильтруем роли, которых еще нет у пользователя
-  return allRoles.filter(role => !currentRoles.includes(role.id));
-};
-
-// Получить список всех ролей (для отображения в интерфейсе)
-export const getAllRoles = () => {
-  return [
-    { id: ROLE_IDS.ADMIN, name: 'Администратор', dbName: ROLES.ADMIN, icon: '👑', description: 'Полный доступ к системе' },
-    { id: ROLE_IDS.SECTION_HEAD, name: 'Руководитель секции', dbName: ROLES.SECTION_HEAD, icon: '🎯', description: 'Управление секцией' },
-    { id: ROLE_IDS.REVIEWER, name: 'Рецензент', dbName: ROLES.REVIEWER, icon: '⭐', description: 'Рецензирование докладов' },
-    { id: ROLE_IDS.AUTHOR, name: 'Автор', dbName: ROLES.AUTHOR, icon: '✍️', description: 'Подача докладов' }
   ];
 };

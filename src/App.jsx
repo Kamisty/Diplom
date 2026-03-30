@@ -17,7 +17,7 @@ import ManageUsers from './pages/Admin/ManageUsers';
 import AssignSectionHeads from './pages/Admin/AssignSectionHeads';
 import RoleBasedRoute from './components/RoleBasedRoute';
 import AccessDenied from './pages/AccessDenied/AccessDenied';
-// import { ROLES } from './config/roles'; // Временно закомментировано, так как не используется
+
 import './App.css';
 import './context/font.css';
 
