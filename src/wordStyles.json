@@ -1,0 +1,65 @@
+{
+  "annotation": {
+    "fontFamily": "Times New Roman, serif",
+    "fontSize": "14pt",
+    "lineHeight": "1.5",
+    "fontStyle": "normal",
+    "fontWeight": "normal",
+    "textAlign": "justify",
+    "marginBottom": "20pt",
+    "color": "#000000"
+  },
+  "keywords": {
+    "fontFamily": "Times New Roman, serif",
+    "fontSize": "12pt",
+    "lineHeight": "1.4",
+    "fontStyle": "italic",
+    "fontWeight": "normal",
+    "textAlign": "left",
+    "marginBottom": "15pt",
+    "color": "#333333"
+  },
+  "mainText": {
+    "fontFamily": "Times New Roman, serif",
+    "fontSize": "12pt",
+    "lineHeight": "1.5",
+    "fontStyle": "normal",
+    "fontWeight": "normal",
+    "textAlign": "justify",
+    "marginBottom": "10pt",
+    "color": "#000000",
+    "textIndent": "1.25cm"
+  },
+  "heading1": {
+    "fontFamily": "Times New Roman, serif",
+    "fontSize": "16pt",
+    "fontWeight": "bold",
+    "textAlign": "center",
+    "marginBottom": "12pt",
+    "marginTop": "24pt"
+  },
+  "heading2": {
+    "fontFamily": "Times New Roman, serif",
+    "fontSize": "14pt",
+    "fontWeight": "bold",
+    "textAlign": "left",
+    "marginBottom": "10pt",
+    "marginTop": "18pt"
+  },
+  "tableCaption": {
+    "fontFamily": "Times New Roman, serif",
+    "fontSize": "11pt",
+    "fontStyle": "italic",
+    "textAlign": "center",
+    "marginTop": "6pt",
+    "marginBottom": "6pt"
+  },
+  "figureCaption": {
+    "fontFamily": "Times New Roman, serif",
+    "fontSize": "11pt",
+    "fontStyle": "italic",
+    "textAlign": "center",
+    "marginTop": "6pt",
+    "marginBottom": "12pt"
+  }
+}

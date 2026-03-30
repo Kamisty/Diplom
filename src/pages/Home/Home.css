@@ -1,0 +1,59 @@
+.home-page {
+  margin-bottom: 150px;
+  display: flex;
+  align-items: center;
+}
+h3{
+  font-size: 25px;
+
+}
+.stroka{
+  display: block;
+  margin-top: 60px;
+  text-align: left;
+  font-size: 25px;
+  font-weight: 700;
+  color: #474747; 
+  text-shadow: 
+    2px 2px 4px rgba(0,0,0,0.1),
+    4px 4px 0 rgba(74, 111, 165, 0.1);
+  margin: 1rem 0;
+  padding: 0.5rem;
+  position: relative;
+ 
+}
+.features{
+  display: flex; 
+  justify-content: center; 
+  gap: 20px; 
+  flex-wrap: wrap; 
+}
+.feature-card p{
+  font-size: 18px;
+}
+.feature-card{
+  display: block;
+  border: 3px solid #e27a02;
+  flex: 1; 
+  width: 300px; 
+  height: 180px;
+  margin-top: 45px;
+  padding: 20px;
+  background-color:#ffffff ;
+  color: #474747;
+  text-align: center;
+  box-sizing: border-box; 
+  border-radius: 25px;
+   box-shadow: 
+    2px 2px 4px rgba(0,0,0,0.1),
+    4px 4px 0 rgba(74, 111, 165, 0.1);
+
+    text-shadow: 
+    2px 2px 4px rgba(0,0,0,0.1),
+    4px 4px 0 rgba(74, 111, 165, 0.1);
+}
+.feature-card:hover{
+  background-color: #e27a02;
+   border: 3px solid #ffffff;
+   color: #000;
+}
