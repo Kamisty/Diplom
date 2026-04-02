@@ -21,7 +21,6 @@
   text-decoration: none;
   color: #e27a02;
   transition: color 0.3s;
-  display: block;
 }
 
 .logo h2 {
@@ -37,7 +36,7 @@
 
 /* Навигационное меню */
 .nav-menu {
-  display:contents;
+  display: flex;
   gap: 2rem;
   align-items: center;
 }
@@ -177,7 +176,7 @@
   background: white;
   border-radius: 12px;
   box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
-  min-width: 260px;
+  min-width: 220px;
   overflow: hidden;
   animation: slideDown 0.2s ease;
 }

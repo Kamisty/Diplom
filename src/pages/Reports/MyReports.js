@@ -1,5 +1,5 @@
 // src/pages/Reports/MyReports.jsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Reports.css';
 
@@ -9,8 +9,11 @@ const MyReports = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Обернем loadReports в useCallback
-  const loadReports = useCallback(async () => {
+  useEffect(() => {
+    loadReports();
+  }, []);
+
+  const loadReports = async () => {
     setLoading(true);
     setError(null);
     
@@ -40,11 +43,7 @@ const MyReports = () => {
     } finally {
       setLoading(false);
     }
-  }, [navigate]); // Добавляем navigate как зависимость
-
-  useEffect(() => {
-    loadReports();
-  }, [loadReports]); // Добавляем loadReports в зависимости
+  };
 
   const getStatusLabel = (status) => {
     const statusMap = {

@@ -1,6 +1,7 @@
-import React, { useContext, useState, useMemo } from 'react';
+// src/components/common/RoleSwitcher/RoleSwitcher.jsx
+import React, { useContext, useState } from 'react';
 import { AuthContext } from '../../../context/AuthContext/Auth';
-import { getRoleName, getRoleIcon, ROLES, getAllRoles } from '../../../config/roles';
+import { getRoleName, getRoleIcon, ROLES } from '../../../config/roles';
 import './RoleSwitcher.css';
 
 const RoleSwitcher = ({ closeDropdown }) => {
@@ -12,46 +13,24 @@ const RoleSwitcher = ({ closeDropdown }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [addRoleMessage, setAddRoleMessage] = useState({ type: '', text: '' });
 
-  // ✅ Все доступные роли
-  const allAvailableRoles = useMemo(() => getAllRoles(), []);
+  // Все доступные роли в системе (используем ID для фронтенда)
+  const allAvailableRoles = [
+    { id: 'author', name: 'Автор', dbName: ROLES.AUTHOR },
+    { id: 'reviewer', name: 'Рецензент', dbName: ROLES.REVIEWER },
+    { id: 'section_head', name: 'Руководитель секции', dbName: ROLES.SECTION_HEAD },
+    { id: 'admin', name: 'Администратор', dbName: ROLES.ADMIN }
+  ];
 
-  // ✅ Текущие роли пользователя
-  const userCurrentRoles = useMemo(() => {
-    const roles = user?.roles || user?.availableRoles || [];
-    console.log('📋 [RoleSwitcher] Текущие роли:', roles);
-    return roles;
-  }, [user?.roles, user?.availableRoles]);
-  
-  // ✅ Доступные для добавления роли
-  const availableNewRoles = useMemo(() => {
-    const available = allAvailableRoles.filter(role => {
-      const hasRole = 
-        userCurrentRoles.includes(role.dbName) || 
-        userCurrentRoles.includes(role.id) ||
-        userCurrentRoles.includes(role.name);
-      
-      if (!hasRole) {
-        console.log('✅ Доступна роль:', role.name);
-      }
-      
-      return !hasRole;
-    });
-    
-    console.log('➕ [RoleSwitcher] Доступно для добавления:', available.length, available);
-    return available;
-  }, [userCurrentRoles, allAvailableRoles]);
+  // Получаем роли, которые еще не назначены пользователю
+  const getAvailableNewRoles = () => {
+    const userRoles = user?.availableRoles || [];
+    return allAvailableRoles.filter(role => !userRoles.includes(role.id));
+  };
 
-  const hasAvailableToAdd = availableNewRoles.length > 0;
-  const hasCurrentRoles = userCurrentRoles.length > 0;
-
-  console.log('🔍 [RoleSwitcher] hasAvailableToAdd:', hasAvailableToAdd);
-  console.log('🔍 [RoleSwitcher] hasCurrentRoles:', hasCurrentRoles);
-
-  if (!user) {
-    return <div className="role-switcher-empty">Загрузка...</div>;
+  // Проверяем, есть ли у пользователя несколько ролей
+  if (!user || !user.availableRoles || user.availableRoles.length <= 1) {
+    return null;
   }
-
-
 
   const switchRole = (newRole) => {
     if (newRole === user.activeRole) {
@@ -77,6 +56,7 @@ const RoleSwitcher = ({ closeDropdown }) => {
         }
         
         if (closeDropdown) closeDropdown();
+        
         redirectBasedOnRole(newRole);
       } catch (error) {
         console.error('Ошибка при смене роли:', error);
@@ -89,15 +69,17 @@ const RoleSwitcher = ({ closeDropdown }) => {
 
   const redirectBasedOnRole = (role) => {
     const roleRoutes = {
-      [ROLES.ADMIN]: '/admin/dashboard',
-      [ROLES.SECTION_HEAD]: '/section-head/dashboard',
-      [ROLES.REVIEWER]: '/reviewer/dashboard',
-      [ROLES.AUTHOR]: '/author/dashboard'
+      'admin': '/admin/dashboard',
+      'section_head': '/section-head/dashboard',
+      'reviewer': '/reviewer/dashboard',
+      'author': '/author/dashboard'
     };
+    
     const redirectPath = roleRoutes[role] || '/dashboard';
     window.location.href = redirectPath;
   };
 
+  // Функция для добавления новой роли
   const handleAddRole = async () => {
     if (!selectedNewRole) {
       setAddRoleMessage({ type: 'error', text: 'Выберите роль для добавления' });
@@ -110,12 +92,15 @@ const RoleSwitcher = ({ closeDropdown }) => {
 
     try {
       const userId = user?.user_id || user?.id;
+      
+      // Находим выбранную роль
       const selectedRoleObj = allAvailableRoles.find(r => r.id === selectedNewRole);
       
       if (!selectedRoleObj) {
         throw new Error('Роль не найдена');
       }
       
+      // Отправляем ID роли на сервер
       const response = await fetch('http://localhost:5000/api/user/add-role', {
         method: 'POST',
         headers: {
@@ -123,94 +108,93 @@ const RoleSwitcher = ({ closeDropdown }) => {
         },
         body: JSON.stringify({
           userId: userId,
-          role: selectedRoleObj.dbName
+          role: selectedNewRole  // Отправляем ID (author, reviewer и т.д.)
         })
       });
 
       const data = await response.json();
 
       if (response.ok && data.success) {
-        const updatedRoles = data.userRoles || data.roles || userCurrentRoles;
+        // Получаем обновленный список ролей из ответа сервера
+        const updatedRoles = data.userRoles;
         
+        // Обновляем пользователя в localStorage
         const updatedUser = {
           ...user,
-          roles: updatedRoles,
           availableRoles: updatedRoles,
-          activeRole: user.activeRole || updatedRoles[0]
+          roles: updatedRoles,
+          // Если это первая добавленная роль, делаем её активной
+          activeRole: user.activeRole || selectedNewRole
         };
         
         localStorage.setItem('user', JSON.stringify(updatedUser));
         
+        // Обновляем контекст
         if (login) {
           login(updatedUser);
         }
         
-        setAddRoleMessage({ 
-          type: 'success', 
-          text: `Роль "${selectedRoleObj.name}" успешно добавлена!` 
-        });
+        setAddRoleMessage({ type: 'success', text: `Роль "${selectedRoleObj.name}" успешно добавлена!` });
         
+        // Сбрасываем выбор
         setSelectedNewRole('');
         setShowAddRole(false);
         
+        // Закрываем дропдаун
         if (closeDropdown) closeDropdown();
+        
+        // Перезагружаем страницу для обновления всех компонентов
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
       } else {
-        setAddRoleMessage({ 
-          type: 'error', 
-          text: data.error || 'Ошибка при добавлении роли' 
-        });
+        setAddRoleMessage({ type: 'error', text: data.error || 'Ошибка при добавлении роли' });
         setTimeout(() => setAddRoleMessage({ type: '', text: '' }), 3000);
       }
     } catch (error) {
       console.error('Ошибка при добавлении роли:', error);
-      setAddRoleMessage({ 
-        type: 'error', 
-        text: 'Ошибка подключения к серверу' 
-      });
+      setAddRoleMessage({ type: 'error', text: 'Ошибка подключения к серверу' });
       setTimeout(() => setAddRoleMessage({ type: '', text: '' }), 3000);
     } finally {
       setIsAdding(false);
     }
   };
 
- return (
+  const availableNewRoles = getAvailableNewRoles();
+
+  return (
     <div className="role-switcher-inline">
       <div className="role-switcher-header">
         <span className="role-switcher-title">Мои роли</span>
       </div>
       
       {/* Список текущих ролей */}
-      {hasCurrentRoles ? (
-        userCurrentRoles.map((role) => (
-          <button
-            key={role}
-            className={`role-switcher-option ${role === user.activeRole ? 'active' : ''}`}
-            onClick={() => switchRole(role)}
-            disabled={isSwitching || role === user.activeRole}
-          >
-            <span className="role-icon">{getRoleIcon(role)}</span>
-            <div className="role-info">
-              <span className="role-name">{getRoleName(role)}</span>
-              {role === user.activeRole && (
-                <span className="active-badge">Активна</span>
-              )}
-            </div>
-            {isSwitching && switchingRole === role && (
-              <span className="switching-spinner">⏳</span>
+      {user.availableRoles.map((role) => (
+        <button
+          key={role}
+          className={`role-switcher-option ${role === user.activeRole ? 'active' : ''}`}
+          onClick={() => switchRole(role)}
+          disabled={isSwitching || role === user.activeRole}
+        >
+          <span className="role-icon">{getRoleIcon(role)}</span>
+          <div className="role-info">
+            <span className="role-name">{getRoleName(role)}</span>
+            {role === user.activeRole && (
+              <span className="active-badge">Активна</span>
             )}
-          </button>
-        ))
-      ) : (
-        <div className="no-roles-message">
-          <p>У вас пока нет назначенных ролей</p>
-        </div>
-      )}
+          </div>
+          {isSwitching && switchingRole === role && (
+            <span className="switching-spinner">⏳</span>
+          )}
+        </button>
+      ))}
 
-      {/* ✅ КНОПКА ДОБАВИТЬ РОЛЬ */}
-      {hasAvailableToAdd && (
+      {/* Разделитель, если есть доступные роли для добавления */}
+      {availableNewRoles.length > 0 && (
         <>
           <div className="role-divider"></div>
           
+          {/* Кнопка "Добавить роль" */}
           <button
             className="add-role-button"
             onClick={() => setShowAddRole(!showAddRole)}
@@ -219,6 +203,7 @@ const RoleSwitcher = ({ closeDropdown }) => {
             <span>Добавить новую роль</span>
           </button>
 
+          {/* Форма добавления роли */}
           {showAddRole && (
             <div className="add-role-form">
               {addRoleMessage.text && (
@@ -252,10 +237,7 @@ const RoleSwitcher = ({ closeDropdown }) => {
                 </button>
                 <button
                   className="cancel-add-role"
-                  onClick={() => {
-                    setShowAddRole(false);
-                    setAddRoleMessage({ type: '', text: '' });
-                  }}
+                  onClick={() => setShowAddRole(false)}
                   disabled={isAdding}
                 >
                   Отмена
@@ -264,13 +246,6 @@ const RoleSwitcher = ({ closeDropdown }) => {
             </div>
           )}
         </>
-      )}
-      
-      {/* Если нет доступных ролей */}
-      {!hasAvailableToAdd && hasCurrentRoles && (
-        <div className="no-more-roles">
-          <small>Все доступные роли уже назначены</small>
-        </div>
       )}
     </div>
   );

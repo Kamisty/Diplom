@@ -1,5 +1,5 @@
 // src/pages/Admin/ManageUsers.jsx
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import './Admin.css';
 
 const ManageUsers = () => {
@@ -13,6 +13,7 @@ const ManageUsers = () => {
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedRoles, setSelectedRoles] = useState([]);
+  const [availableRoles, setAvailableRoles] = useState([]);
   const [savingRoles, setSavingRoles] = useState(false);
   const [roleMessage, setRoleMessage] = useState({ type: '', text: '' });
   
@@ -22,22 +23,28 @@ const ManageUsers = () => {
   const [profileData, setProfileData] = useState(null);
   const [loadingProfile, setLoadingProfile] = useState(false);
 
-  // ✅ FIX: allRoles в useMemo для стабильной ссылки
-  const allRoles = useMemo(() => [
+  // Все доступные роли в системе
+  const allRoles = [
     { id: 'author', name: 'Автор', dbName: 'Автор', description: 'Подача докладов' },
     { id: 'reviewer', name: 'Рецензент', dbName: 'Рецензент', description: 'Рецензирование докладов' },
     { id: 'section_head', name: 'Руководитель секции', dbName: 'Руководитель секции', description: 'Управление секцией' },
     { id: 'admin', name: 'Администратор', dbName: 'Администратор конференции', description: 'Полный доступ к системе' }
-  ], []);
+  ];
 
-  // ✅ FIX: loadUsers через useCallback
-  const loadUsers = useCallback(async () => {
+  // Загрузка пользователей с сервера
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const loadUsers = async () => {
     setLoading(true);
     setError(null);
     
     try {
       const response = await fetch('http://localhost:5000/api/users');
       const data = await response.json();
+
+      console.log('Загруженные пользователи:', data);
 
       if (response.ok && data.success) {
         setUsers(data.users);
@@ -51,15 +58,10 @@ const ManageUsers = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  // ✅ FIX: useEffect с loadUsers в зависимостях
-  useEffect(() => {
-    loadUsers();
-  }, [loadUsers]);
+  };
 
   // Получение всех ролей пользователя в виде строки
-  const getUserRolesString = useCallback((user) => {
+  const getUserRolesString = (user) => {
     if (!user.roles || !Array.isArray(user.roles)) return 'Участник';
     if (user.roles.length === 0) return 'Участник';
     
@@ -71,41 +73,39 @@ const ManageUsers = () => {
     };
     
     return user.roles.map(r => roleMap[r] || r).join(', ');
-  }, []);
+  };
 
   // Проверка, имеет ли пользователь определенную роль
-  const hasRole = useCallback((user, roleName) => {
+  const hasRole = (user, roleName) => {
     return user.roles?.includes(roleName) || false;
-  }, []);
+  };
 
-  // ✅ FIX: filteredUsers через useMemo
-  const filteredUsers = useMemo(() => {
-    return users.filter(user => {
-      const matchesSearch = 
-        (user.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-        (user.last_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-        (user.first_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-        (user.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-        (user.login?.toLowerCase() || '').includes(searchTerm.toLowerCase());
-      
-      let matchesRole = true;
-      if (roleFilter !== 'all') {
-        const roleMap = {
-          'admin': 'Администратор конференции',
-          'section_head': 'Руководитель секции',
-          'reviewer': 'Рецензент',
-          'author': 'Автор'
-        };
-        const roleName = roleMap[roleFilter];
-        matchesRole = hasRole(user, roleName);
-      }
-      
-      return matchesSearch && matchesRole;
-    });
-  }, [users, searchTerm, roleFilter, hasRole]);
+  // Фильтрация пользователей
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = 
+      (user.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (user.last_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (user.first_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (user.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (user.login?.toLowerCase() || '').includes(searchTerm.toLowerCase());
+    
+    let matchesRole = true;
+    if (roleFilter !== 'all') {
+      const roleMap = {
+        'admin': 'Администратор конференции',
+        'section_head': 'Руководитель секции',
+        'reviewer': 'Рецензент',
+        'author': 'Автор'
+      };
+      const roleName = roleMap[roleFilter];
+      matchesRole = hasRole(user, roleName);
+    }
+    
+    return matchesSearch && matchesRole;
+  });
 
   // Получение полного имени пользователя
-  const getFullName = useCallback((user) => {
+  const getFullName = (user) => {
     if (user.name) return user.name;
     
     const parts = [];
@@ -114,9 +114,9 @@ const ManageUsers = () => {
     if (user.middle_name) parts.push(user.middle_name);
     
     return parts.length > 0 ? parts.join(' ') : 'Не указано';
-  }, []);
+  };
 
-  const getRoleClass = useCallback((user) => {
+  const getRoleClass = (user) => {
     if (!user.roles || user.roles.length === 0) return 'role-default';
     
     const role = user.roles[0];
@@ -125,10 +125,13 @@ const ManageUsers = () => {
     if (role.includes('Рецензент')) return 'role-reviewer';
     if (role.includes('Автор')) return 'role-author';
     return 'role-default';
-  }, []);
+  };
 
   // Функция для просмотра профиля пользователя
-  const handleViewProfile = useCallback(async (userId) => {
+  const handleViewProfile = async (userId) => {
+    console.log('Просмотр профиля пользователя:', userId);
+    
+    // Находим пользователя
     const user = users.find(u => u.user_id === userId);
     if (!user) return;
     
@@ -137,6 +140,7 @@ const ManageUsers = () => {
     setShowProfileModal(true);
     
     try {
+      // Загружаем дополнительные данные профиля
       const response = await fetch(`http://localhost:5000/api/user-profile/${userId}`);
       const data = await response.json();
       
@@ -151,10 +155,13 @@ const ManageUsers = () => {
     } finally {
       setLoadingProfile(false);
     }
-  }, [users]);
+  };
 
   // Функция для открытия модального окна изменения ролей
-  const handleChangeRole = useCallback((userId) => {
+  const handleChangeRole = async (userId) => {
+    console.log('Изменение роли пользователя:', userId);
+    
+    // Находим пользователя
     const user = users.find(u => u.user_id === userId);
     if (!user) return;
     
@@ -162,10 +169,10 @@ const ManageUsers = () => {
     setSelectedRoles(user.roles || []);
     setRoleMessage({ type: '', text: '' });
     setShowRoleModal(true);
-  }, [users]);
+  };
 
   // Функция для переключения роли (добавление/удаление)
-  const toggleRole = useCallback((roleId) => {
+  const toggleRole = (roleId) => {
     const role = allRoles.find(r => r.id === roleId);
     if (!role) return;
     
@@ -176,9 +183,9 @@ const ManageUsers = () => {
         return [...prev, role.dbName];
       }
     });
-  }, [allRoles]);
+  };
 
-  // ✅ FIX: Функция для сохранения изменений ролей (ОСНОВНОЕ ИСПРАВЛЕНИЕ)
+  // Функция для сохранения изменений ролей
   const handleSaveRoles = async () => {
     if (!selectedUser) return;
     
@@ -200,65 +207,22 @@ const ManageUsers = () => {
       const data = await response.json();
       
       if (response.ok && data.success) {
-        // ✅ FIX 1: Используем data.roles из ответа сервера
-        const updatedRoles = data.roles || selectedRoles;
-        
-        // ✅ FIX 2: Обновляем список пользователей в таблице
         setUsers(prev => prev.map(u => 
           u.user_id === selectedUser.user_id 
-            ? { ...u, roles: updatedRoles }
+            ? { ...u, roles: selectedRoles }
             : u
         ));
-        
-        // ✅ FIX 3: Если это текущий пользователь — обновляем localStorage!
-        try {
-          const storedUser = localStorage.getItem('user');
-          if (storedUser) {
-            const currentUser = JSON.parse(storedUser);
-            
-            // Проверяем, что это тот же пользователь
-            if (currentUser.user_id === selectedUser.user_id || currentUser.id === selectedUser.user_id) {
-              const updatedUser = {
-                ...currentUser,
-                roles: updatedRoles,
-                availableRoles: updatedRoles,
-                // Если активная роль была удалена, переключаем на первую доступную
-                activeRole: updatedRoles.includes(currentUser.activeRole) 
-                  ? currentUser.activeRole 
-                  : (updatedRoles[0] || null)
-              };
-              
-              // ✅ Сохраняем обновлённого пользователя
-              localStorage.setItem('user', JSON.stringify(updatedUser));
-              
-              // ✅ Dispatch custom event для обновления всех компонентов (Header, Profile)
-              window.dispatchEvent(new CustomEvent('userRolesUpdated', { 
-                detail: updatedUser 
-              }));
-              
-              console.log('✅ Текущий пользователь обновлён в localStorage:', updatedUser);
-            }
-          }
-        } catch (err) {
-          console.error('❌ Ошибка при обновлении localStorage:', err);
-        }
         
         setRoleMessage({ 
           type: 'success', 
           text: `Роли пользователя "${getFullName(selectedUser)}" успешно обновлены!` 
         });
         
-        // ✅ FIX 4: Закрываем модальное окно и сбрасываем состояния
         setTimeout(() => {
           setShowRoleModal(false);
           setSelectedUser(null);
           setSelectedRoles([]);
-          setRoleMessage({ type: '', text: '' });
-          
-          // ✅ FIX 5: Принудительное обновление страницы (можно убрать для более плавного UX)
-          window.location.reload();
-        }, 600);
-        
+        }, 1000);
       } else {
         setRoleMessage({ 
           type: 'error', 
@@ -266,7 +230,7 @@ const ManageUsers = () => {
         });
       }
     } catch (error) {
-      console.error('❌ Ошибка при сохранении ролей:', error);
+      console.error('Ошибка при сохранении ролей:', error);
       setRoleMessage({ 
         type: 'error', 
         text: 'Ошибка подключения к серверу' 
@@ -277,23 +241,27 @@ const ManageUsers = () => {
   };
 
   // Функция для закрытия модального окна ролей
-  const closeRoleModal = useCallback(() => {
+  const closeRoleModal = () => {
     setShowRoleModal(false);
     setSelectedUser(null);
     setSelectedRoles([]);
     setRoleMessage({ type: '', text: '' });
-  }, []);
+  };
 
   // Функция для закрытия модального окна профиля
-  const closeProfileModal = useCallback(() => {
+  const closeProfileModal = () => {
     setShowProfileModal(false);
     setProfileUser(null);
     setProfileData(null);
-  }, []);
+  };
 
-  const handleEditUser = useCallback((userId) => {
+  const handleEditUser = async (userId) => {
     console.log('Редактирование пользователя:', userId);
-  }, []);
+  };
+
+  const handleToggleStatus = async (userId, currentStatus) => {
+    console.log('Изменение статуса пользователя:', userId);
+  };
 
   return (
     <div className="admin-page">
@@ -372,7 +340,13 @@ const ManageUsers = () => {
                       >
                         👤
                       </button>
-                     
+                      <button 
+                        className="btn-icon edit"
+                        onClick={() => handleEditUser(user.user_id)}
+                        title="Статус руководителя"
+                      >
+                        ⚙️
+                      </button>
                       <button 
                         className="btn-icon role"
                         onClick={() => handleChangeRole(user.user_id)}

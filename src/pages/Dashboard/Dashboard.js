@@ -1,8 +1,8 @@
 // src/pages/Dashboard/Dashboard.jsx
-import React, { useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext/Auth';
-import { getRoleName, ROLES } from '../../config/roles';
+import { hasPermission, getRoleName, getRoleIcon, ROLES } from '../../config/roles';
 import './Dashboard.css';
 
 const Dashboard = () => {
@@ -13,14 +13,17 @@ const Dashboard = () => {
     pendingReviews: 0
   });
 
-  // Получаем АКТИВНУЮ роль пользователя
+  // Получаем АКТИВНУЮ роль пользователя (ту, под которой он вошел)
   const activeRole = user?.activeRole;
   
-  // ✅ FIX: Оборачиваем userRoles в useMemo для стабильной ссылки
-  const userRoles = useMemo(() => user?.roles || [], [user?.roles]);
+  // Получаем все роли пользователя (для информации)
+  const userRoles = user?.roles || [];
   
-  // ✅ FIX: Простая функция без useCallback (тривиальная логика)
+  // Функции для проверки АКТИВНОЙ роли
   const isActiveRole = (role) => activeRole === role;
+  
+  // Функция для проверки, есть ли у пользователя определенная роль (для случаев, когда нужно показать информацию о наличии роли)
+  const hasRole = (role) => userRoles.includes(role);
   
   // Для отладки
   console.log('Dashboard - user:', user);
@@ -29,13 +32,17 @@ const Dashboard = () => {
   console.log('Dashboard - isAdmin:', isActiveRole(ROLES.ADMIN));
   console.log('Dashboard - isAuthor:', isActiveRole(ROLES.AUTHOR));
 
-  // ✅ FIX: loadStats с правильными зависимостями
-  const loadStats = useCallback(async () => {
+  // Загрузка статистики на основе АКТИВНОЙ роли
+  useEffect(() => {
+    loadStats();
+  }, [activeRole]); // Перезагружаем при смене роли
+
+  const loadStats = async () => {
     try {
       const userId = user?.user_id || user?.id;
       
-      // ✅ Используем прямое сравнение вместо isActiveRole для избежания лишних зависимостей
-      if (activeRole === ROLES.AUTHOR) {
+      // Загрузка количества докладов пользователя (только если активная роль - автор)
+      if (isActiveRole(ROLES.AUTHOR)) {
         const reportsResponse = await fetch(`http://localhost:5000/api/reports/user/${userId}`);
         const reportsData = await reportsResponse.json();
         if (reportsData.success) {
@@ -43,7 +50,8 @@ const Dashboard = () => {
         }
       }
       
-      if (activeRole === ROLES.ADMIN) {
+      // Загрузка количества конференций (только если активная роль - админ)
+      if (isActiveRole(ROLES.ADMIN)) {
         const confResponse = await fetch('http://localhost:5000/api/conferences');
         const confData = await confResponse.json();
         if (confData.success) {
@@ -51,7 +59,8 @@ const Dashboard = () => {
         }
       }
       
-      if (activeRole === ROLES.REVIEWER) {
+      // Загрузка количества ожидающих рецензий (только если активная роль - рецензент)
+      if (isActiveRole(ROLES.REVIEWER)) {
         const reviewsResponse = await fetch(`http://localhost:5000/api/reviews/pending/${userId}`);
         const reviewsData = await reviewsResponse.json();
         if (reviewsData.success) {
@@ -61,17 +70,14 @@ const Dashboard = () => {
     } catch (error) {
       console.error('Ошибка загрузки статистики:', error);
     }
-  }, [activeRole, user?.user_id, user?.id]); // ✅ Только необходимые зависимости
+  };
 
-  useEffect(() => {
-    loadStats();
-  }, [loadStats]);
-
-  // ✅ FIX: getQuickActions с правильными зависимостями
-  const getQuickActions = useCallback(() => {
+  // Быстрые действия на основе АКТИВНОЙ роли
+  const getQuickActions = () => {
     const actions = [];
     
-    if (activeRole === ROLES.AUTHOR) {
+    // Для авторов (только если активная роль - автор)
+    if (isActiveRole(ROLES.AUTHOR)) {
       actions.push({
         title: 'Подать доклад',
         description: 'Подайте новый доклад на конференцию',
@@ -88,7 +94,8 @@ const Dashboard = () => {
       });
     }
     
-    if (activeRole === ROLES.REVIEWER) {
+    // Для рецензентов (только если активная роль - рецензент)
+    if (isActiveRole(ROLES.REVIEWER)) {
       actions.push({
         title: 'Рецензирование',
         description: 'Проверьте назначенные вам доклады',
@@ -98,7 +105,8 @@ const Dashboard = () => {
       });
     }
     
-    if (activeRole === ROLES.SECTION_HEAD) {
+    // Для руководителей секций (только если активная роль - руководитель секции)
+    if (isActiveRole(ROLES.SECTION_HEAD)) {
       actions.push({
         title: 'Доклады секции',
         description: 'Просмотрите доклады вашей секции',
@@ -115,7 +123,8 @@ const Dashboard = () => {
       });
     }
     
-    if (activeRole === ROLES.ADMIN) {
+    // Для администраторов (только если активная роль - администратор)
+    if (isActiveRole(ROLES.ADMIN)) {
       actions.push({
         title: 'Создать конференцию',
         description: 'Создайте новую научную конференцию',
@@ -147,10 +156,10 @@ const Dashboard = () => {
     }
     
     return actions;
-  }, [activeRole]); // ✅ Только activeRole
+  };
 
-  // ✅ FIX: getDisplayRole с правильными зависимостями
-  const getDisplayRole = useCallback(() => {
+  // Получение отображаемого названия АКТИВНОЙ роли
+  const getDisplayRole = () => {
     if (!activeRole) {
       if (userRoles.length === 0) return 'Участник';
       if (userRoles.length === 1) {
@@ -172,27 +181,28 @@ const Dashboard = () => {
       [ROLES.AUTHOR]: 'Автор'
     };
     return roleMap[activeRole] || activeRole;
-  }, [activeRole, userRoles]); // ✅ userRoles стабилизирован через useMemo
+  };
 
-  // ✅ FIX: getDisplayRoleIcon с правильными зависимостями
-  const getDisplayRoleIcon = useCallback(() => {
-    if (activeRole === ROLES.ADMIN) return '👑';
-    if (activeRole === ROLES.SECTION_HEAD) return '🎯';
-    if (activeRole === ROLES.REVIEWER) return '⭐';
-    if (activeRole === ROLES.AUTHOR) return '✍️';
+  // Получение иконки для АКТИВНОЙ роли
+  const getDisplayRoleIcon = () => {
+    if (isActiveRole(ROLES.ADMIN)) return '👑';
+    if (isActiveRole(ROLES.SECTION_HEAD)) return '🎯';
+    if (isActiveRole(ROLES.REVIEWER)) return '⭐';
+    if (isActiveRole(ROLES.AUTHOR)) return '✍️';
     
+    // Если активной роли нет, показываем иконку по наличию ролей
     if (userRoles.includes(ROLES.ADMIN)) return '👑';
     if (userRoles.includes(ROLES.SECTION_HEAD)) return '🎯';
     if (userRoles.includes(ROLES.REVIEWER)) return '⭐';
     if (userRoles.includes(ROLES.AUTHOR)) return '✍️';
     return '👤';
-  }, [activeRole, userRoles]); // ✅ userRoles стабилизирован
+  };
 
   const quickActions = getQuickActions();
   
-  // ✅ FIX: otherRoles через useMemo для стабильности
+  // Показываем подсказку о других доступных ролях
   const hasMultipleRoles = userRoles.length > 1;
-  const otherRoles = useMemo(() => userRoles.filter(role => role !== activeRole), [userRoles, activeRole]);
+  const otherRoles = userRoles.filter(role => role !== activeRole);
 
   return (
     <div className="dashboard-page">
@@ -203,6 +213,7 @@ const Dashboard = () => {
             {getDisplayRoleIcon()} Текущая роль: {getDisplayRole()}
           </p>
           
+          {/* Подсказка о других доступных ролях */}
           {hasMultipleRoles && otherRoles.length > 0 && (
             <div className="other-roles-hint">
               💡 У вас также есть другие роли: 
@@ -218,7 +229,8 @@ const Dashboard = () => {
         </div>
 
         <div className="stats-grid">
-          {activeRole === ROLES.ADMIN && (
+          {/* Показываем статистику только для активной роли */}
+          {isActiveRole(ROLES.ADMIN) && (
             <div className="stat-card">
               <div className="stat-icon">📊</div>
               <div className="stat-content">
@@ -228,7 +240,7 @@ const Dashboard = () => {
             </div>
           )}
           
-          {activeRole === ROLES.AUTHOR && (
+          {isActiveRole(ROLES.AUTHOR) && (
             <div className="stat-card">
               <div className="stat-icon">📝</div>
               <div className="stat-content">
@@ -238,7 +250,7 @@ const Dashboard = () => {
             </div>
           )}
           
-          {activeRole === ROLES.REVIEWER && (
+          {isActiveRole(ROLES.REVIEWER) && (
             <div className="stat-card">
               <div className="stat-icon">⏳</div>
               <div className="stat-content">
@@ -248,7 +260,8 @@ const Dashboard = () => {
             </div>
           )}
           
-          {activeRole !== ROLES.ADMIN && activeRole !== ROLES.AUTHOR && activeRole !== ROLES.REVIEWER && (
+          {/* Если нет подходящей статистики, показываем приветственную карточку */}
+          {!isActiveRole(ROLES.ADMIN) && !isActiveRole(ROLES.AUTHOR) && !isActiveRole(ROLES.REVIEWER) && (
             <div className="stat-card">
               <div className="stat-icon">👋</div>
               <div className="stat-content">
@@ -285,7 +298,7 @@ const Dashboard = () => {
                 Вы вошли в систему как {getDisplayRole()}
               </span>
             </div>
-            {activeRole === ROLES.AUTHOR && (
+            {isActiveRole(ROLES.AUTHOR) && (
               <div className="activity-item">
                 <span className="activity-date">Сегодня</span>
                 <span className="activity-text">
@@ -293,7 +306,7 @@ const Dashboard = () => {
                 </span>
               </div>
             )}
-            {activeRole === ROLES.REVIEWER && (
+            {isActiveRole(ROLES.REVIEWER) && (
               <div className="activity-item">
                 <span className="activity-date">Сегодня</span>
                 <span className="activity-text">

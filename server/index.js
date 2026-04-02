@@ -485,15 +485,14 @@ app.post('/api/user-roles', async (req, res) => {
     }
 
     // Отправляем ответ с ролями
-   res.json({
+    res.json({
       success: true,
-      roles: userRoles,  // ✅ Массив ролей: ['Автор', 'Рецензент']
+      roles: userRoles,
       user: {
         id: user.user_id,
         login: user.login,
         name: user.name,
-        email: user.email,
-        roles: userRoles  // ✅ Дублируем для удобства фронтенда
+        email: user.email
       }
     });
 
@@ -543,8 +542,13 @@ app.get('/api/user/:userId/roles', async (req, res) => {
 
 
 // ============================================
-// ДОБАВЛЕНИЕ РОЛИ ПОЛЬЗОВАТЕЛЮ (ИСПРАВЛЕНО)
+// ДОБАВЛЕНИЕ РОЛИ ПОЛЬЗОВАТЕЛЮ
 // ============================================
+
+// ============================================
+// ДОБАВЛЕНИЕ РОЛИ ПОЛЬЗОВАТЕЛЮ
+// ============================================
+
 app.post('/api/user/add-role', async (req, res) => {
   console.log("\n" + "=".repeat(60));
   console.log("🔥 POST /api/user/add-role ВЫЗВАН!");
@@ -563,7 +567,7 @@ app.post('/api/user/add-role', async (req, res) => {
 
     console.log(`🔍 Получен role: ${role}`);
 
-    // Маппинг: ID фронтенда → название в БД
+    // Маппинг ID роли -> название в БД
     const idToDbMapping = {
       'author': 'Автор',
       'reviewer': 'Рецензент',
@@ -571,23 +575,36 @@ app.post('/api/user/add-role', async (req, res) => {
       'admin': 'Администратор конференции'
     };
 
-    let roleName; // Название роли для БД
+    // Обратный маппинг (название БД -> ID)
+    const dbToIdMapping = {
+      'Автор': 'author',
+      'Рецензент': 'reviewer',
+      'Руководитель секции': 'section_head',
+      'Администратор конференции': 'admin'
+    };
 
-    // Определяем, что пришло: ID или название из БД
+    let roleName; // Название роли для БД
+    let roleId;   // ID роли для фронтенда
+
+    // Проверяем, что пришло: ID или название
     if (role in idToDbMapping) {
+      // Пришел ID (author, reviewer и т.д.)
       roleName = idToDbMapping[role];
-      console.log(`✅ ID роли "${role}" преобразован в название БД: "${roleName}"`);
-    } else if (Object.values(idToDbMapping).includes(role)) {
+      roleId = role;
+      console.log(`✅ Получен ID роли: ${role} -> преобразовано в название: ${roleName}`);
+    } else if (role in dbToIdMapping) {
+      // Пришло название (Автор, Рецензент и т.д.)
       roleName = role;
-      console.log(`✅ Получено название роли из БД: "${roleName}"`);
+      roleId = dbToIdMapping[role];
+      console.log(`✅ Получено название роли: ${role} -> преобразовано в ID: ${roleId}`);
     } else {
       return res.status(400).json({
         success: false,
-        error: `Некорректная роль: ${role}. Доступно: author, reviewer, section_head, admin или Автор, Рецензент, Руководитель секции, Администратор конференции`
+        error: `Некорректное название роли: ${role}. Доступные роли: author, reviewer, section_head, admin или Автор, Рецензент, Руководитель секции, Администратор конференции`
       });
     }
 
-    // Проверяем существование пользователя
+    // Проверяем, существует ли пользователь и получаем его данные
     const userCheck = await pool.query(
       "SELECT user_id, name, login, email FROM users WHERE user_id = $1",
       [userId]
@@ -602,13 +619,14 @@ app.post('/api/user/add-role', async (req, res) => {
 
     const user = userCheck.rows[0];
 
-    // Находим ID роли в таблице roles
+    // Находим ID роли в таблице roles по названию
     const roleResult = await pool.query(
       "SELECT role_id FROM roles WHERE role_name = $1",
       [roleName]
     );
 
     if (roleResult.rows.length === 0) {
+      console.log(`❌ Роль "${roleName}" не найдена в таблице roles`);
       return res.status(404).json({
         success: false,
         error: `Роль "${roleName}" не найдена в системе`
@@ -617,7 +635,7 @@ app.post('/api/user/add-role', async (req, res) => {
 
     const roleDbId = roleResult.rows[0].role_id;
 
-    // Проверяем, не добавлена ли роль уже
+    // Проверяем, есть ли уже такая роль у пользователя
     const existingRole = await pool.query(
       "SELECT * FROM user_roles WHERE user_id = $1 AND role_id = $2",
       [userId, roleDbId]
@@ -630,38 +648,44 @@ app.post('/api/user/add-role', async (req, res) => {
       });
     }
 
-    // Добавляем роль
+    // Добавляем роль пользователю
     await pool.query(
       "INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)",
       [userId, roleDbId]
     );
 
-    // Специальная обработка для рецензента
+    // ========== ДОБАВЛЯЕМ ОБРАБОТКУ ДЛЯ РЕЦЕНЗЕНТА ==========
+    // Если добавляется роль "Рецензент", создаем запись в таблице resensent
     if (roleName === 'Рецензент') {
-      console.log(`📝 Пользователь ${userId} становится рецензентом...`);
+      console.log(`📝 Пользователь ${userId} становится рецензентом, добавляем запись в таблицу resensent...`);
       
-      const nameParts = (user.name || '').trim().split(' ');
+      // Формируем полное имя рецензента
+      const nameParts = user.name.trim().split(' ');
       const lastName = nameParts[0] || '';
       const firstName = nameParts[1] || '';
       const middleName = nameParts.slice(2).join(' ') || '';
       const fullName = `${lastName} ${firstName} ${middleName}`.trim();
       
+      // Проверяем, существует ли уже запись для этого пользователя
       const existingResensent = await pool.query(
         `SELECT * FROM resensent WHERE user_id = $1`,
         [userId]
       );
       
       if (existingResensent.rows.length === 0) {
+        // Добавляем запись в таблицу resensent
         await pool.query(
           `INSERT INTO resensent (user_id, name_resensent, email, created_at) 
            VALUES ($1, $2, $3, NOW())`,
-          [userId, fullName || user.name || user.login, user.email || user.login]
+          [userId, fullName || user.name, user.email || user.login]
         );
-        console.log(`✅ Рецензент добавлен: ${fullName || user.name || user.login}`);
+        console.log(`✅ Рецензент добавлен в таблицу resensent: ${fullName || user.name}`);
+      } else {
+        console.log(`⚠️ Рецензент с user_id ${userId} уже существует в таблице resensent`);
       }
     }
 
-    // ✅ ГЛАВНОЕ: Возвращаем роли в формате БД (не конвертируем в ID!)
+    // Получаем обновленный список ролей пользователя (в ID формате для фронтенда)
     const updatedRolesResult = await pool.query(
       `SELECT r.role_name 
        FROM user_roles ur 
@@ -670,23 +694,18 @@ app.post('/api/user/add-role', async (req, res) => {
       [userId]
     );
 
-    // ✅ Возвращаем role_name как есть: ['Автор', 'Рецензент']
-    const updatedRoles = updatedRolesResult.rows.map(row => row.role_name);
+    // Преобразуем названия ролей в ID для фронтенда
+    const updatedRoles = updatedRolesResult.rows.map(row => {
+      return dbToIdMapping[row.role_name] || row.role_name;
+    });
 
     console.log(`✅ Роль "${roleName}" добавлена пользователю ${userId}`);
-    console.log(`📋 Обновлённые роли (БД-формат):`, updatedRoles);
+    console.log(`📋 Обновленный список ролей (ID):`, updatedRoles);
 
     res.json({
       success: true,
       message: `Роль "${roleName}" успешно добавлена`,
-      userRoles: updatedRoles,  // ✅ Теперь: ['Автор'], а не ['author']
-      user: {
-        id: user.user_id,
-        login: user.login,
-        name: user.name,
-        email: user.email,
-        roles: updatedRoles  // ✅ Для удобства фронтенда
-      }
+      userRoles: updatedRoles
     });
 
   } catch (error) {
@@ -702,8 +721,9 @@ app.post('/api/user/add-role', async (req, res) => {
 
 
 // ============================================
-// УДАЛЕНИЕ РОЛИ У ПОЛЬЗОВАТЕЛЯ (ИСПРАВЛЕНО)
+// УДАЛЕНИЕ РОЛИ У ПОЛЬЗОВАТЕЛЯ
 // ============================================
+
 app.delete('/api/user/remove-role', async (req, res) => {
   console.log("\n" + "=".repeat(60));
   console.log("🔥 DELETE /api/user/remove-role ВЫЗВАН!");
@@ -779,8 +799,9 @@ app.delete('/api/user/remove-role', async (req, res) => {
     }
 
     // ========== ОБРАБОТКА УДАЛЕНИЯ РЕЦЕНЗЕНТА ==========
+    // Если удаляется роль "Рецензент", удаляем запись из таблицы resensent
     if (roleName === 'Рецензент') {
-      console.log(`🗑️ Пользователь ${userId} больше не рецензент...`);
+      console.log(`🗑️ Пользователь ${userId} больше не рецензент, удаляем из таблицы resensent...`);
       
       await pool.query(
         `DELETE FROM resensent WHERE user_id = $1`,
@@ -789,7 +810,7 @@ app.delete('/api/user/remove-role', async (req, res) => {
       console.log(`✅ Рецензент удален из таблицы resensent`);
     }
 
-    // Получаем обновленный список ролей (в формате БД!)
+    // Получаем обновленный список ролей
     const updatedRolesResult = await pool.query(
       `SELECT r.role_name 
        FROM user_roles ur 
@@ -798,19 +819,19 @@ app.delete('/api/user/remove-role', async (req, res) => {
       [userId]
     );
 
-    // ✅ Возвращаем названия из БД, а не ID
-    const updatedRoles = updatedRolesResult.rows.map(row => row.role_name);
+    const updatedRoles = updatedRolesResult.rows.map(row => {
+      return dbToIdMapping[row.role_name] || row.role_name;
+    });
 
     console.log(`✅ Роль "${roleName}" удалена у пользователя ${userId}`);
 
-    // ✅ ОТВЕТ СЕРВЕРА
     res.json({
       success: true,
       message: `Роль "${roleName}" успешно удалена`,
-      userRoles: updatedRoles  // ✅ ['Автор'], а не ['author']
+      userRoles: updatedRoles
     });
 
-  } catch (error) {  // ← ✅ Закрывающий catch для try
+  } catch (error) {
     console.error("❌ Ошибка при удалении роли:", error);
     res.status(500).json({
       success: false,
@@ -818,7 +839,7 @@ app.delete('/api/user/remove-role', async (req, res) => {
       details: error.message
     });
   }
-}); 
+});
 
 
 
@@ -1642,9 +1663,13 @@ app.get('/api/users', async (req, res) => {
 });
 
 
+
+
 // ============================================
-// ОБНОВЛЕНИЕ РОЛЕЙ ПОЛЬЗОВАТЕЛЯ (ИСПРАВЛЕНО)
+// ОБНОВЛЕНИЕ РОЛИ ПОЛЬЗОВАТЕЛЯ - http://localhost:5000/api/users/:id/role
 // ============================================
+
+// server.js - обновленный эндпоинт для изменения ролей
 app.put('/api/user/update-roles', async (req, res) => {
   console.log("\n" + "=".repeat(60));
   console.log("🔥 PUT /api/user/update-roles ВЫЗВАН!");
@@ -1658,32 +1683,6 @@ app.put('/api/user/update-roles', async (req, res) => {
       return res.status(400).json({
         success: false,
         error: "Не указан ID пользователя или список ролей"
-      });
-    }
-
-    // ✅ Маппинг: ID фронтенда → название в БД
-    const idToDbMapping = {
-      'author': 'Автор',
-      'reviewer': 'Рецензент',
-      'section_head': 'Руководитель секции',
-      'admin': 'Администратор конференции'
-    };
-
-    // ✅ Нормализуем роли: конвертируем ID в названия БД
-    const normalizedRoles = roles.map(role => {
-      // Если это ID (author, reviewer...) → конвертируем в название БД
-      if (role in idToDbMapping) {
-        return idToDbMapping[role];
-      }
-      // Если уже название из БД → оставляем как есть
-      return role;
-    });
-
-    // ✅ Проверка: нельзя удалить все роли
-    if (normalizedRoles.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: "У пользователя должна быть хотя бы одна роль"
       });
     }
 
@@ -1704,7 +1703,7 @@ app.put('/api/user/update-roles', async (req, res) => {
       
       const user = userInfo.rows[0];
 
-      // Получаем текущие роли пользователя (для сравнения)
+      // Получаем текущие роли пользователя
       const currentRolesResult = await client.query(
         `SELECT r.role_name 
          FROM user_roles ur 
@@ -1715,9 +1714,9 @@ app.put('/api/user/update-roles', async (req, res) => {
       
       const currentRoles = currentRolesResult.rows.map(row => row.role_name);
       
-      // Проверяем изменение роли "Рецензент" для таблицы resensent
+      // Проверяем, была ли добавлена или удалена роль "Рецензент"
       const wasReviewer = currentRoles.includes('Рецензент');
-      const isReviewer = normalizedRoles.includes('Рецензент');
+      const isReviewer = roles.includes('Рецензент');
       
       // Удаляем все существующие роли пользователя
       await client.query(
@@ -1725,12 +1724,9 @@ app.put('/api/user/update-roles', async (req, res) => {
         [userId]
       );
 
-      // ✅ Добавляем новые роли с валидацией
-      const successfullyAddedRoles = [];
-      const failedRoles = [];
-
-      for (const roleName of normalizedRoles) {
-        // Находим роль в таблице roles
+      // Добавляем новые роли
+      for (const roleName of roles) {
+        // Находим ID роли
         const roleResult = await client.query(
           "SELECT role_id FROM roles WHERE role_name = $1",
           [roleName]
@@ -1742,35 +1738,21 @@ app.put('/api/user/update-roles', async (req, res) => {
             "INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)",
             [userId, roleId]
           );
-          successfullyAddedRoles.push(roleName);
-        } else {
-          // ❌ Роль не найдена в БД — запоминаем для отчёта
-          failedRoles.push(roleName);
-          console.warn(`⚠️ Роль "${roleName}" не найдена в таблице roles`);
         }
       }
-
-      // ✅ Если какие-то роли не удалось добавить — предупреждаем (но не откатываем)
-      if (failedRoles.length > 0) {
-        console.warn(`⚠️ Не удалось добавить роли: ${failedRoles.join(', ')}`);
-      }
-
-      // ✅ Если ни одна роль не добавлена — ошибка
-      if (successfullyAddedRoles.length === 0) {
-        throw new Error("Не удалось добавить ни одной роли (проверьте названия в таблице roles)");
-      }
-
-      // ========== ОБРАБОТКА ТАБЛИЦЫ resensent ==========
+      
+      // Обработка таблицы resensent
       if (!wasReviewer && isReviewer) {
         // Роль "Рецензент" была ДОБАВЛЕНА
         console.log(`📝 Добавляем пользователя ${userId} в таблицу resensent...`);
         
-        const nameParts = (user.name || '').trim().split(' ');
+        const nameParts = user.name.trim().split(' ');
         const lastName = nameParts[0] || '';
         const firstName = nameParts[1] || '';
         const middleName = nameParts.slice(2).join(' ') || '';
         const fullName = `${lastName} ${firstName} ${middleName}`.trim();
         
+        // Проверяем, существует ли уже запись
         const existingResensent = await client.query(
           `SELECT * FROM resensent WHERE user_id = $1`,
           [userId]
@@ -1780,9 +1762,9 @@ app.put('/api/user/update-roles', async (req, res) => {
           await client.query(
             `INSERT INTO resensent (user_id, name_resensent, email, created_at) 
              VALUES ($1, $2, $3, NOW())`,
-            [userId, fullName || user.name || user.login, user.email || user.login]
+            [userId, fullName, user.email]
           );
-          console.log(`✅ Рецензент добавлен в таблицу resensent: ${fullName || user.name}`);
+          console.log(`✅ Рецензент добавлен в таблицу resensent: ${fullName}`);
         }
       } else if (wasReviewer && !isReviewer) {
         // Роль "Рецензент" была УДАЛЕНА
@@ -1797,49 +1779,31 @@ app.put('/api/user/update-roles', async (req, res) => {
 
       await client.query('COMMIT');
 
-      // ✅ ГЛАВНОЕ: Возвращаем роли, которые РЕАЛЬНО сохранились в БД
-      // (а не то, что пришло в запросе)
-      const finalRolesResult = await client.query(
-        `SELECT r.role_name 
-         FROM user_roles ur 
-         JOIN roles r ON ur.role_id = r.role_id 
-         WHERE ur.user_id = $1`,
-        [userId]
-      );
-      
-      const finalRoles = finalRolesResult.rows.map(row => row.role_name);
-
-      console.log(`✅ Роли пользователя ${userId} обновлены:`, finalRoles);
+      console.log(`✅ Роли пользователя ${userId} обновлены:`, roles);
 
       res.json({
         success: true,
         message: "Роли успешно обновлены",
-        roles: finalRoles,  // ✅ Авторитетный список из БД
-        warnings: failedRoles.length > 0 
-          ? `Не найдены роли: ${failedRoles.join(', ')}` 
-          : null
+        roles: roles
       });
 
     } catch (err) {
       await client.query('ROLLBACK');
-      console.error("❌ Ошибка в транзакции:", err);
       throw err;
     } finally {
       client.release();
     }
 
   } catch (error) {
-    console.error("❌ Ошибка при обновлении ролей:", error);
+    console.error("❌ Ошибка:", error);
     res.status(500).json({
       success: false,
-      error: "Ошибка сервера при обновлении ролей",
+      error: "Ошибка сервера",
       details: error.message
     });
   }
 });
-
-
-// // ============================================
+// ============================================
 // ПОЛУЧЕНИЕ РУКОВОДИТЕЛЕЙ СЕКЦИЙ - http://localhost:5000/api/users/section-heads
 // ============================================
 app.get('/api/users/section-heads', async (req, res) => {
@@ -1984,21 +1948,19 @@ app.post('/api/user/change-email', async (req, res) => {
       });
     }
     
-    // Обновляем email и логин в базе данных
+    // Обновляем email в базе данных (только email)
     const updateResult = await client.query(
       `UPDATE users 
-       SET email = $1,
-           login = $1
+       SET email = $1
        WHERE user_id = $2 
        RETURNING user_id, login, email, name`,
       [newEmail, userId]
     );
 
-    console.log('✅ Email и логин успешно обновлены в БД для пользователя:', userId);
+    console.log('✅ Email успешно обновлен в БД для пользователя:', userId);
     console.log('📧 Старый email:', user.email);
     console.log('📧 Новый email:', newEmail);
     console.log('👤 Обновленные данные:', updateResult.rows[0]);
-
     
     res.json({ 
       success: true, 
