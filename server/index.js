@@ -4,6 +4,7 @@ const cors = require("cors");
 const pool = require("./db");
 const bcrypt = require("bcryptjs");
 
+const db = require('./db');  // <-- ДОБАВЬТЕ ЭТУ СТРОКУ
 // Настройка CORS для React
 app.use(cors({
     origin: "http://localhost:3000",
@@ -1522,62 +1523,6 @@ app.get('/api/sections', async (req, res) => {
   }
 });
 
-// ============================================
-// НАЗНАЧЕНИЕ РУКОВОДИТЕЛЯ СЕКЦИИ - http://localhost:5000/api/sections/:id/head
-// ============================================
-app.put('/api/sections/:id/head', async (req, res) => {
-  console.log("\n" + "=".repeat(60));
-  console.log("🔥 PUT /api/sections/:id/head ВЫЗВАН!");
-  console.log("=".repeat(60) + "\n");
-
-  try {
-    const { id } = req.params;
-    const { headId } = req.body;
-
-    // Проверяем, что секция существует
-    const sectionCheck = await pool.query(
-      'SELECT * FROM sections WHERE id_sections = $1',
-      [id]
-    );
-
-    if (sectionCheck.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'Секция не найдена'
-      });
-    }
-
-    // Обновляем руководителя секции
-    const result = await pool.query(
-      `UPDATE sections 
-       SET user_id = $1
-       WHERE id_sections = $2
-       RETURNING *`,
-      [headId, id]
-    );
-
-    console.log(`✅ Руководитель назначен для секции ${id}`);
-
-    res.json({
-      success: true,
-      message: 'Руководитель успешно назначен',
-      section: {
-        id: result.rows[0].id_sections,
-        name: result.rows[0].name_section,
-        head_id: result.rows[0].user_id
-      }
-    });
-
-  } catch (error) {
-    console.error('❌ Ошибка при назначении руководителя:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Ошибка при назначении руководителя',
-      details: error.message
-    });
-  }
-});
-
 
 // ============================================
 // ПОЛУЧЕНИЕ ПОЛЬЗОВАТЕЛЕЙ - http://localhost:5000/api/users/:id
@@ -1880,6 +1825,140 @@ app.get('/api/users/section-heads', async (req, res) => {
     });
   }
 });
+
+
+
+
+
+
+
+
+
+
+// // ============================================
+// НАЗНАЧЕНИЕ РУКОВОДИТЕЛЕЙ СЕКЦИЙ - http://localhost:5000/api/users/section-heads
+// ============================================
+// server/index.js
+
+// Получение назначений руководителей для конференции
+app.get('/api/section-assignments', async (req, res) => {
+  try {
+    const { conferenceId } = req.query;
+    
+    if (!conferenceId) {
+      return res.status(400).json({ success: false, error: 'Не указан ID конференции' });
+    }
+
+    const query = `
+      SELECT 
+        s.name_section as section_name,
+        hs.user_id as head_id,
+        u.name as head_name
+      FROM sections s
+      LEFT JOIN header_section hs ON s.id_sections = hs.id_section
+      LEFT JOIN users u ON hs.user_id = u.user_id
+      WHERE s.conference_id = $1
+    `;
+    
+    const result = await db.query(query, [conferenceId]);
+    
+    res.json({
+      success: true,
+      assignments: result.rows
+    });
+  } catch (error) {
+    console.error('Ошибка при получении назначений:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Сохранение назначения руководителя
+app.post('/api/section-assignments', async (req, res) => {
+  try {
+    const { conferenceId, sectionName, headId } = req.body;
+    
+    if (!conferenceId || !sectionName) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Не указаны ID конференции или название секции' 
+      });
+    }
+
+    // 1. Найти секцию
+    const findSectionQuery = `
+      SELECT id_sections 
+      FROM sections 
+      WHERE conference_id = $1 AND name_section = $2
+    `;
+    
+    const sectionResult = await db.query(findSectionQuery, [conferenceId, sectionName]);
+    
+    if (sectionResult.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Секция не найдена' 
+      });
+    }
+    
+    const sectionId = sectionResult.rows[0].id_sections;
+    
+    // 2. Проверить существующее назначение
+    const checkQuery = `
+      SELECT id_header_section 
+      FROM header_section 
+      WHERE id_section = $1
+    `;
+    
+    const existingResult = await db.query(checkQuery, [sectionId]);
+    
+    if (existingResult.rows.length > 0) {
+      // Обновить
+      const updateQuery = `
+        UPDATE header_section 
+        SET user_id = $1 
+        WHERE id_section = $2
+        RETURNING *
+      `;
+      
+      const updateResult = await db.query(updateQuery, [headId || null, sectionId]);
+      
+      res.json({
+        success: true,
+        message: 'Назначение обновлено',
+        assignment: updateResult.rows[0]
+      });
+    } else {
+      // Создать новое назначение
+      const insertQuery = `
+        INSERT INTO header_section (user_id, id_section)
+        VALUES ($1, $2)
+        RETURNING *
+      `;
+      
+      const insertResult = await db.query(insertQuery, [headId || null, sectionId]);
+      
+      res.json({
+        success: true,
+        message: 'Руководитель назначен',
+        assignment: insertResult.rows[0]
+      });
+    }
+    
+  } catch (error) {
+    console.error('Ошибка при сохранении назначения:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+
+
+
+
+
+
 
 // ============================================
 // ПОЛУЧЕНИЕ СПИСКА КОНФЕРЕНЦИЙ
