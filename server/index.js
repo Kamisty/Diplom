@@ -5,7 +5,6 @@ const pool = require("./db");
 const bcrypt = require("bcryptjs");
 
 const db = require('./db');  // <-- ДОБАВЬТЕ ЭТУ СТРОКУ
-const db = require('./db');  // <-- ДОБАВЬТЕ ЭТУ СТРОКУ
 // Настройка CORS для React
 app.use(cors({
     origin: "http://localhost:3000",
