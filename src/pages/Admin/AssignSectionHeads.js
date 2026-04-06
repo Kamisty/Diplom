@@ -1,5 +1,4 @@
-// src/pages/Admin/AssignSectionHeads.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './Admin.css';
 
 const AssignSectionHeads = () => {
@@ -9,65 +8,12 @@ const AssignSectionHeads = () => {
   const [sectionHeads, setSectionHeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingHeads, setLoadingHeads] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [savingSectionId, setSavingSectionId] = useState(null);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
 
-  useEffect(() => {
-    fetchConferences();
-    fetchSectionHeads();
-  }, []);
-
-  // Когда выбрана конференция, достаем её секции из поля sections
-  useEffect(() => {
-    if (selectedConference) {
-      const conference = conferences.find(c => c.id === parseInt(selectedConference));
-      if (conference && conference.sections) {
-        console.log('Секции конференции:', conference.sections);
-        
-        // Загружаем назначения для этой конференции
-        loadSectionAssignments(conference.id);
-        
-        // Преобразуем массив названий секций в объекты
-        const sectionsArray = conference.sections.map((sectionName, index) => ({
-          id: `temp-${index}`,
-          name: sectionName,
-          conferenceId: conference.id,
-          headId: null
-        }));
-        
-        setSections(sectionsArray);
-      } else {
-        setSections([]);
-      }
-    } else {
-      setSections([]);
-    }
-  }, [selectedConference, conferences]);
-
-  // Загрузка назначений руководителей для конференции
-  const loadSectionAssignments = async (conferenceId) => {
-    try {
-      const response = await fetch(`http://localhost:5000/api/section-assignments?conferenceId=${conferenceId}`);
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Назначения руководителей:', data);
-        
-        if (data.success && data.assignments) {
-          setSections(prevSections => 
-            prevSections.map(section => {
-              const assignment = data.assignments.find(a => a.section_name === section.name);
-              return assignment ? { ...section, headId: assignment.head_id } : section;
-            })
-          );
-        }
-      }
-    } catch (err) {
-      console.error('Ошибка загрузки назначений:', err);
-    }
-  };
-
-  const fetchConferences = async () => {
+  // Загрузка конференций
+  const fetchConferences = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch('http://localhost:5000/api/conferences');
@@ -86,12 +32,12 @@ const AssignSectionHeads = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const fetchSectionHeads = async () => {
+  // Загрузка руководителей
+  const fetchSectionHeads = useCallback(async () => {
     try {
       setLoadingHeads(true);
-      
       const response = await fetch('http://localhost:5000/api/users/section-heads');
       
       if (!response.ok) {
@@ -112,7 +58,61 @@ const AssignSectionHeads = () => {
     } finally {
       setLoadingHeads(false);
     }
-  };
+  }, []);
+
+  // Загрузка секций и назначений для выбранной конференции
+  const loadSectionsAndAssignments = useCallback(async (conferenceId) => {
+    try {
+      // Загружаем секции конференции
+      const sectionsResponse = await fetch(`http://localhost:5000/api/conferences/${conferenceId}/sections`);
+      const sectionsData = await sectionsResponse.json();
+      
+      console.log('Загруженные секции:', sectionsData);
+      
+      if (sectionsData.success && Array.isArray(sectionsData.sections)) {
+        // Загружаем назначения
+        const assignmentsResponse = await fetch(`http://localhost:5000/api/section-assignments?conferenceId=${conferenceId}`);
+        let assignments = [];
+        
+        if (assignmentsResponse.ok) {
+          const assignmentsData = await assignmentsResponse.json();
+          if (assignmentsData.success && Array.isArray(assignmentsData.assignments)) {
+            assignments = assignmentsData.assignments;
+          }
+        }
+        
+        // Объединяем секции с назначениями
+        const sectionsWithHeads = sectionsData.sections.map(section => ({
+          id: section.id,
+          name: section.name,
+          conferenceId: parseInt(conferenceId),
+          headId: assignments.find(a => a.section_name === section.name)?.head_id || null
+        }));
+        
+        setSections(sectionsWithHeads);
+      } else {
+        setSections([]);
+      }
+    } catch (err) {
+      console.error('Ошибка загрузки секций:', err);
+      setError('Не удалось загрузить секции');
+      setSections([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchConferences();
+    fetchSectionHeads();
+  }, [fetchConferences, fetchSectionHeads]);
+
+  // Когда выбрана конференция, загружаем её секции
+  useEffect(() => {
+    if (selectedConference) {
+      loadSectionsAndAssignments(parseInt(selectedConference));
+    } else {
+      setSections([]);
+    }
+  }, [selectedConference, loadSectionsAndAssignments]);
 
   const handleConferenceChange = (e) => {
     setSelectedConference(e.target.value);
@@ -121,18 +121,19 @@ const AssignSectionHeads = () => {
   };
 
   const handleAssignHead = (sectionIndex, userId) => {
-    setSections(sections.map((section, index) =>
-      index === sectionIndex ? { ...section, headId: userId } : section
-    ));
+    setSections(prevSections => 
+      prevSections.map((section, index) =>
+        index === sectionIndex ? { ...section, headId: userId ? parseInt(userId) : null } : section
+      )
+    );
   };
 
   const handleSaveSection = async (sectionIndex) => {
     const section = sections[sectionIndex];
+    setSavingSectionId(section.id);
+    setError(null);
     
     try {
-      setSaving(true);
-      setError(null);
-      
       const response = await fetch('http://localhost:5000/api/section-assignments', {
         method: 'POST',
         headers: {
@@ -146,7 +147,8 @@ const AssignSectionHeads = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Ошибка при сохранении');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Ошибка при сохранении');
       }
 
       const result = await response.json();
@@ -155,14 +157,25 @@ const AssignSectionHeads = () => {
       setSuccessMessage(`Руководитель для секции "${section.name}" назначен!`);
       setTimeout(() => setSuccessMessage(''), 3000);
       
-      // Обновляем назначения
-      loadSectionAssignments(parseInt(selectedConference));
+      // Обновляем данные после сохранения
+      await loadSectionsAndAssignments(parseInt(selectedConference));
       
     } catch (err) {
       console.error('Ошибка сохранения:', err);
       setError(`Ошибка: ${err.message}`);
     } finally {
-      setSaving(false);
+      setSavingSectionId(null);
+    }
+  };
+
+  // Ручное обновление секций
+  const handleRefreshSections = async () => {
+    if (selectedConference) {
+      setSuccessMessage('');
+      setError(null);
+      await loadSectionsAndAssignments(parseInt(selectedConference));
+      setSuccessMessage('Список секций обновлён');
+      setTimeout(() => setSuccessMessage(''), 2000);
     }
   };
 
@@ -173,7 +186,7 @@ const AssignSectionHeads = () => {
     const head = sectionHeads.find(u => u.id === headId);
     if (!head) return 'Не назначен';
     
-    return head.name || 'Имя не указано';
+    return head.name || head.login || 'Имя не указано';
   };
 
   const getSelectedConferenceTitle = () => {
@@ -199,6 +212,7 @@ const AssignSectionHeads = () => {
         {error && (
           <div className="error-message">
             {error}
+            <button onClick={() => setError(null)} className="close-error">×</button>
           </div>
         )}
 
@@ -229,7 +243,16 @@ const AssignSectionHeads = () => {
 
           {selectedConference && (
             <div className="sections-list">
-              <h2>Секции конференции: {getSelectedConferenceTitle()}</h2>
+              <div className="sections-header">
+                <h2>Секции конференции: {getSelectedConferenceTitle()}</h2>
+                <button 
+                  className="btn-refresh" 
+                  onClick={handleRefreshSections}
+                  disabled={loadingHeads}
+                >
+                  🔄 Обновить секции
+                </button>
+              </div>
               
               {loadingHeads && (
                 <div className="loading-small">Загрузка списка руководителей...</div>
@@ -252,18 +275,18 @@ const AssignSectionHeads = () => {
                       </div>
 
                       <div className="assign-control">
-                        <label htmlFor={`head-${index}`}>Назначить руководителя:</label>
+                        <label htmlFor={`head-${section.id}`}>Назначить руководителя:</label>
                         <select
-                          id={`head-${index}`}
+                          id={`head-${section.id}`}
                           value={section.headId || ''}
-                          onChange={(e) => handleAssignHead(index, e.target.value ? parseInt(e.target.value) : null)}
+                          onChange={(e) => handleAssignHead(index, e.target.value)}
                           className="head-select"
-                          disabled={saving || loadingHeads}
+                          disabled={savingSectionId === section.id || loadingHeads}
                         >
                           <option value="">-- Не назначать --</option>
                           {sectionHeads.map(head => (
                             <option key={head.id} value={head.id}>
-                              {head.name}
+                              {head.name || head.login}
                             </option>
                           ))}
                         </select>
@@ -273,9 +296,9 @@ const AssignSectionHeads = () => {
                         <button 
                           className="btn-save"
                           onClick={() => handleSaveSection(index)}
-                          disabled={saving}
+                          disabled={savingSectionId === section.id}
                         >
-                          {saving ? 'Сохранение...' : 'Сохранить'}
+                          {savingSectionId === section.id ? 'Сохранение...' : 'Сохранить'}
                         </button>
                       </div>
                     </div>

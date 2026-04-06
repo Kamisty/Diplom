@@ -4,6 +4,7 @@ const cors = require("cors");
 const pool = require("./db");
 const bcrypt = require("bcryptjs");
 
+const db = require('./db');  // <-- ДОБАВЬТЕ ЭТУ СТРОКУ
 // Настройка CORS для React
 app.use(cors({
     origin: "http://localhost:3000",
@@ -1051,106 +1052,77 @@ app.post('/api/conferences', async (req, res) => {
       });
     }
 
-    // Преобразуем массив секций в JSON для PostgreSQL
-    const sectionsJson = JSON.stringify(nonEmptySections);
-
-    // Проверяем структуру таблицы conferences
+    // Начинаем транзакцию
+    const client = await pool.connect();
+    
     try {
-      // Сначала проверим, существует ли таблица и какие в ней колонки
-      const tableCheck = await pool.query(`
-        SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_name = 'conferences'
-      `);
+      await client.query('BEGIN');
 
-      console.log('Структура таблицы conferences:', tableCheck.rows.map(r => r.column_name));
+      // ✅ Убрали created_at и updated_at
+      const query = `
+        INSERT INTO conferences 
+        (title, description, start_date, end_date, submission_deadline, 
+         location, format, created_by)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING id, title, created_by
+      `;
 
-      // Если таблицы нет, создаем её
-      if (tableCheck.rows.length === 0) {
-        console.log('Таблица conferences не найдена, создаем...');
-        await pool.query(`
-          CREATE TABLE IF NOT EXISTS conferences (
-            id SERIAL PRIMARY KEY,
-            title VARCHAR(255) NOT NULL,
-            description TEXT,
-            start_date DATE NOT NULL,
-            end_date DATE NOT NULL,
-            submission_deadline DATE NOT NULL,
-            location VARCHAR(255) NOT NULL,
-            format VARCHAR(50) CHECK (format IN ('offline', 'online', 'hybrid')),
-            section JSONB DEFAULT '[]',
-            created_by INTEGER REFERENCES users(user_id) ON DELETE SET NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-          )
-        `);
-        console.log('✅ Таблица conferences создана');
-      }
-    } catch (err) {
-      console.log('Ошибка при проверке таблицы:', err.message);
-    }
-
-    // Вставляем данные в таблицу conferences
-    const query = `
-      INSERT INTO conferences 
-      (title, description, start_date, end_date, submission_deadline, 
-       location, format, section, created_by)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      RETURNING id, title, created_by
-    `;
-
-    const values = [
-      title,
-      description,
-      start_date,
-      end_date,
-      submission_deadline,
-      location,
-      format,
-      sectionsJson,
-      created_by
-    ];
-
-    const result = await pool.query(query, values);
-    const conferenceId = result.rows[0].id;
-
-    console.log(`✅ Конференция создана с ID: ${conferenceId}`);
-    console.log(`👤 Создатель: ${userCheck.rows[0].login} (ID: ${created_by})`);
-
-
-  try {
-  for (const sectionName of nonEmptySections) {
-    await pool.query(
-      `INSERT INTO sections (conference_id, name_section, user_id) 
-       VALUES ($1, $2, $3)`,
-      [conferenceId, sectionName, created_by] // Передаем ID создателя
-    );
-  }
-  console.log(`✅ Секции сохранены в таблицу sections для конференции ${conferenceId}`);
-} catch (sectionErr) {
-  console.error('❌ Ошибка при сохранении секций:', sectionErr);
-}
-
-    res.status(201).json({
-      success: true,
-      message: 'Конференция успешно создана!',
-      conference: {
-        id: conferenceId,
+      const values = [
         title,
-        created_by: {
-          id: userCheck.rows[0].user_id,
-          login: userCheck.rows[0].login,
-          name: userCheck.rows[0].name
-        },
-        created_at: result.rows[0].created_at
+        description,
+        start_date,
+        end_date,
+        submission_deadline,
+        location,
+        format,
+        created_by
+      ];
+
+      const result = await client.query(query, values);
+      const conferenceId = result.rows[0].id;
+
+      console.log(`✅ Конференция создана с ID: ${conferenceId}`);
+      console.log(`👤 Создатель: ${userCheck.rows[0].login} (ID: ${created_by})`);
+
+      // Сохраняем секции в таблицу sections
+      for (const sectionName of nonEmptySections) {
+        await client.query(
+          `INSERT INTO sections (conference_id, name_section, user_id) 
+           VALUES ($1, $2, $3)`,
+          [conferenceId, sectionName.trim(), created_by]
+        );
       }
-    });
+      console.log(`✅ Добавлено ${nonEmptySections.length} секций для конференции ${conferenceId}`);
+
+      await client.query('COMMIT');
+
+      res.status(201).json({
+        success: true,
+        message: 'Конференция успешно создана!',
+        conference: {
+          id: conferenceId,
+          title,
+          created_by: {
+            id: userCheck.rows[0].user_id,
+            login: userCheck.rows[0].login,
+            name: userCheck.rows[0].name
+          }
+        },
+        sections_count: nonEmptySections.length
+      });
+
+    } catch (err) {
+      await client.query('ROLLBACK');
+      console.error('❌ Ошибка в транзакции:', err);
+      throw err;
+    } finally {
+      client.release();
+    }
 
   } catch (error) {
     console.error('❌ Ошибка при создании конференции:', error);
     
-    // Проверяем специфические ошибки PostgreSQL
-    if (error.code === '42P01') { // Таблица не существует
+    if (error.code === '42P01') {
       return res.status(500).json({
         success: false,
         error: 'Таблица conferences не существует. Проверьте базу данных.',
@@ -1158,7 +1130,7 @@ app.post('/api/conferences', async (req, res) => {
       });
     }
     
-    if (error.code === '23503') { // Нарушение внешнего ключа
+    if (error.code === '23503') {
       return res.status(400).json({
         success: false,
         error: 'Указанный пользователь не существует',
@@ -1166,7 +1138,7 @@ app.post('/api/conferences', async (req, res) => {
       });
     }
 
-    if (error.code === '23502') { // NOT NULL violation
+    if (error.code === '23502') {
       return res.status(400).json({
         success: false,
         error: 'Отсутствует обязательное поле',
@@ -1182,34 +1154,37 @@ app.post('/api/conferences', async (req, res) => {
   }
 });
 
+
 // ============================================
 // ПОЛУЧЕНИЕ ВСЕХ КОНФЕРЕНЦИЙ - http://localhost:5000/api/conferences
 // ============================================
 app.get('/api/conferences', async (req, res) => {
   try {
     const query = `
-      SELECT c.*, 
-             u.login as creator_login, 
-             u.name as creator_name,
-             u.email as creator_email
+      SELECT 
+        c.*, 
+        u.login as creator_login, 
+        u.name as creator_name,
+        u.email as creator_email,
+        COALESCE(
+          (SELECT json_agg(json_build_object('id', s.id_sections, 'name', s.name_section))
+           FROM sections s
+           WHERE s.conference_id = c.id),
+          '[]'::json
+        ) as sections
       FROM conferences c
       LEFT JOIN users u ON c.created_by = u.user_id
+      GROUP BY c.id, u.login, u.name, u.email
       ORDER BY c.start_date DESC
     `;
     
     const result = await pool.query(query);
     
-    // Парсим JSON для секций
-    const conferences = result.rows.map(conf => ({
-      ...conf,
-      sections: conf.section ? JSON.parse(conf.section) : []
-    }));
-
-    console.log(`📊 Получено конференций: ${conferences.length}`);
+    console.log(`📊 Получено конференций: ${result.rows.length}`);
 
     res.json({
       success: true,
-      conferences
+      conferences: result.rows
     });
 
   } catch (error) {
@@ -1248,9 +1223,21 @@ app.get('/api/conferences/:id', async (req, res) => {
       });
     }
 
+    // Получаем секции для этой конференции
+    const sectionsQuery = `
+      SELECT 
+        s.id_sections as id,
+        s.name_section as name
+      FROM sections s
+      WHERE s.conference_id = $1
+      ORDER BY s.name_section
+    `;
+    
+    const sectionsResult = await pool.query(sectionsQuery, [id]);
+
     const conference = {
       ...result.rows[0],
-      sections: result.rows[0].section ? JSON.parse(result.rows[0].section) : []
+      sections: sectionsResult.rows
     };
 
     res.json({
@@ -1274,7 +1261,7 @@ app.get('/api/conferences/:id', async (req, res) => {
 app.put('/api/conferences/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const updates = req.body;
+    const { title, description, start_date, end_date, submission_deadline, location, format } = req.body;
 
     // Проверяем существование конференции
     const conferenceCheck = await pool.query(
@@ -1289,60 +1276,30 @@ app.put('/api/conferences/:id', async (req, res) => {
       });
     }
 
-    // Подготавливаем обновление
-    const setClause = [];
-    const values = [];
-    let paramIndex = 1;
-
-    const updateFields = {
-      title: updates.title,
-      description: updates.description,
-      start_date: updates.start_date,
-      end_date: updates.end_date,
-      submission_deadline: updates.submission_deadline,
-      location: updates.location,
-      format: updates.format,
-      section: updates.sections ? JSON.stringify(updates.sections) : undefined
-    };
-
-    for (const [field, value] of Object.entries(updateFields)) {
-      if (value !== undefined) {
-        setClause.push(`${field} = $${paramIndex}`);
-        values.push(value);
-        paramIndex++;
-      }
-    }
-
-    // Добавляем updated_at
-    setClause.push(`updated_at = CURRENT_TIMESTAMP`);
-
-    if (setClause.length === 1) { // Только updated_at
-      return res.status(400).json({
-        success: false,
-        error: 'Нет данных для обновления'
-      });
-    }
-
-    values.push(id); // для WHERE id = $last
-
     const query = `
       UPDATE conferences 
-      SET ${setClause.join(', ')}
-      WHERE id = $${paramIndex}
+      SET title = $1, 
+          description = $2, 
+          start_date = $3, 
+          end_date = $4, 
+          submission_deadline = $5, 
+          location = $6, 
+          format = $7
+      WHERE id = $8
       RETURNING *
     `;
 
-    const result = await pool.query(query, values);
+    const result = await pool.query(query, [
+      title, description, start_date, end_date, 
+      submission_deadline, location, format, id
+    ]);
     
     console.log(`✅ Конференция ${id} обновлена`);
 
     res.json({
       success: true,
       message: 'Конференция успешно обновлена',
-      conference: {
-        ...result.rows[0],
-        sections: JSON.parse(result.rows[0].section || '[]')
-      }
+      conference: result.rows[0]
     });
 
   } catch (error) {
@@ -1354,6 +1311,8 @@ app.put('/api/conferences/:id', async (req, res) => {
     });
   }
 });
+
+
 
 // ============================================
 // УДАЛЕНИЕ КОНФЕРЕНЦИИ - http://localhost:5000/api/conferences/:id
@@ -1394,6 +1353,177 @@ app.delete('/api/conferences/:id', async (req, res) => {
     });
   }
 });
+
+
+
+
+// ============================================
+// ПОЛУЧЕНИЕ СЕКЦИЙ КОНФЕРЕНЦИИ - http://localhost:5000/api/conferences/:id/sections
+// ============================================
+app.get('/api/conferences/:id/sections', async (req, res) => {
+  console.log("\n" + "=".repeat(60));
+  console.log("🔥 GET /api/conferences/:id/sections ВЫЗВАН!");
+  console.log(`📦 ID конференции: ${req.params.id}`);
+  console.log("=".repeat(60) + "\n");
+
+  try {
+    const { id } = req.params;
+
+    const query = `
+      SELECT 
+        s.id_sections as id,
+        s.name_section as name,
+        s.conference_id,
+        s.user_id as head_id,
+        u.name as head_name
+      FROM sections s
+      LEFT JOIN users u ON s.user_id = u.user_id
+      WHERE s.conference_id = $1
+      ORDER BY s.name_section
+    `;
+
+    const result = await pool.query(query, [id]);
+
+    console.log(`✅ Загружено секций: ${result.rows.length}`);
+
+    res.json({
+      success: true,
+      sections: result.rows
+    });
+
+  } catch (error) {
+    console.error('❌ Ошибка при получении секций конференции:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Ошибка при загрузке секций',
+      details: error.message
+    });
+  }
+});
+
+
+// ============================================
+// СОЗДАНИЕ СЕКЦИИ ДЛЯ КОНФЕРЕНЦИИ - http://localhost:5000/api/conferences/:id/sections
+// ============================================
+app.post('/api/conferences/:id/sections', async (req, res) => {
+  console.log("\n" + "=".repeat(60));
+  console.log("🔥 POST /api/conferences/:id/sections ВЫЗВАН!");
+  console.log("📦 Тело запроса:", req.body);
+  console.log("=".repeat(60) + "\n");
+
+  try {
+    const { id } = req.params;
+    const { name } = req.body;
+    
+    // ✅ Получаем реального пользователя из тела запроса
+    let userId = req.body.user_id;
+    
+    // Если user_id не передан, пытаемся получить из сессии или берем первого существующего
+    if (!userId) {
+      const userResult = await pool.query(
+        "SELECT user_id FROM users ORDER BY user_id LIMIT 1"
+      );
+      if (userResult.rows.length > 0) {
+        userId = userResult.rows[0].user_id;
+      } else {
+        return res.status(400).json({
+          success: false,
+          error: 'Нет пользователей в системе'
+        });
+      }
+    }
+
+    // Проверяем, существует ли пользователь
+    const userCheck = await pool.query(
+      "SELECT user_id FROM users WHERE user_id = $1",
+      [userId]
+    );
+    
+    if (userCheck.rows.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: `Пользователь с ID ${userId} не существует`
+      });
+    }
+
+    if (!name || name.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        error: 'Название секции обязательно'
+      });
+    }
+
+    // ✅ Вставляем секцию с правильным user_id
+    const query = `
+      INSERT INTO sections (conference_id, name_section, user_id)
+      VALUES ($1, $2, $3)
+      RETURNING id_sections as id, name_section as name
+    `;
+
+    const result = await pool.query(query, [id, name.trim(), userId]);
+
+    console.log(`✅ Секция "${name}" добавлена к конференции ${id} пользователем ${userId}`);
+
+    res.json({
+      success: true,
+      section: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('❌ Ошибка при создании секции:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Ошибка при создании секции',
+      details: error.message
+    });
+  }
+});
+
+
+// ============================================
+// УДАЛЕНИЕ СЕКЦИИ - http://localhost:5000/api/sections/:id
+// ============================================
+app.delete('/api/sections/:id', async (req, res) => {
+  console.log("\n" + "=".repeat(60));
+  console.log("🔥 DELETE /api/sections/:id ВЫЗВАН!");
+  console.log(`📦 ID секции: ${req.params.id}`);
+  console.log("=".repeat(60) + "\n");
+
+  try {
+    const { id } = req.params;
+
+    // Проверяем, существует ли секция
+    const checkQuery = 'SELECT id_sections FROM sections WHERE id_sections = $1';
+    const checkResult = await pool.query(checkQuery, [id]);
+
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Секция не найдена'
+      });
+    }
+
+    // Удаляем секцию
+    const deleteQuery = 'DELETE FROM sections WHERE id_sections = $1';
+    await pool.query(deleteQuery, [id]);
+
+    console.log(`✅ Секция ${id} удалена`);
+
+    res.json({
+      success: true,
+      message: 'Секция успешно удалена'
+    });
+
+  } catch (error) {
+    console.error('❌ Ошибка при удалении секции:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Ошибка при удалении секции',
+      details: error.message
+    });
+  }
+});
+
 
 // ============================================
 // СОХРАНЕНИЕ СЕКЦИЙ КОНФЕРЕНЦИИ - http://localhost:5000/api/sections
@@ -1517,62 +1647,6 @@ app.get('/api/sections', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Ошибка при загрузке секций',
-      details: error.message
-    });
-  }
-});
-
-// ============================================
-// НАЗНАЧЕНИЕ РУКОВОДИТЕЛЯ СЕКЦИИ - http://localhost:5000/api/sections/:id/head
-// ============================================
-app.put('/api/sections/:id/head', async (req, res) => {
-  console.log("\n" + "=".repeat(60));
-  console.log("🔥 PUT /api/sections/:id/head ВЫЗВАН!");
-  console.log("=".repeat(60) + "\n");
-
-  try {
-    const { id } = req.params;
-    const { headId } = req.body;
-
-    // Проверяем, что секция существует
-    const sectionCheck = await pool.query(
-      'SELECT * FROM sections WHERE id_sections = $1',
-      [id]
-    );
-
-    if (sectionCheck.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'Секция не найдена'
-      });
-    }
-
-    // Обновляем руководителя секции
-    const result = await pool.query(
-      `UPDATE sections 
-       SET user_id = $1
-       WHERE id_sections = $2
-       RETURNING *`,
-      [headId, id]
-    );
-
-    console.log(`✅ Руководитель назначен для секции ${id}`);
-
-    res.json({
-      success: true,
-      message: 'Руководитель успешно назначен',
-      section: {
-        id: result.rows[0].id_sections,
-        name: result.rows[0].name_section,
-        head_id: result.rows[0].user_id
-      }
-    });
-
-  } catch (error) {
-    console.error('❌ Ошибка при назначении руководителя:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Ошибка при назначении руководителя',
       details: error.message
     });
   }
@@ -1881,31 +1955,190 @@ app.get('/api/users/section-heads', async (req, res) => {
   }
 });
 
+
+
+
+
+
+
+
+
+
+// // ============================================
+// НАЗНАЧЕНИЕ РУКОВОДИТЕЛЕЙ СЕКЦИЙ - http://localhost:5000/api/users/section-heads
 // ============================================
-// ПОЛУЧЕНИЕ СПИСКА КОНФЕРЕНЦИЙ
-// ============================================
-app.get('/api/conferences', async (req, res) => {
+// server/index.js
+
+// Получение назначений руководителей для конференции
+app.get('/api/section-assignments', async (req, res) => {
   try {
-    console.log('📥 Запрос на получение конференций');
+    const { conferenceId } = req.query;
     
-    const result = await pool.query(`
-      SELECT  
-        name, 
-        description
-      FROM conferences 
-      ORDER BY deadline DESC
-    `);
+    if (!conferenceId) {
+      return res.status(400).json({ success: false, error: 'Не указан ID конференции' });
+    }
+
+    const query = `
+      SELECT 
+        s.name_section as section_name,
+        hs.user_id as head_id,
+        u.name as head_name
+      FROM sections s
+      LEFT JOIN header_section hs ON s.id_sections = hs.id_section
+      LEFT JOIN users u ON hs.user_id = u.user_id
+      WHERE s.conference_id = $1
+    `;
     
-    console.log(`📦 Найдено конференций: ${result.rows.length}`);
+    const result = await db.query(query, [conferenceId]);
     
-    res.json(result.rows);
+    res.json({
+      success: true,
+      assignments: result.rows
+    });
   } catch (error) {
-    console.error('❌ Ошибка при получении конференций:', error);
-    res.status(500).json({ error: 'Ошибка сервера' });
+    console.error('Ошибка при получении назначений:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Сохранение назначения руководителя
+app.post('/api/section-assignments', async (req, res) => {
+  try {
+    const { conferenceId, sectionName, headId } = req.body;
+    
+    if (!conferenceId || !sectionName) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Не указаны ID конференции или название секции' 
+      });
+    }
+
+    // 1. Найти секцию
+    const findSectionQuery = `
+      SELECT id_sections 
+      FROM sections 
+      WHERE conference_id = $1 AND name_section = $2
+    `;
+    
+    const sectionResult = await db.query(findSectionQuery, [conferenceId, sectionName]);
+    
+    if (sectionResult.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Секция не найдена' 
+      });
+    }
+    
+    const sectionId = sectionResult.rows[0].id_sections;
+    
+    // 2. Проверить существующее назначение
+    const checkQuery = `
+      SELECT id_header_section 
+      FROM header_section 
+      WHERE id_section = $1
+    `;
+    
+    const existingResult = await db.query(checkQuery, [sectionId]);
+    
+    if (existingResult.rows.length > 0) {
+      // Обновить
+      const updateQuery = `
+        UPDATE header_section 
+        SET user_id = $1 
+        WHERE id_section = $2
+        RETURNING *
+      `;
+      
+      const updateResult = await db.query(updateQuery, [headId || null, sectionId]);
+      
+      res.json({
+        success: true,
+        message: 'Назначение обновлено',
+        assignment: updateResult.rows[0]
+      });
+    } else {
+      // Создать новое назначение
+      const insertQuery = `
+        INSERT INTO header_section (user_id, id_section)
+        VALUES ($1, $2)
+        RETURNING *
+      `;
+      
+      const insertResult = await db.query(insertQuery, [headId || null, sectionId]);
+      
+      res.json({
+        success: true,
+        message: 'Руководитель назначен',
+        assignment: insertResult.rows[0]
+      });
+    }
+    
+  } catch (error) {
+    console.error('Ошибка при сохранении назначения:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
   }
 });
 
 
+
+
+// ===== СЕКЦИИ РУКОВОДИТЕЛЯ =====
+app.get('/api/sections/head/:userId', (req, res) => {
+  const { userId } = req.params;
+  
+  const query = `
+    SELECT 
+      s.id_sections as id,
+      s.name_section as name,
+      s.conference_id,
+      COUNT(r.report_id) as reports_count
+    FROM sections s
+    LEFT JOIN reports r ON r.id_sections = s.id_sections
+    WHERE s.user_id = $1
+    GROUP BY s.id_sections, s.name_section, s.conference_id
+    ORDER BY s.name_section
+  `;
+  
+  db.query(query, [userId], (err, results) => {
+    if (err) {
+      console.error('Ошибка:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+    res.json({ success: true, sections: results.rows });
+  });
+});
+
+// ===== ДОКЛАДЫ СЕКЦИИ =====
+app.get('/api/reports/section/:sectionId', (req, res) => {
+  const { sectionId } = req.params;
+  
+  const query = `
+    SELECT 
+      r.report_id as id,
+      r.title_report as title,
+      r.abstract,
+      r.keywords,
+      r.status,
+      r.created_at,
+      u.name as author_name,
+      u.login as author_login
+    FROM reports r
+    JOIN users u ON r.user_id = u.id
+    WHERE r.id_sections = $1
+    ORDER BY r.created_at DESC
+  `;
+  
+  db.query(query, [sectionId], (err, results) => {
+    if (err) {
+      console.error('Ошибка:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+    res.json({ success: true, reports: results.rows });
+  });
+});
 
 
 
@@ -2017,6 +2250,8 @@ app.post('/api/user/change-email', async (req, res) => {
   }
 });
 
+
+
 // ============================================
 // ПРОВЕРКА ТЕКУЩЕГО EMAIL (для отладки)
 // ============================================
@@ -2056,49 +2291,100 @@ app.get('/api/user/:userId/check-email', async (req, res) => {
 
 
 // ============================================
-// СМЕНА ПАРОЛЯ ПОЛЬЗОВАТЕЛЯ
+// ЗАПРОС НА ВОССТАНОВЛЕНИЕ ПАРОЛЯ (отправка кода)
 // ============================================
-app.post('/api/user/change-password', async (req, res) => {
+app.post('/api/user/forgot-password', async (req, res) => {
   const client = await pool.connect();
   
   try {
-    const { userId, currentPassword, newPassword } = req.body;
+    const { email } = req.body;
     
-    console.log('📦 Запрос на смену пароля для пользователя ID:', userId);
-    console.log('📦 Полученные данные:', { 
-      userId, 
-      currentPassword: currentPassword ? '***' : 'не указан', 
-      newPassword: newPassword ? '***' : 'не указан' 
+    console.log('📧 Запрос на восстановление пароля для email:', email);
+    
+    if (!email) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Email не указан' 
+      });
+    }
+    
+    // Находим пользователя по email
+    const userResult = await client.query(
+      'SELECT user_id, email, login FROM users WHERE email = $1',
+      [email]
+    );
+    
+    if (userResult.rows.length === 0) {
+      // Для безопасности не сообщаем, что пользователь не найден
+      console.log('⚠️ Пользователь с email не найден:', email);
+      return res.json({ 
+        success: true, 
+        message: 'Если пользователь существует, код отправлен на почту' 
+      });
+    }
+    
+    const user = userResult.rows[0];
+    
+    // Генерируем 6-значный код
+    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 15); // Код действителен 15 минут
+    
+    // Удаляем старые коды для этого email (если есть)
+    await client.query(
+      'DELETE FROM password_reset_codes WHERE email = $1',
+      [email]
+    );
+    
+    // Сохраняем новый код в базу данных
+    await client.query(
+      `INSERT INTO password_reset_codes (email, code, created_at, expires_at, used)
+       VALUES ($1, $2, NOW(), $3, false)`,
+      [email, resetCode, expiresAt]
+    );
+    
+    // Отправляем email с кодом
+    await sendResetCodeEmail(email, resetCode);
+    
+    console.log('✅ Код восстановления отправлен на:', email);
+    
+    res.json({ 
+      success: true, 
+      message: 'Код подтверждения отправлен на вашу почту' 
     });
     
-    // Валидация
-    if (!userId) {
-      console.log('❌ userId не указан');
-      return res.status(400).json({ 
-        success: false, 
-        error: 'ID пользователя не указан' 
-      });
-    }
-    
-    if (!currentPassword) {
-      console.log('❌ currentPassword не указан');
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Введите текущий пароль' 
-      });
-    }
-    
-    if (!newPassword) {
-      console.log('❌ newPassword не указан');
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Введите новый пароль' 
-      });
-    }
+  } catch (error) {
+    console.error('❌ Ошибка при отправке кода:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Ошибка при отправке кода восстановления' 
+    });
+  } finally {
+    client.release();
+  }
+});
 
+// ============================================
+// СБРОС ПАРОЛЯ (подтверждение кода и установка нового пароля)
+// ============================================
+app.post('/api/user/reset-password', async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    const { email, code, newPassword } = req.body;
+    
+    console.log('🔐 Запрос на сброс пароля для email:', email);
+    
+    // Валидация
+    if (!email || !code || !newPassword) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Все поля обязательны для заполнения' 
+      });
+    }
+    
     // Проверка сложности пароля
     if (newPassword.length < 8) {
-      console.log('❌ Пароль слишком короткий');
       return res.status(400).json({ 
         success: false, 
         error: 'Пароль должен содержать минимум 8 символов' 
@@ -2106,7 +2392,6 @@ app.post('/api/user/change-password', async (req, res) => {
     }
     
     if (!/[A-Z]/.test(newPassword)) {
-      console.log('❌ Нет заглавной буквы');
       return res.status(400).json({ 
         success: false, 
         error: 'Пароль должен содержать хотя бы одну заглавную букву' 
@@ -2114,119 +2399,74 @@ app.post('/api/user/change-password', async (req, res) => {
     }
     
     if (!/[0-9]/.test(newPassword)) {
-      console.log('❌ Нет цифры');
       return res.status(400).json({ 
         success: false, 
         error: 'Пароль должен содержать хотя бы одну цифру' 
       });
     }
     
-    // Проверяем, что новый пароль отличается от старого
-    if (currentPassword === newPassword) {
+    // Проверяем код восстановления
+    const resetResult = await client.query(
+      `SELECT * FROM password_reset_codes 
+       WHERE email = $1 AND code = $2 AND used = false AND expires_at > NOW()`,
+      [email, code]
+    );
+    
+    if (resetResult.rows.length === 0) {
       return res.status(400).json({ 
         success: false, 
-        error: 'Новый пароль должен отличаться от текущего' 
+        error: 'Неверный или просроченный код подтверждения' 
       });
     }
     
-    // Получаем данные пользователя
-    console.log('🔍 Поиск пользователя с ID:', userId);
+    // Находим пользователя
     const userResult = await client.query(
-      'SELECT user_id, password_hash FROM users WHERE user_id = $1',
-      [userId]
+      'SELECT user_id FROM users WHERE email = $1',
+      [email]
     );
     
-    console.log('📊 Результат запроса:', userResult.rows.length ? 'Пользователь найден' : 'Пользователь не найден');
-    
     if (userResult.rows.length === 0) {
-      console.log('❌ Пользователь не найден');
       return res.status(404).json({ 
         success: false, 
         error: 'Пользователь не найден' 
       });
     }
-
+    
     const user = userResult.rows[0];
-    console.log('👤 Найден пользователь:', { userId: user.user_id });
-    
-    // Проверяем текущий пароль
-    console.log('🔐 Проверка текущего пароля...');
-    let validPassword = false;
-    
-    try {
-      validPassword = await bcrypt.compare(currentPassword, user.password_hash);
-      console.log('✅ Результат проверки пароля:', validPassword ? 'верный' : 'неверный');
-    } catch (bcryptError) {
-      console.error('❌ Ошибка при сравнении паролей:', bcryptError);
-      return res.status(500).json({ 
-        success: false, 
-        error: 'Ошибка при проверке пароля' 
-      });
-    }
-    
-    if (!validPassword) {
-      console.log('❌ Неверный текущий пароль');
-      return res.status(401).json({ 
-        success: false, 
-        error: 'Неверный текущий пароль' 
-      });
-    }
     
     // Хешируем новый пароль
-    console.log('🔐 Хеширование нового пароля...');
     const saltRounds = 10;
-    let newPasswordHash;
-    
-    try {
-      newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
-      console.log('✅ Новый пароль захеширован');
-    } catch (hashError) {
-      console.error('❌ Ошибка при хешировании пароля:', hashError);
-      return res.status(500).json({ 
-        success: false, 
-        error: 'Ошибка при обработке пароля' 
-      });
-    }
+    const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
     
     // Обновляем пароль в базе данных
-    console.log('💾 Обновление пароля в БД...');
-    try {
-      await client.query(
-        `UPDATE users 
-         SET password_hash = $1
-         WHERE user_id = $2`,
-        [newPasswordHash, userId]
-      );
-      console.log('✅ Пароль обновлен в БД');
-    } catch (dbError) {
-      console.error('❌ Ошибка при обновлении БД:', dbError);
-      return res.status(500).json({ 
-        success: false, 
-        error: 'Ошибка при сохранении нового пароля' 
-      });
-    }
-
-    console.log('✅ Пароль успешно изменен для пользователя:', userId);
+    await client.query(
+      'UPDATE users SET password_hash = $1 WHERE user_id = $2',
+      [newPasswordHash, user.user_id]
+    );
+    
+    // Помечаем код как использованный
+    await client.query(
+      'UPDATE password_reset_codes SET used = true WHERE email = $1 AND code = $2',
+      [email, code]
+    );
+    
+    console.log('✅ Пароль успешно изменен для пользователя:', user.user_id);
     
     res.json({ 
       success: true, 
-      message: 'Пароль успешно изменен'
+      message: 'Пароль успешно изменен' 
     });
     
   } catch (error) {
-    console.error('❌ Общая ошибка при смене пароля:', error);
-    console.error('❌ Стек ошибки:', error.stack);
+    console.error('❌ Ошибка при сбросе пароля:', error);
     res.status(500).json({ 
       success: false, 
-      error: 'Ошибка сервера при смене пароля',
-      details: error.message 
+      error: 'Ошибка сервера при сбросе пароля' 
     });
   } finally {
     client.release();
-    console.log('📌 Соединение с БД освобождено');
   }
 });
-
 
 // ============================================
 // ЗАПУСК СЕРВЕРА

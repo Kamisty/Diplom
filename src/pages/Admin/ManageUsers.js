@@ -291,10 +291,6 @@ const ManageUsers = () => {
     setProfileData(null);
   }, []);
 
-  const handleEditUser = useCallback((userId) => {
-    console.log('Редактирование пользователя:', userId);
-  }, []);
-
   return (
     <div className="admin-page">
       <div className="container">

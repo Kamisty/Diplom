@@ -369,6 +369,167 @@ COMMENT ON TABLE coauthors IS 'Соавторы докладов';
 COMMENT ON TABLE reviews IS 'Рецензии на доклады';
 COMMENT ON TABLE section_program IS 'Программа секций';
 
+
+-- =====================================================
+-- ДОБАВЛЕНИЕ ТАБЛИЦЫ header_section (Руководители секций)
+-- =====================================================
+
+-- Добавляем последовательность для header_section
+DROP SEQUENCE IF EXISTS header_section_id_seq CASCADE;
+CREATE SEQUENCE IF NOT EXISTS header_section_id_seq START 1;
+
+-- Таблица руководителей секций
+CREATE TABLE IF NOT EXISTS public.header_section (
+    id_header_section INTEGER PRIMARY KEY DEFAULT nextval('header_section_id_seq'),
+    user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    id_section INTEGER NOT NULL REFERENCES sections(id_sections) ON DELETE CASCADE,
+    assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    assigned_by INTEGER REFERENCES users(user_id) ON DELETE SET NULL,
+    notes TEXT,
+    UNIQUE(id_section) -- Одна секция может иметь только одного руководителя
+);
+
+-- Индексы для header_section
+CREATE INDEX idx_header_section_user ON header_section(user_id);
+CREATE INDEX idx_header_section_section ON header_section(id_section);
+CREATE INDEX idx_header_section_assigned_at ON header_section(assigned_at);
+
+-- =====================================================
+-- ОБНОВЛЕНИЕ ТАБЛИЦЫ sections (убираем дублирующее поле user_id)
+-- =====================================================
+
+-- Удаляем поле user_id из sections, так как теперь руководитель в header_section
+ALTER TABLE sections DROP COLUMN IF EXISTS user_id;
+
+-- Добавляем поле created_by (кто создал секцию)
+ALTER TABLE sections ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(user_id) ON DELETE SET NULL;
+
+-- =====================================================
+-- ДОБАВЛЕНИЕ КОММЕНТАРИЕВ ДЛЯ НОВОЙ ТАБЛИЦЫ
+-- =====================================================
+
+COMMENT ON TABLE header_section IS 'Руководители секций';
+COMMENT ON COLUMN header_section.id_header_section IS 'Уникальный идентификатор';
+COMMENT ON COLUMN header_section.user_id IS 'ID пользователя-руководителя';
+COMMENT ON COLUMN header_section.id_section IS 'ID секции';
+COMMENT ON COLUMN header_section.assigned_at IS 'Дата назначения';
+COMMENT ON COLUMN header_section.assigned_by IS 'Кто назначил';
+COMMENT ON COLUMN header_section.notes IS 'Примечания';
+
+-- =====================================================
+-- ДОБАВЛЕНИЕ ТРИГГЕРА ДЛЯ updated_at В header_section (если нужно)
+-- =====================================================
+
+CREATE TRIGGER update_header_section_updated_at BEFORE UPDATE ON header_section
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- =====================================================
+-- ДОБАВЛЕНИЕ НАЧАЛЬНЫХ ДАННЫХ ДЛЯ РУКОВОДИТЕЛЕЙ (опционально)
+-- =====================================================
+
+-- Пример: назначить руководителя для секции с id=1
+-- INSERT INTO header_section (user_id, id_section, assigned_by)
+-- VALUES (1, 1, 1)
+-- ON CONFLICT (id_section) DO UPDATE SET user_id = EXCLUDED.user_id;
+
+-- =====================================================
+-- ФУНКЦИЯ ДЛЯ ПОЛУЧЕНИЯ РУКОВОДИТЕЛЯ СЕКЦИИ
+-- =====================================================
+
+CREATE OR REPLACE FUNCTION get_section_head(p_section_id INTEGER)
+RETURNS TABLE(
+    user_id INTEGER,
+    name VARCHAR(255),
+    email VARCHAR(100),
+    assigned_at TIMESTAMP
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        u.user_id,
+        u.name,
+        u.email,
+        hs.assigned_at
+    FROM header_section hs
+    JOIN users u ON hs.user_id = u.user_id
+    WHERE hs.id_section = p_section_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- =====================================================
+-- ФУНКЦИЯ ДЛЯ ПОЛУЧЕНИЯ ВСЕХ СЕКЦИЙ С РУКОВОДИТЕЛЯМИ
+-- =====================================================
+
+CREATE OR REPLACE FUNCTION get_sections_with_heads(p_conference_id INTEGER)
+RETURNS TABLE(
+    section_id INTEGER,
+    section_name VARCHAR(200),
+    head_id INTEGER,
+    head_name VARCHAR(255),
+    head_email VARCHAR(100),
+    assigned_at TIMESTAMP
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        s.id_sections,
+        s.name_section,
+        hs.user_id,
+        u.name,
+        u.email,
+        hs.assigned_at
+    FROM sections s
+    LEFT JOIN header_section hs ON s.id_sections = hs.id_section
+    LEFT JOIN users u ON hs.user_id = u.user_id
+    WHERE s.conference_id = p_conference_id
+    ORDER BY s.name_section;
+END;
+$$ LANGUAGE plpgsql;
+
+-- =====================================================
+-- ОБНОВЛЕННЫЙ СПИСОК ТАБЛИЦ ДЛЯ УДАЛЕНИЯ
+-- =====================================================
+
+-- Добавляем header_section в список удаления
+DROP TABLE IF EXISTS 
+    coauthors,
+    report_versions,
+    reviews,
+    section_program,
+    section_resensent,
+    reports,
+    header_section,  -- <-- ДОБАВЛЕНО
+    sections,
+    conferences,
+    resensent,
+    user_roles,
+    user_profiles,
+    users,
+    roles
+CASCADE;
+
+-- =====================================================
+-- ПРОВЕРКА СОЗДАННЫХ ТАБЛИЦ (обновленная)
+-- =====================================================
+
+SELECT 
+    table_name, 
+    column_name, 
+    data_type 
+FROM information_schema.columns 
+WHERE table_schema = 'public'
+ORDER BY table_name, ordinal_position;
+
+-- =====================================================
+-- ПРОВЕРКА НАЛИЧИЯ ТАБЛИЦЫ header_section
+-- =====================================================
+
+SELECT EXISTS (
+    SELECT FROM information_schema.tables 
+    WHERE table_schema = 'public' 
+    AND table_name = 'header_section'
+) AS header_section_exists;
+
 -- =====================================================
 -- ПРОВЕРКА СОЗДАННЫХ ТАБЛИЦ
 -- =====================================================
