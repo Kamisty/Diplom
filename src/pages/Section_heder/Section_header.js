@@ -96,42 +96,60 @@ const SectionHeadDashboard = () => {
       <div className="dashboard-content">
         {/* Левая колонка - список секций */}
         <div className="sections-sidebar">
-          <h2>Мои секции</h2>
-          {error && <div className="error-message">{error}</div>}
-          
-          {sections.length === 0 ? (
-            <div className="no-sections">
-              <p>У вас пока нет назначенных секций</p>
-            </div>
-          ) : (
-            <div className="sections-list">
-              {sections.map((section) => (
-                <div
-                  key={section.id}
-                  className={`section-card ${selectedSection?.id === section.id ? 'active' : ''}`}
-                  onClick={() => handleSectionClick(section)}
-                >
-                  <h3>{section.name}</h3>
-                  <p>{section.description}</p>
-                  <div className="section-meta">
-                    <span className="reports-count">
-                      📄 {section.reports_count || 0} докладов
-                    </span>
-                  </div>
-                </div>
-              ))}
+  <h2>Мои секции</h2>
+  {error && <div className="error-message">{error}</div>}
+  
+  {sections.length === 0 ? (
+    <div className="no-sections">
+      <p>У вас пока нет назначенных секций</p>
+    </div>
+  ) : (
+    <div className="sections-list">
+      {sections.map((section) => (
+        <div
+          key={section.id}
+          className={`section-card ${selectedSection?.id === section.id ? 'active' : ''}`}
+          onClick={() => handleSectionClick(section)}
+        >
+          {/* Название конференции */}
+          {section.conference_title && (
+            <div className="section-conference">
+              <span className="conference-badge">
+                🏛️ {section.conference_title}
+              </span>
             </div>
           )}
+          
+          {/* Название секции */}
+          <h3>{section.name}</h3>
+          
+          {/* Количество докладов */}
+          <div className="section-meta">
+            <span className="reports-count">
+              📄 {section.reports_count || 0} докладов
+            </span>
+          </div>
         </div>
+      ))}
+    </div>
+  )}
+</div>
 
         {/* Правая колонка - доклады выбранной секции */}
         <div className="reports-content">
-          {selectedSection ? (
-            <>
-              <div className="reports-header">
-                <h2>{selectedSection.name}</h2>
-                <p>{selectedSection.description}</p>
-              </div>
+        {selectedSection ? (
+          <>
+            <div className="reports-header">
+              {/* Отображаем название конференции */}
+              {selectedSection.title && (
+                <div className="conference-title">
+                  <span className="conference-icon">🏛️</span>
+                  <span className="conference-name">{selectedSection.title}</span>
+                </div>
+              )}
+              <h2>{selectedSection.name}</h2>
+              <p>{selectedSection.description}</p>
+            </div>
 
               <div className="reports-list">
                 <h3>Доклады секции</h3>

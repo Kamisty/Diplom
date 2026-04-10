@@ -1371,6 +1371,7 @@ app.get('/api/conferences/:id/sections', async (req, res) => {
 
     const query = `
       SELECT 
+        c.title,
         s.id_sections as id,
         s.name_section as name,
         s.conference_id,
@@ -1378,6 +1379,7 @@ app.get('/api/conferences/:id/sections', async (req, res) => {
         u.name as head_name
       FROM sections s
       LEFT JOIN users u ON s.user_id = u.user_id
+      LEFT JOIN conferences c ON c.id = s.conference_id
       WHERE s.conference_id = $1
       ORDER BY s.name_section
     `;
@@ -2089,16 +2091,22 @@ app.post('/api/section-assignments', async (req, res) => {
 app.get('/api/sections/head/:userId', (req, res) => {
   const { userId } = req.params;
   
-  const query = `
+   const query = `
     SELECT 
       s.id_sections as id,
       s.name_section as name,
       s.conference_id,
+      c.title as conference_title,
       COUNT(r.report_id) as reports_count
     FROM sections s
+    LEFT JOIN conferences c ON c.id = s.conference_id
     LEFT JOIN reports r ON r.id_sections = s.id_sections
     WHERE s.user_id = $1
-    GROUP BY s.id_sections, s.name_section, s.conference_id
+    GROUP BY 
+      s.id_sections, 
+      s.name_section, 
+      s.conference_id,
+      c.title
     ORDER BY s.name_section
   `;
   
@@ -2110,6 +2118,8 @@ app.get('/api/sections/head/:userId', (req, res) => {
     res.json({ success: true, sections: results.rows });
   });
 });
+
+
 
 // ===== ДОКЛАДЫ СЕКЦИИ =====
 app.get('/api/reports/section/:sectionId', (req, res) => {
