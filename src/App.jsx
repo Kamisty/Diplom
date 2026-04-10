@@ -17,7 +17,9 @@ import ManageUsers from './pages/Admin/ManageUsers';
 import AssignSectionHeads from './pages/Admin/AssignSectionHeads';
 import RoleBasedRoute from './components/RoleBasedRoute';
 import AccessDenied from './pages/AccessDenied/AccessDenied';
-
+import SectionHeadDashboard from './pages/Section_heder/Section_header';
+import EditConference from './pages/Conference/EditConference';
+import ConferenceDetails from './pages/Conference/ConferenceDetails';
 import './App.css';
 import './context/font.css';
 
@@ -83,6 +85,20 @@ function App() {
                   <ReviewReports />
                 </RoleBasedRoute>
               } />
+
+              <Route path="/section-head/dashboard" element={
+                <RoleBasedRoute requiredPermission="section_head_access">
+                  <SectionHeadDashboard />
+                </RoleBasedRoute>
+              } />
+
+              <Route path="/admin/edit-conference/:id" element={
+            <RoleBasedRoute requiredPermission="edit_conference">
+              <EditConference />
+            </RoleBasedRoute>
+              } />
+
+              <Route path="/conference/:id" element={<ConferenceDetails />} />
             </Routes>
           </main>
           
