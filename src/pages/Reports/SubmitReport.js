@@ -20,13 +20,16 @@ const SubmitReport = () => {
   const navigate = useNavigate();
   
   // Состояния для отправки
+  
+const [submitSuccess, setSubmitSuccess] = useState(false);
+const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [conferences, setConferences] = useState([]);
   const [loadingConferences, setLoadingConferences] = useState(true);
   const [sections, setSections] = useState([]);
   const [loadingSections, setLoadingSections] = useState(false);
   const [reportFile, setReportFile] = useState(null);
-  const [submitSuccess, setSubmitSuccess] = useState(false);
+
   const [errors, setErrors] = useState({});
   
   // Состояния для статьи
@@ -539,11 +542,7 @@ const SubmitReport = () => {
     const hasEmptyAuthor = formData.authors.some(author => !author.trim());
     if (hasEmptyAuthor) newErrors.authors = 'Заполните ФИО всех авторов';
     
-    if (!reportFile) {
-      newErrors.file = 'Загрузите файл доклада';
-    } else if (reportFile.size > 10 * 1024 * 1024) {
-      newErrors.file = 'Файл не должен превышать 10MB';
-    }
+   
     
     if (contentBlocks.length === 0) {
       newErrors.content = 'Добавьте хотя бы один блок контента';
@@ -553,60 +552,79 @@ const SubmitReport = () => {
     return Object.keys(newErrors).length === 0;
   };
   
+
+
   // Отправка доклада
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+// Отправка доклада
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  
+  console.log('🔴 Функция handleSubmit ВЫЗВАНА!');
+  console.log('📦 Данные формы:', formData);
+  console.log('📝 Аннотация:', article.annotation);
+  console.log('📚 Блоки контента:', contentBlocks.length);
+  
+  if (!validateForm()) {
+    console.log('❌ Валидация не пройдена');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+  
+  console.log('✅ Валидация пройдена, отправляем запрос...');
+  setLoading(true);
+  
+  try {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    if (!user.id) {
+      alert('Необходимо авторизоваться');
+      navigate('/input');
       return;
     }
     
-    setLoading(true);
+    // ✅ ОТПРАВЛЯЕМ КАК JSON (не FormData)
+    const requestData = {
+      title: formData.title,
+      section_id: formData.sectionId,
+      user_id: user.id,
+      abstract: article.annotation,
+      keywords: article.keywords,
+      authors: formData.authors.filter(a => a.trim()),
+      content: contentBlocks,
+      additional_info: formData.additionalInfo
+    };
     
-    try {
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
-      if (!user.id) {
-        alert('Необходимо авторизоваться');
-        navigate('/input');
-        return;
-      }
-      
-      const formDataToSend = new FormData();
-      formDataToSend.append('title', formData.title);
-      formDataToSend.append('conference_id', formData.conferenceId);
-      formDataToSend.append('section_id', formData.sectionId);
-      formDataToSend.append('user_id', user.id);
-      formDataToSend.append('abstract', article.annotation);
-      formDataToSend.append('keywords', article.keywords);
-      formDataToSend.append('authors', JSON.stringify(formData.authors.filter(a => a.trim())));
-      formDataToSend.append('content', JSON.stringify(contentBlocks));
-      formDataToSend.append('additional_info', formData.additionalInfo);
-      formDataToSend.append('file', reportFile);
-      
-      const response = await fetch('http://localhost:5000/api/reports', {
-        method: 'POST',
-        body: formDataToSend
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        setSubmitSuccess(true);
-        localStorage.removeItem('articleDraft');
-        setTimeout(() => {
-          navigate('/my-reports');
-        }, 2000);
-      } else {
-        alert(data.error || 'Ошибка при отправке доклада');
-      }
-    } catch (error) {
-      console.error('Ошибка:', error);
-      alert('Ошибка подключения к серверу');
-    } finally {
-      setLoading(false);
+    console.log('📤 Отправляем данные на сервер:', requestData);
+    
+    const response = await fetch('http://localhost:5000/api/reports', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestData)
+    });
+    
+    const data = await response.json();
+    
+    if (response.ok) {
+      setSuccessMessage(data.message || 'Доклад успешно отправлен!');
+      setSubmitSuccess(true);
+      localStorage.removeItem('articleDraft');
+      setTimeout(() => {
+        navigate('/my-reports');
+      }, 3000);
+    } else {
+      console.error('❌ Ошибка сервера:', data);
+      alert(data.error || 'Ошибка при отправке доклада');
+      setSubmitSuccess(false);
     }
-  };
+  } catch (error) {
+    console.error('❌ Ошибка подключения:', error);
+    alert('Ошибка подключения к серверу. Убедитесь, что сервер запущен на порту 5000');
+    setSubmitSuccess(false);
+  } finally {
+    setLoading(false);
+  }
+};
   
   const formatDate = (dateString) => {
     if (!dateString) return 'Дата не указана';
