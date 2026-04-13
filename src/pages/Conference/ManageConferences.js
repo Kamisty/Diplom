@@ -274,28 +274,35 @@ const ManageConferences = () => {
                       <td>{getSectionsCount(conf)}</td>
                       <td>{getCreatorName(conf)}</td>
                       <td className="actions">
-                        <button 
-                          className="btn-icon view" 
-                          onClick={() => handleView(conf.id)}
-                          title="Просмотр"
-                        >
-                          👁️
-                        </button>
-                        <button 
-                          className="btn-icon edit" 
-                          onClick={() => handleEdit(conf.id)}
-                          title="Редактировать"
-                        >
-                          ✏️
-                        </button>
-                        <button 
-                          className="btn-icon delete" 
-                          onClick={() => handleDelete(conf.id)}
-                          title="Удалить"
-                        >
-                          🗑️
-                        </button>
-                      </td>
+  <button 
+    className="btn-icon template" 
+    onClick={() => navigate(`/admin/conferences/${conf.id}/template`)}
+    title="Настроить шаблон оформления"
+  >
+    🎨
+  </button>
+  <button 
+    className="btn-icon view" 
+    onClick={() => handleView(conf.id)}
+    title="Просмотр"
+  >
+    👁️
+  </button>
+  <button 
+    className="btn-icon edit" 
+    onClick={() => handleEdit(conf.id)}
+    title="Редактировать"
+  >
+    ✏️
+  </button>
+  <button 
+    className="btn-icon delete" 
+    onClick={() => handleDelete(conf.id)}
+    title="Удалить"
+  >
+    🗑️
+  </button>
+</td>
                     </tr>
                   );
                 })}

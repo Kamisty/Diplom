@@ -8,31 +8,26 @@ import FormulaManager from '../../components/article/FormulaManager';
 import TextEditor from '../../components/article/TextEditor';
 import './Reports.css';
 
-
-console.log('=== RENDER DEBUG ===');
-console.log('ReactQuill:', ReactQuill);
-console.log('TableManager:', TableManager);
-console.log('ImageManager:', ImageManager);
-console.log('FormulaManager:', FormulaManager);
-console.log('TextEditor:', TextEditor);
-
+// ============================================
+// НАЧАЛО КОМПОНЕНТА
+// ============================================
 const SubmitReport = () => {
   const navigate = useNavigate();
   
-  // Состояния для отправки
-  
-const [submitSuccess, setSubmitSuccess] = useState(false);
-const [successMessage, setSuccessMessage] = useState('');
+  // ==================== 1. ВСЕ useState ====================
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [conferences, setConferences] = useState([]);
   const [loadingConferences, setLoadingConferences] = useState(true);
   const [sections, setSections] = useState([]);
   const [loadingSections, setLoadingSections] = useState(false);
   const [reportFile, setReportFile] = useState(null);
-
+  const [literature, setLiterature] = useState('');
   const [errors, setErrors] = useState({});
+  const [template, setTemplate] = useState(null);
+  const [conferenceTemplate, setConferenceTemplate] = useState(null);
   
-  // Состояния для статьи
   const [article, setArticle] = useState({
     annotation: '',
     keywords: '',
@@ -42,7 +37,6 @@ const [successMessage, setSuccessMessage] = useState('');
   const [editingBlock, setEditingBlock] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
   
-  // Состояния для менеджеров
   const [isTableManagerOpen, setIsTableManagerOpen] = useState(false);
   const [isImageManagerOpen, setIsImageManagerOpen] = useState(false);
   const [isFormulaManagerOpen, setIsFormulaManagerOpen] = useState(false);
@@ -55,7 +49,6 @@ const [successMessage, setSuccessMessage] = useState('');
   const [showSaveMessage, setShowSaveMessage] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   
-  // Состояния для формы доклада
   const [formData, setFormData] = useState({
     title: '',
     conferenceId: '',
@@ -66,7 +59,7 @@ const [successMessage, setSuccessMessage] = useState('');
   
   const quillRef = useRef(null);
   
-  // Настройки редактора
+  // ==================== 2. НАСТРОЙКИ РЕДАКТОРА ====================
   const modules = {
     toolbar: [
       [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
@@ -86,21 +79,56 @@ const [successMessage, setSuccessMessage] = useState('');
     'link', 'color', 'background'
   ];
   
+  // ==================== 3. ВСЕ useEffect ====================
+  
   // Загрузка конференций
   useEffect(() => {
     fetchConferences();
   }, []);
   
-  // Загрузка секций при выборе конференции
+  // Загрузка секций и шаблона при выборе конференции
   useEffect(() => {
     if (formData.conferenceId) {
       fetchSections(formData.conferenceId);
-      // Сбрасываем выбранную секцию при смене конференции
+      loadConferenceTemplate(formData.conferenceId);
       setFormData(prev => ({ ...prev, sectionId: '' }));
     } else {
       setSections([]);
+      setConferenceTemplate(null);
     }
   }, [formData.conferenceId]);
+  
+  // Загрузка черновика
+  useEffect(() => {
+    const savedArticle = localStorage.getItem('articleDraft');
+    if (savedArticle) {
+      try {
+        const parsed = JSON.parse(savedArticle);
+        setArticle(parsed.article || { annotation: '', keywords: '' });
+        setContentBlocks(parsed.contentBlocks || []);
+        setTableCounter(parsed.counters?.table || 1);
+        setImageCounter(parsed.counters?.image || 1);
+        setFormulaCounter(parsed.counters?.formula || 1);
+        if (parsed.formData) {
+          setFormData(prev => ({ ...prev, ...parsed.formData }));
+        }
+        if (parsed.literature) {
+          setLiterature(parsed.literature);
+        }
+        showTemporaryMessage('📂 Черновик загружен');
+      } catch (error) {
+        console.error('Ошибка загрузки черновика:', error);
+      }
+    }
+  }, []);
+  
+  // ==================== 4. ВСЕ ФУНКЦИИ ====================
+  
+  const showTemporaryMessage = (message) => {
+    setSaveMessage(message);
+    setShowSaveMessage(true);
+    setTimeout(() => setShowSaveMessage(false), 3000);
+  };
   
   const fetchConferences = async () => {
     setLoadingConferences(true);
@@ -169,31 +197,28 @@ const [successMessage, setSuccessMessage] = useState('');
     }
   };
   
-  // Загрузка черновика
-  useEffect(() => {
-    const savedArticle = localStorage.getItem('articleDraft');
-    if (savedArticle) {
-      try {
-        const parsed = JSON.parse(savedArticle);
-        setArticle(parsed.article || { annotation: '', keywords: '' });
-        setContentBlocks(parsed.contentBlocks || []);
-        setTableCounter(parsed.counters?.table || 1);
-        setImageCounter(parsed.counters?.image || 1);
-        setFormulaCounter(parsed.counters?.formula || 1);
-        if (parsed.formData) {
-          setFormData(prev => ({ ...prev, ...parsed.formData }));
-        }
-        showTemporaryMessage('📂 Черновик загружен');
-      } catch (error) {
-        console.error('Ошибка загрузки черновика:', error);
+  const loadConferenceTemplate = async (conferenceId) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/conferences/${conferenceId}/template`);
+      const data = await response.json();
+      if (data.success) {
+        setConferenceTemplate(data.template);
+        console.log('Шаблон загружен:', data.template);
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки шаблона:', error);
+    }
+  };
+  
+  const loadTemplate = async () => {
+    const response = await fetch(`http://localhost:5000/api/conferences/${formData.conferenceId}/template`);
+    const data = await response.json();
+    if (data.success) {
+      setTemplate(data.template);
+      if (data.template.rules) {
+        // Обновляем правила валидации
       }
     }
-  }, []);
-  
-  const showTemporaryMessage = (message) => {
-    setSaveMessage(message);
-    setShowSaveMessage(true);
-    setTimeout(() => setShowSaveMessage(false), 3000);
   };
   
   // Функции для работы с авторами
@@ -352,6 +377,11 @@ const [successMessage, setSuccessMessage] = useState('');
     }
   };
   
+  // ... остальные функции (handleSubmit, validateForm, renderTableBlock, saveDraft и т.д.)
+  
+  // ==================== 5. RETURN ====================
+
+
   // Обработчик для таблиц
   const handleSaveTable = (tableData) => {
     if (editingBlock?.type === 'table') {
@@ -519,6 +549,7 @@ const [successMessage, setSuccessMessage] = useState('');
         authors: formData.authors, 
         additionalInfo: formData.additionalInfo 
       },
+       literature: literature,
       lastModified: new Date().toISOString()
     };
     localStorage.setItem('articleDraft', JSON.stringify(articleData));
@@ -554,15 +585,12 @@ const [successMessage, setSuccessMessage] = useState('');
   
 
 
-  // Отправка доклада
+
 // Отправка доклада
 const handleSubmit = async (e) => {
   e.preventDefault();
   
   console.log('🔴 Функция handleSubmit ВЫЗВАНА!');
-  console.log('📦 Данные формы:', formData);
-  console.log('📝 Аннотация:', article.annotation);
-  console.log('📚 Блоки контента:', contentBlocks.length);
   
   if (!validateForm()) {
     console.log('❌ Валидация не пройдена');
@@ -570,7 +598,7 @@ const handleSubmit = async (e) => {
     return;
   }
   
-  console.log('✅ Валидация пройдена, отправляем запрос...');
+  console.log('✅ Валидация пройдена');
   setLoading(true);
   
   try {
@@ -581,19 +609,46 @@ const handleSubmit = async (e) => {
       return;
     }
     
-    // ✅ ОТПРАВЛЯЕМ КАК JSON (не FormData)
+    // ✅ ФОРМИРУЕМ МАССИВ АВТОРОВ
+    const authorsArray = [];
+    
+    for (let i = 0; i < formData.authors.length; i++) {
+      const name = formData.authors[i];
+      if (name && name.trim()) {
+        authorsArray.push({
+          name: name.trim(),
+          academic_degree: null,
+          academic_title: null,
+          position: null,
+          workplace: null,
+          email: null
+        });
+      }
+    }
+    
+    console.log('📝 ОТПРАВЛЯЕМЫЕ АВТОРЫ:', authorsArray);
+    console.log('📝 КОЛИЧЕСТВО АВТОРОВ:', authorsArray.length);
+    
+    // Проверка: должен быть хотя бы один автор
+    if (authorsArray.length === 0) {
+      alert('Добавьте хотя бы одного автора');
+      setLoading(false);
+      return;
+    }
+    
     const requestData = {
       title: formData.title,
-      section_id: formData.sectionId,
+      section_id: parseInt(formData.sectionId),
       user_id: user.id,
       abstract: article.annotation,
       keywords: article.keywords,
-      authors: formData.authors.filter(a => a.trim()),
       content: contentBlocks,
-      additional_info: formData.additionalInfo
+      additional_info: formData.additionalInfo,
+      literature: literature || '',
+      coauthors: authorsArray  // ✅ Отправляем всех авторов
     };
     
-    console.log('📤 Отправляем данные на сервер:', requestData);
+    console.log('📤 ПОЛНЫЕ ДАННЫЕ ДЛЯ ОТПРАВКИ:', JSON.stringify(requestData, null, 2));
     
     const response = await fetch('http://localhost:5000/api/reports', {
       method: 'POST',
@@ -615,12 +670,10 @@ const handleSubmit = async (e) => {
     } else {
       console.error('❌ Ошибка сервера:', data);
       alert(data.error || 'Ошибка при отправке доклада');
-      setSubmitSuccess(false);
     }
   } catch (error) {
     console.error('❌ Ошибка подключения:', error);
     alert('Ошибка подключения к серверу. Убедитесь, что сервер запущен на порту 5000');
-    setSubmitSuccess(false);
   } finally {
     setLoading(false);
   }
@@ -1263,35 +1316,77 @@ const handleSubmit = async (e) => {
           </div>
           
           {/* Авторы */}
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Авторы *</label>
-            {formData.authors.map((author, index) => (
-              <div key={index} style={styles.authorInput}>
-                <input
-                  type="text"
-                  value={author}
-                  onChange={(e) => updateAuthor(index, e.target.value)}
-                  placeholder={`Автор ${index + 1} (ФИО полностью)`}
-                  style={styles.input}
-                  disabled={loading}
-                />
-                {formData.authors.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeAuthor(index)}
-                    style={styles.removeAuthor}
-                    disabled={loading}
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-            ))}
-            <button type="button" onClick={addAuthor} style={styles.addAuthorBtn} disabled={loading}>
-              + Добавить соавтора
-            </button>
-            {errors.authors && <span style={styles.errorMessage}>{errors.authors}</span>}
-          </div>
+<div style={styles.formGroup}>
+  <label style={styles.label}>Авторы *</label>
+  <div style={{ marginBottom: '10px', fontSize: '14px', color: '#666' }}>
+    Первый автор будет основным, остальные - соавторами
+  </div>
+  
+  {formData.authors.map((author, index) => (
+    <div key={index} style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'center' }}>
+      <input
+        type="text"
+        value={author}
+        onChange={(e) => {
+          const newAuthors = [...formData.authors];
+          newAuthors[index] = e.target.value;
+          setFormData(prev => ({ ...prev, authors: newAuthors }));
+        }}
+        placeholder={`ФИО автора ${index + 1}`}
+        style={{ ...styles.input, flex: 1 }}
+        disabled={loading}
+      />
+      {formData.authors.length > 1 && (
+        <button
+          type="button"
+          onClick={() => {
+            const newAuthors = formData.authors.filter((_, i) => i !== index);
+            setFormData(prev => ({ ...prev, authors: newAuthors }));
+          }}
+          style={{
+            padding: '8px 15px',
+            backgroundColor: '#e74c3c',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            fontSize: '14px'
+          }}
+          disabled={loading}
+        >
+          Удалить
+        </button>
+      )}
+    </div>
+  ))}
+  
+  <button
+    type="button"
+    onClick={() => {
+      setFormData(prev => ({
+        ...prev,
+        authors: [...prev.authors, '']
+      }));
+    }}
+    style={{
+      marginTop: '10px',
+      padding: '10px 20px',
+      backgroundColor: '#27ae60',
+      color: '#fff',
+      border: 'none',
+      borderRadius: '8px',
+      cursor: 'pointer',
+      fontSize: '14px'
+    }}
+    disabled={loading}
+  >
+    + Добавить соавтора
+  </button>
+  
+  {errors.authors && <span style={{ color: '#e74c3c', fontSize: '12px', marginTop: '5px', display: 'block' }}>
+    {errors.authors}
+  </span>}
+</div>
           
           {/* Аннотация */}
           <div style={styles.formGroup}>
@@ -1519,7 +1614,26 @@ const handleSubmit = async (e) => {
               </div>
             </div>
           </div>
-          
+
+          {/* Список литературы */}
+<div style={styles.formGroup}>
+  <label style={styles.label}>Список литературы</label>
+  <textarea
+    value={literature}
+    onChange={(e) => setLiterature(e.target.value)}
+    rows="6"
+    style={styles.textarea}
+    placeholder={`Пример оформления:
+1. Иванов И.И. Название книги. - М.: Издательство, 2024. - 300 с.
+2. Петров П.П. Название статьи // Журнал. - 2023. - №5. - С. 10-15.
+3. Сидоров С.С. Название // Сборник трудов конференции. - 2022. - С. 100-105.`}
+    disabled={loading}
+  />
+  <div style={{ fontSize: '12px', color: '#999', marginTop: '5px' }}>
+    Оформите список литературы в соответствии с ГОСТ
+  </div>
+</div>
+
           {/* Дополнительная информация */}
           <div style={styles.formGroup}>
             <label style={styles.label}>Дополнительная информация</label>
@@ -1556,6 +1670,7 @@ const handleSubmit = async (e) => {
                 setFormulaCounter(1);
                 setFormData({ title: '', conferenceId: '', sectionId: '', authors: [''], additionalInfo: '' });
                 setReportFile(null);
+                setLiterature('');
                 setEditingBlock(null);
                 localStorage.removeItem('articleDraft');
               }
@@ -1570,82 +1685,153 @@ const handleSubmit = async (e) => {
           {errors.content && <span style={styles.errorMessage}>{errors.content}</span>}
         </form>
       ) : (
-        <div style={styles.previewContainer}>
-          <h2 style={styles.previewTitle}>Научная статья</h2>
-          
-          <div style={styles.previewSection}>
-            <div style={styles.previewLabel}>Авторы</div>
-            <div>{formData.authors.filter(a => a.trim()).join(', ') || 'Не указаны'}</div>
-          </div>
-          
-          <div style={styles.previewSection}>
-            <div style={styles.previewLabel}>Аннотация</div>
-            <div>{article.annotation || 'Аннотация отсутствует'}</div>
-          </div>
-          
-          {article.keywords && (
-            <div style={styles.previewSection}>
-              <div style={styles.previewLabel}>Ключевые слова</div>
-              <div>{article.keywords}</div>
-            </div>
-          )}
-          
-          <div style={styles.previewSection}>
-            <div style={styles.previewLabel}>Содержание</div>
-            <div>
-              {contentBlocks.length > 0 ? (
-                contentBlocks.map((block) => {
-                  switch (block.type) {
-                    case 'text':
-                      return (
-                        <div key={block.id} style={{ margin: '20px 0' }}>
-                          <div dangerouslySetInnerHTML={{ __html: block.content }} />
-                        </div>
-                      );
-                    case 'table':
-                      return renderTableBlock(block);
-                    case 'image':
-                      return (
-                        <div key={block.id} style={{ textAlign: block.align, margin: '30px 0' }}>
-                          <img src={block.src} alt={block.caption} style={{ maxWidth: '100%', width: block.width }} />
-                          <div style={{ marginTop: '8px', fontSize: '12px', color: '#666' }}>
-                            Рисунок {block.number} — {block.caption}
-                          </div>
-                        </div>
-                      );
-                    case 'formula':
-                      return (
-                        <div key={block.id} style={{ textAlign: block.align || 'center', margin: '30px 0', fontSize: block.size || 16 }}>
-                          <strong>Формула {block.number}:</strong> {block.formulaString || block.content}
-                        </div>
-                      );
-                    default:
-                      return null;
-                  }
-                })
-              ) : (
-                <div style={styles.emptyState}>Содержание статьи пусто</div>
-              )}
-            </div>
-          </div>
-          
-          {contentBlocks.length > 0 && (
-            <div style={{ marginTop: '30px', padding: '20px', borderTop: '2px solid #fff0e0' }}>
-              <strong>Статистика:</strong> Всего: {contentBlocks.length},
-              Таблиц: {contentBlocks.filter(b => b.type === 'table').length},
-              Рисунков: {contentBlocks.filter(b => b.type === 'image').length},
-              Формул: {contentBlocks.filter(b => b.type === 'formula').length}
-            </div>
-          )}
-          
-          <div style={{ marginTop: '30px', textAlign: 'center' }}>
-            <button onClick={() => setShowPreview(false)} style={styles.previewButton}>
-              ← Вернуться к редактированию
-            </button>
-          </div>
+  <div style={styles.previewContainer}>
+    <h2 style={styles.previewTitle}>Научная статья</h2>
+    
+    {/* ✅ Добавьте название конференции, если выбрана */}
+    {formData.conferenceId && conferenceTemplate && (
+      <div style={styles.previewSection}>
+        <div style={styles.previewLabel}>Конференция</div>
+        <div>{conferences.find(c => c.id === parseInt(formData.conferenceId))?.title || 'Не указана'}</div>
+      </div>
+    )}
+    
+    {/* ✅ Применяем стили из шаблона к авторам */}
+    <div style={styles.previewSection}>
+      <div style={styles.previewLabel}>Авторы</div>
+      <div style={conferenceTemplate?.styles?.authors}>
+        {formData.authors.filter(a => a.trim()).join(', ') || 'Не указаны'}
+      </div>
+    </div>
+    
+    {/* ✅ Применяем стили из шаблона к аннотации */}
+    <div style={styles.previewSection}>
+      <div style={styles.previewLabel}>Аннотация</div>
+      <div style={conferenceTemplate?.styles?.abstract}>
+        {article.annotation || 'Аннотация отсутствует'}
+      </div>
+    </div>
+    
+    {/* ✅ Применяем стили из шаблона к ключевым словам */}
+    {article.keywords && (
+      <div style={styles.previewSection}>
+        <div style={styles.previewLabel}>Ключевые слова</div>
+        <div style={conferenceTemplate?.styles?.keywords}>
+          {article.keywords}
         </div>
-      )}
-      
+      </div>
+    )}
+    
+    {/* ✅ Применяем стили из шаблона к содержанию */}
+    <div style={styles.previewSection}>
+      <div style={styles.previewLabel}>Содержание</div>
+      <div style={conferenceTemplate?.styles?.content}>
+        {contentBlocks.length > 0 ? (
+          contentBlocks.map((block) => {
+            switch (block.type) {
+              case 'text':
+                return (
+                  <div key={block.id} style={{ margin: '20px 0', ...(conferenceTemplate?.styles?.textBlock || {}) }}>
+                    <div dangerouslySetInnerHTML={{ __html: block.content }} />
+                  </div>
+                );
+              case 'table':
+                return (
+                  <div key={block.id}>
+                    <div style={conferenceTemplate?.styles?.tableCaption}>
+                      Таблица {block.number} — {block.caption}
+                    </div>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ 
+                        borderCollapse: 'collapse', 
+                        width: '100%',
+                        ...(conferenceTemplate?.styles?.table || {})
+                      }}>
+                        <thead>
+                          <tr>
+                            {block.headers?.map((header, i) => (
+                              <th key={i} style={{ 
+                                border: '1px solid black', 
+                                padding: '8px',
+                                ...(conferenceTemplate?.styles?.tableHeader || {})
+                              }}>{header}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {block.data?.map((row, i) => (
+                            <tr key={i}>
+                              {row.map((cell, j) => (
+                                <td key={j} style={{ 
+                                  border: '1px solid black', 
+                                  padding: '8px',
+                                  ...(conferenceTemplate?.styles?.tableCell || {})
+                                }}>{cell}</td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              case 'image':
+                return (
+                  <div key={block.id} style={{ textAlign: block.align, margin: '30px 0' }}>
+                    <img src={block.src} alt={block.caption} style={{ maxWidth: '100%', width: block.width }} />
+                    <div style={{ 
+                      marginTop: '8px', 
+                      fontSize: '12px', 
+                      color: '#666',
+                      ...(conferenceTemplate?.styles?.figureCaption || {})
+                    }}>
+                      Рисунок {block.number} — {block.caption}
+                    </div>
+                  </div>
+                );
+              case 'formula':
+                return (
+                  <div key={block.id} style={{ 
+                    textAlign: block.align || 'center', 
+                    margin: '30px 0', 
+                    fontSize: block.size || 16,
+                    ...(conferenceTemplate?.styles?.formula || {})
+                  }}>
+                    <strong>Формула {block.number}:</strong> {block.formulaString || block.content}
+                  </div>
+                );
+              default:
+                return null;
+            }
+          })
+        ) : (
+          <div style={styles.emptyState}>Содержание статьи пусто</div>
+        )}
+      </div>
+    </div>
+    
+    {/* ✅ Применяем стили из шаблона к литературе */}
+    {literature && (
+      <div style={styles.previewSection}>
+        <div style={styles.previewLabel}>Список литературы</div>
+        <div style={{ 
+          whiteSpace: 'pre-wrap', 
+          fontSize: '14px', 
+          lineHeight: '1.5',
+          ...(conferenceTemplate?.styles?.references || {})
+        }}>
+          {literature}
+        </div>
+      </div>
+    )}
+    
+    <div style={{ marginTop: '30px', textAlign: 'center' }}>
+      <button onClick={() => setShowPreview(false)} style={styles.previewButton}>
+        ← Вернуться к редактированию
+      </button>
+    </div>
+  </div>
+)}
       {/* Модальные окна */}
       <TableManager
         isOpen={isTableManagerOpen}
@@ -1682,5 +1868,6 @@ const handleSubmit = async (e) => {
     </div>
   );
 };
+ 
 
 export default SubmitReport;

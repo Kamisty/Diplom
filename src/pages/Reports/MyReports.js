@@ -49,6 +49,7 @@ const MyReports = () => {
   const getStatusLabel = (status) => {
     const statusMap = {
       'draft': 'Черновик',
+       'pending': 'На рассмотрении',
       'submitted': 'На рассмотрении',
       'under_review': 'На рецензировании',
       'revision_required': 'Требуется доработка',
@@ -62,6 +63,7 @@ const MyReports = () => {
   const getStatusClass = (status) => {
     const classMap = {
       'draft': 'status-draft',
+       'pending': 'status-pending',
       'submitted': 'status-pending',
       'under_review': 'status-review',
       'revision_required': 'status-revision',
@@ -129,13 +131,13 @@ const MyReports = () => {
                   </span>
                 </div>
                 
-                <div className="report-details">
-                  <p>
-                    <strong>Конференция:</strong> {report.conference_name || 'Не указана'}
-                  </p>
-                  <p>
-                    <strong>Авторы:</strong> {report.authors?.join(', ') || 'Не указаны'}
-                  </p>
+            <div className="report-details">
+                 <p>
+                     <strong>Конференция:</strong> {report.conference_title || 'Не указана'}
+                </p>
+                <p>
+                   <strong>Авторы:</strong> {report.authors_list || 'Не указаны'}
+                </p>
                   <p>
                     <strong>Дата подачи:</strong> {formatDate(report.created_at)}
                   </p>
