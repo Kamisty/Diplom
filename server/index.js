@@ -13,8 +13,74 @@ app.use(cors({
     credentials: true
 }));
 
+
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
+
+
+
+// ============================================
+// НАСТРОЙКА ПОЧТЫ (Яндекс)
+// ============================================
+const nodemailer = require('nodemailer');
+
+// Настройка транспортера для Яндекс.Почты
+const emailTransporter = nodemailer.createTransport({
+    host: 'smtp.yandex.ru',
+    port: 465,
+    secure: true,          // true для порта 465
+    auth: {
+        user: 'k.montseva@yandex.ru',     // ваш email (например, k.montseva@yandex.ru)
+        pass: 'egsnwzvnarlhjlua'     // пароль приложения, который скопировали
+    },
+    // Дополнительные настройки для надёжности
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 20000,
+});
+
+// ============================================
+//  ФУНКЦИЯ ОТПРАВКИ EMAIL
+// ============================================
+async function sendResetCodeEmail(email, code) {
+    try {
+        const info = await emailTransporter.sendMail({
+            from: '"Платформа конференций" <k.montseva@yandex.ru>',
+            to: email,
+            subject: 'Восстановление пароля',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+                        <h2>Восстановление пароля</h2>
+                    </div>
+                    <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px;">
+                        <p>Ваш код подтверждения:</p>
+                        <div style="font-size: 36px; font-weight: bold; color: #667eea; text-align: center; padding: 20px; letter-spacing: 5px; background: white; border-radius: 10px; margin: 20px 0;">
+                            ${code}
+                        </div>
+                        <p>Код действителен в течение 15 минут.</p>
+                    </div>
+                </div>
+            `
+        });
+        console.log(`✅ Email отправлен на ${email}`);
+        return true;
+    } catch (error) {
+        console.error('❌ Ошибка отправки email:', error);
+        return false;
+    }
+}
+
+
+// Проверка соединения при запуске
+emailTransporter.verify((error, success) => {
+    if (error) {
+        console.error('❌ Ошибка подключения к почтовому серверу:', error);
+    } else {
+        console.log('✅ Почтовый сервер настроен и готов к отправке');
+    }
+});
+
 
 // Логирование всех запросов
 app.use((req, res, next) => {
@@ -2091,7 +2157,7 @@ app.post('/api/section-assignments', async (req, res) => {
 // ===== СЕКЦИИ РУКОВОДИТЕЛЯ =====
 app.get('/api/sections/head/:userId', (req, res) => {
   const { userId } = req.params;
-  
+
    const query = `
     SELECT 
       s.id_sections as id,
@@ -2342,6 +2408,22 @@ app.post('/api/user/forgot-password', async (req, res) => {
     expiresAt.setMinutes(expiresAt.getMinutes() + 15); // Код действителен 15 минут
     
     // Удаляем старые коды для этого email (если есть)
+
+    expiresAt.setMinutes(expiresAt.getMinutes() + 15);
+    
+    // Создаём таблицу если её нет
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS password_reset_codes (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) NOT NULL,
+        code VARCHAR(10) NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        expires_at TIMESTAMP NOT NULL,
+        used BOOLEAN DEFAULT FALSE
+      )
+    `);
+    
+
     await client.query(
       'DELETE FROM password_reset_codes WHERE email = $1',
       [email]
@@ -2355,6 +2437,7 @@ app.post('/api/user/forgot-password', async (req, res) => {
     );
     
     // Отправляем email с кодом
+
     await sendResetCodeEmail(email, resetCode);
     
     console.log('✅ Код восстановления отправлен на:', email);
@@ -2374,6 +2457,7 @@ app.post('/api/user/forgot-password', async (req, res) => {
     client.release();
   }
 });
+
 
 // ============================================
 // СБРОС ПАРОЛЯ (подтверждение кода и установка нового пароля)
@@ -2498,6 +2582,7 @@ app.post('/api/reports', async (req, res) => {
       user_id,
       abstract,
       keywords,
+      authors,           // ✅ ДОБАВЛЕНО: авторы из запроса
       content,
       additional_info,
       coauthors = [],
@@ -2542,6 +2627,7 @@ app.post('/api/reports', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Секция не найдена' });
     }
 
+
     const conference_id = sectionCheck.rows[0].conference_id;
 
     // Преобразование в JSONB
@@ -2563,6 +2649,7 @@ app.post('/api/reports', async (req, res) => {
         abstract,
         keywords,
         additional_info,
+        coauthors,
         content,
         status,
         created_at,
@@ -2573,10 +2660,13 @@ app.post('/api/reports', async (req, res) => {
         literature,
         coauthors
       )
+
       VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11, $12, $13::jsonb)
       RETURNING report_id, title, status, created_at
+
     `;
 
+    // ✅ ПРАВИЛЬНЫЙ МАССИВ ЗНАЧЕНИЙ (10 значений)
     const values = [
       title.trim(),
       abstract.trim(),
@@ -2647,6 +2737,7 @@ app.get('/api/reports/user/:userId', async (req, res) => {
         r.abstract,
         r.keywords,
         r.status,
+        r.coauthors,
         r.created_at,
         r.submitted_at,
         r.final_decision_at,
@@ -2736,6 +2827,7 @@ app.get('/api/reports/:reportId', async (req, res) => {
       SELECT 
         r.*,
         s.name_section as section_name,
+        r.coauthors,
         s.conference_id,
         c.title as conference_title,
         u.name as author_name,
@@ -2878,6 +2970,10 @@ app.delete('/api/reports/:reportId', async (req, res) => {
     });
   }
 });
+
+
+
+
 // ============================================
 // ЗАПУСК СЕРВЕРА
 // ============================================
@@ -2891,20 +2987,13 @@ app.listen(PORT, () => {
     console.log(`   GET  http://localhost:${PORT}/test`);
     console.log(`   POST http://localhost:${PORT}/test-post`);
     console.log(`   POST http://localhost:${PORT}/api/register <- РЕГИСТРАЦИЯ`);
-    console.log(`   POST http://localhost:${PORT}/api/input <- ВХОД`);
+    console.log(`   POST http://localhost:${PORT}/api/login <- ВХОД`);
     console.log(`   GET  http://localhost:${PORT}/api/user-profile/:userId <- ПОЛУЧЕНИЕ ПРОФИЛЯ`);
     console.log(`   POST http://localhost:${PORT}/api/user-profile/update <- ОБНОВЛЕНИЕ ПРОФИЛЯ`);
-    console.log(`   POST http://localhost:${PORT}/api/conferences <- СОЗДАНИЕ КОНФЕРЕНЦИИ`);
-    console.log(`   GET  http://localhost:${PORT}/api/conferences <- СПИСОК КОНФЕРЕНЦИЙ`);
-    console.log(`   GET  http://localhost:${PORT}/api/conferences/:id <- ПОЛУЧЕНИЕ КОНФЕРЕНЦИИ`);
-    console.log(`   PUT  http://localhost:${PORT}/api/conferences/:id <- ОБНОВЛЕНИЕ КОНФЕРЕНЦИИ`);
-    console.log(`   DELETE http://localhost:${PORT}/api/conferences/:id <- УДАЛЕНИЕ КОНФЕРЕНЦИИ`);
-    console.log(`   POST http://localhost:${PORT}/api/reports <- СОХРАНЕНИЕ ДОКЛАДА (НОВЫЙ!)`);
-    console.log(`   GET  http://localhost:${PORT}/api/reports/user/:userId <- ДОКЛАДЫ ПОЛЬЗОВАТЕЛЯ (НОВЫЙ!)`);
-    console.log(`   GET  http://localhost:${PORT}/api/reports/:id <- ПОЛУЧЕНИЕ ДОКЛАДА (НОВЫЙ!)`);
-    console.log(`   GET  http://localhost:${PORT}/api/reports/:id/download <- СКАЧИВАНИЕ ФАЙЛА (НОВЫЙ!)`);
-    console.log(`   DELETE http://localhost:${PORT}/api/reports/:id <- УДАЛЕНИЕ ДОКЛАДА (НОВЫЙ!)`);
-    console.log(`   POST http://localhost:${PORT}/api/drafts <- СОХРАНЕНИЕ ЧЕРНОВИКА (НОВЫЙ!)`);
-    console.log(`   GET  http://localhost:${PORT}/api/drafts/user/:userId <- ЗАГРУЗКА ЧЕРНОВИКА (НОВЫЙ!)`);
+    console.log(`   POST http://localhost:${PORT}/api/conferences <- СОЗДАНИЕ КОНФЕРЕНЦИИ (НОВЫЙ!)`);
+    console.log(`   GET  http://localhost:${PORT}/api/conferences <- СПИСОК КОНФЕРЕНЦИЙ (НОВЫЙ!)`);
+    console.log(`   GET  http://localhost:${PORT}/api/conferences/:id <- ПОЛУЧЕНИЕ КОНФЕРЕНЦИИ (НОВЫЙ!)`);
+    console.log(`   PUT  http://localhost:${PORT}/api/conferences/:id <- ОБНОВЛЕНИЕ КОНФЕРЕНЦИИ (НОВЫЙ!)`);
+    console.log(`   DELETE http://localhost:${PORT}/api/conferences/:id <- УДАЛЕНИЕ КОНФЕРЕНЦИИ (НОВЫЙ!)`);
     console.log("=".repeat(60) + "\n");
 });
