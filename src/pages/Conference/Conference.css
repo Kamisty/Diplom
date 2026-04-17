@@ -181,13 +181,12 @@
 }
 
 .btn-primary {
-  background: #66ead4;
   color: white;
   flex: 1;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #5a67d8;
+  background: #ec883b;
   transform: translateY(-2px);
   box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
 }
@@ -876,21 +875,22 @@
 }
 
 .btn-edit {
-  background: #007bff;
-  color: white;
+  background: #ffffff;
+  color: rgb(0, 0, 0);
   border: none;
   padding: 12px 28px;
   border-radius: 8px;
+  font-weight: 600;
   cursor: pointer;
-  font-size: 18px;
-  font-weight: 500;
+  font-size: 16px;
   transition: all 0.3s ease;
 }
 
 .btn-edit:hover {
-  background: #0056b3;
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(229, 62, 62, 0.4);
 }
+
 
 /* Состояния загрузки и ошибок */
 .loading,
