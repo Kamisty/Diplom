@@ -220,6 +220,148 @@
   color: #666;
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* Кнопка назначения рецензента */
+.btn-assign-reviewer {
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  margin-left: 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.btn-assign-reviewer:hover {
+  background-color: #45a049;
+}
+
+/* Список рецензентов */
+.reviewers-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.reviewer-badge {
+  background-color: #e3f2fd;
+  color: #1976d2;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+}
+
+.no-reviewer {
+  color: #999;
+  font-size: 12px;
+}
+
+/* Модальное окно */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background-color: white;
+  padding: 25px;
+  border-radius: 8px;
+  width: 500px;
+  max-width: 90%;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.modal-content h3 {
+  margin-top: 0;
+  color: #333;
+}
+
+.modal-content .form-group {
+  margin: 20px 0;
+}
+
+.modal-content label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+.reviewer-select {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.btn-confirm {
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-confirm:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+.btn-cancel {
+  background-color: #ffffff;
+  color: rgb(0, 0, 0);
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* Таблица докладов */
+.reports-table td {
+  vertical-align: middle;
+}
+
+.reports-table .btn-view-report,
+.reports-table .btn-assign-reviewer {
+  white-space: nowrap;
+}
+
+
+
+
+
+
+
 @media (max-width: 768px) {
   .dashboard-content {
     grid-template-columns: 1fr;

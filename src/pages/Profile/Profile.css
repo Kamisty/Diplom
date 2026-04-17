@@ -230,8 +230,8 @@
 
 /* Кнопка "Редактировать профиль" */
 .btn-edit {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: #ffffff;
+  color: #000000;
 }
 
 .btn-edit:hover {
@@ -241,8 +241,8 @@
 
 /* Кнопка "Сменить пароль" - ИСПРАВЛЕНА */
 .btn-change-password {
-  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
-  color: white;
+  background: #ffffff;
+  color: #000000;
 }
 
 .btn-change-password:hover {
@@ -252,8 +252,8 @@
 
 /* Кнопка "Выйти" */
 .btn-logout {
-  background: linear-gradient(135deg, #fc8181 0%, #e53e3e 100%);
-  color: white;
+  background: #ffffff;
+  color: #000000;
 }
 
 .btn-logout:hover {
@@ -263,8 +263,8 @@
 
 /* Кнопка "Сохранить" */
 .btn-save {
-  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
-  color: white;
+  background: #ffffff;
+  color: #000000;
 }
 
 .btn-save:hover:not(:disabled) {

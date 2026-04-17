@@ -13,6 +13,7 @@ import ManageConferences from './pages/Conference/ManageConferences';
 import SubmitReport from './pages/Reports/SubmitReport';
 import MyReports from './pages/Reports/MyReports';
 import ReviewReports from './pages/Reports/ReviewReports';
+import ReportDetail from './pages/Reports/ReportDetail'; 
 import ManageUsers from './pages/Admin/ManageUsers';
 import AssignSectionHeads from './pages/Admin/AssignSectionHeads';
 import RoleBasedRoute from './components/RoleBasedRoute';
@@ -97,6 +98,11 @@ function App() {
               <EditConference />
             </RoleBasedRoute>
               } />
+
+              <Route path="/review-reports" element={<ReviewReports/>} />
+
+               <Route path="/report/:id" element={<ReportDetail />} />
+             
 
               <Route path="/conference/:id" element={<ConferenceDetails />} />
             </Routes>

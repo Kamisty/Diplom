@@ -1,5 +1,5 @@
 // src/pages/Reports/ReviewReports.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Reports.css';
 
@@ -7,178 +7,153 @@ const ReviewReports = () => {
   const navigate = useNavigate();
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('pending');
+  const [error, setError] = useState(null);
+
+  const loadReports = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      
+      if (!user.id) {
+        navigate('/input');
+        return;
+      }
+
+      console.log('Загрузка докладов для рецензирования, рецензент ID:', user.id);
+      
+      // ✅ ИСПРАВЛЕНО: Загружаем доклады, назначенные на рецензирование
+      const response = await fetch(`http://localhost:5000/api/reports/for-review/${user.id}`);
+      const data = await response.json();
+      
+      console.log('Получены доклады для рецензирования:', data);
+      
+      if (response.ok && data.success) {
+        setReports(data.reports || []);
+      } else {
+        setError(data.error || 'Ошибка при загрузке докладов');
+      }
+    } catch (error) {
+      console.error('Ошибка:', error);
+      setError('Ошибка подключения к серверу');
+    } finally {
+      setLoading(false);
+    }
+  }, [navigate]);
 
   useEffect(() => {
-    loadAssignedReports();
-  }, []);
-
-  const loadAssignedReports = () => {
-    setLoading(true);
-    // Имитация загрузки данных
-    setTimeout(() => {
-      setReports([
-        {
-          id: 1,
-          title: 'Искусственный интеллект в медицине',
-          author: 'Иванов И.И.',
-          conference: 'Международная конференция по IT',
-          deadline: '2024-04-15',
-          status: 'pending',
-          priority: 'high'
-        },
-        {
-          id: 2,
-          title: 'Блокчейн технологии в образовании',
-          author: 'Петров П.П.',
-          conference: 'Научно-практическая конференция',
-          deadline: '2024-04-20',
-          status: 'in_progress',
-          priority: 'medium'
-        },
-        {
-          id: 3,
-          title: 'Анализ больших данных',
-          author: 'Сидоров С.С.',
-          conference: 'Всероссийский форум',
-          deadline: '2024-04-10',
-          status: 'pending',
-          priority: 'high'
-        }
-      ]);
-      setLoading(false);
-    }, 1000);
-  };
-
-  const filteredReports = reports.filter(report => {
-    if (filter === 'all') return true;
-    return report.status === filter;
-  });
+    loadReports();
+  }, [loadReports]);
 
   const getStatusLabel = (status) => {
     const statusMap = {
-      'pending': 'Ожидает',
-      'in_progress': 'В процессе',
-      'completed': 'Завершено',
-      'overdue': 'Просрочено'
+      'draft': 'Черновик',
+      'pending': 'На рассмотрении',
+      'submitted': 'На рассмотрении',
+      'under_review': 'На рецензировании',
+      'revision_required': 'Требуется доработка',
+      'accepted': 'Принят',
+      'rejected': 'Отклонен',
+      'withdrawn': 'Отозван'
     };
     return statusMap[status] || status;
   };
 
   const getStatusClass = (status) => {
     const classMap = {
+      'draft': 'status-draft',
       'pending': 'status-pending',
-      'in_progress': 'status-progress',
-      'completed': 'status-approved',
-      'overdue': 'status-rejected'
+      'submitted': 'status-pending',
+      'under_review': 'status-review',
+      'revision_required': 'status-revision',
+      'accepted': 'status-approved',
+      'rejected': 'status-rejected',
+      'withdrawn': 'status-withdrawn'
     };
     return classMap[status] || '';
   };
 
-  const getPriorityClass = (priority) => {
-    const classMap = {
-      'high': 'priority-high',
-      'medium': 'priority-medium',
-      'low': 'priority-low'
-    };
-    return classMap[priority] || '';
-  };
-
-  const handleReview = (id) => {
-    navigate(`/review-report/${id}`);
-  };
-
-  const handleDownload = (id) => {
-    console.log('Скачивание файла доклада:', id);
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Дата не указана';
+    try {
+      return new Date(dateString).toLocaleDateString('ru-RU', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return dateString;
+    }
   };
 
   return (
-    <div className="reviews-page">
+    <div className="reports-page">
       <div className="container">
-        <h1>Рецензирование докладов</h1>
-
-        <div className="filters-bar">
-          <div className="filter-buttons">
-            <button 
-              className={filter === 'all' ? 'active' : ''}
-              onClick={() => setFilter('all')}
-            >
-              Все
-            </button>
-            <button 
-              className={filter === 'pending' ? 'active' : ''}
-              onClick={() => setFilter('pending')}
-            >
-              Ожидают
-            </button>
-            <button 
-              className={filter === 'in_progress' ? 'active' : ''}
-              onClick={() => setFilter('in_progress')}
-            >
-              В процессе
-            </button>
-            <button 
-              className={filter === 'completed' ? 'active' : ''}
-              onClick={() => setFilter('completed')}
-            >
-              Завершены
-            </button>
-          </div>
+        <div className="page-header">
+          <h1>Доклады на рецензирование</h1>
+          <p className="subtitle">Доклады, назначенные вам для рецензирования</p>
         </div>
+
+        {error && (
+          <div className="error-message">
+            {error}
+          </div>
+        )}
 
         {loading ? (
           <div className="loading">Загрузка докладов...</div>
+        ) : reports.length === 0 ? (
+          <div className="no-data">
+            <p>Нет докладов, назначенных на рецензирование</p>
+          </div>
         ) : (
-          <div className="reviews-list">
-            {filteredReports.map(report => (
-              <div key={report.id} className="review-item">
-                <div className="review-header">
-                  <div className="review-title">
+          <div className="reports-grid">
+            {reports.map(report => {
+              const reportId = report.report_id || report.id;
+              
+              return (
+                <div key={reportId} className="report-card">
+                  <div className="report-header">
                     <h3>{report.title}</h3>
-                    <span className={`priority-badge ${getPriorityClass(report.priority)}`}>
-                      {report.priority === 'high' ? 'Высокий приоритет' : 
-                       report.priority === 'medium' ? 'Средний приоритет' : 'Низкий приоритет'}
+                    <span className={`status-badge ${getStatusClass(report.status)}`}>
+                      {getStatusLabel(report.status)}
                     </span>
                   </div>
-                  <span className={`status-badge ${getStatusClass(report.status)}`}>
-                    {getStatusLabel(report.status)}
-                  </span>
-                </div>
-
-                <div className="review-details">
-                  <div className="detail-item">
-                    <strong>Автор:</strong> {report.author}
+                  
+                  <div className="report-details">
+                    <p>
+                      <strong>Конференция:</strong> {report.conference_title || 'Не указана'}
+                    </p>
+                    <p>
+                      <strong>Автор:</strong> {report.author_name || report.authors?.[0]?.name || 'Не указан'}
+                    </p>
+                    <p>
+                      <strong>Секция:</strong> {report.section_name || 'Не указана'}
+                    </p>
+                    <p>
+                      <strong>Дата подачи:</strong> {formatDate(report.submitted_at || report.created_at)}
+                    </p>
                   </div>
-                  <div className="detail-item">
-                    <strong>Конференция:</strong> {report.conference}
-                  </div>
-                  <div className="detail-item">
-                    <strong>Дедлайн:</strong> {report.deadline}
+
+                  <div className="report-actions">
+                    <button 
+                      className="btn-secondary"
+                      onClick={() => {
+                        if (reportId) {
+                          navigate(`/report/${reportId}`);
+                        }
+                      }}
+                      title="Просмотр статьи и рецензия"
+                    >
+                      Просмотр статьи и рецензия
+                    </button>
                   </div>
                 </div>
-
-                <div className="review-actions">
-                  <button 
-                    className="btn-review"
-                    onClick={() => handleReview(report.id)}
-                  >
-                    {report.status === 'completed' ? 'Просмотреть рецензию' : 'Рецензировать'}
-                  </button>
-                  <button 
-                    className="btn-download"
-                    onClick={() => handleDownload(report.id)}
-                  >
-                    📥 Скачать
-                  </button>
-                </div>
-              </div>
-            ))}
-
-            {filteredReports.length === 0 && (
-              <div className="no-data">
-                Нет назначенных докладов для рецензирования
-              </div>
-            )}
+              );
+            })}
           </div>
         )}
       </div>
