@@ -8,11 +8,7 @@ import FormulaManager from '../../components/article/FormulaManager';
 import TextEditor from '../../components/article/TextEditor';
 import './Reports.css';
 
-<<<<<<< Updated upstream
-// ============================================
-// НАЧАЛО КОМПОНЕНТА
-// ============================================
-=======
+
 console.log('=== RENDER DEBUG ===');
 console.log('ReactQuill:', ReactQuill);
 console.log('TableManager:', TableManager);
@@ -20,7 +16,7 @@ console.log('ImageManager:', ImageManager);
 console.log('FormulaManager:', FormulaManager);
 console.log('TextEditor:', TextEditor);
 
->>>>>>> Stashed changes
+
 const SubmitReport = () => {
   const navigate = useNavigate();
   
@@ -594,12 +590,6 @@ const SubmitReport = () => {
   };
   
 
-<<<<<<< Updated upstream
-
-
-=======
-  // Отправка доклада
->>>>>>> Stashed changes
 // Отправка доклада
 const handleSubmit = async (e) => {
   e.preventDefault();
