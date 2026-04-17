@@ -6,13 +6,14 @@ import TableManager from '../../components/article/TableManager';
 import ImageManager from '../../components/article/ImageManager';
 import FormulaManager from '../../components/article/FormulaManager';
 import TextEditor from '../../components/article/TextEditor';
+
 import './Reports.css';
 
-<<<<<<< Updated upstream
+
 // ============================================
 // НАЧАЛО КОМПОНЕНТА
 // ============================================
-=======
+
 console.log('=== RENDER DEBUG ===');
 console.log('ReactQuill:', ReactQuill);
 console.log('TableManager:', TableManager);
@@ -20,11 +21,10 @@ console.log('ImageManager:', ImageManager);
 console.log('FormulaManager:', FormulaManager);
 console.log('TextEditor:', TextEditor);
 
->>>>>>> Stashed changes
+
 const SubmitReport = () => {
   const navigate = useNavigate();
   
-  // ==================== 1. ВСЕ useState ====================
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -594,12 +594,7 @@ const SubmitReport = () => {
   };
   
 
-<<<<<<< Updated upstream
 
-
-=======
-  // Отправка доклада
->>>>>>> Stashed changes
 // Отправка доклада
 const handleSubmit = async (e) => {
   e.preventDefault();

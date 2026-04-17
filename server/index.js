@@ -1851,7 +1851,7 @@ app.put('/api/user/update-roles', async (req, res) => {
       const currentRolesResult = await client.query(
         `SELECT r.role_name 
          FROM user_roles ur 
-         JOIN roles r ON ur.role_id = r.role_id 
+         INNER JOIN roles r ON ur.role_id = r.role_id 
          WHERE ur.user_id = $1`,
         [userId]
       );
@@ -1945,7 +1945,7 @@ app.put('/api/user/update-roles', async (req, res) => {
       const finalRolesResult = await client.query(
         `SELECT r.role_name 
          FROM user_roles ur 
-         JOIN roles r ON ur.role_id = r.role_id 
+         INNER JOIN roles r ON ur.role_id = r.role_id 
          WHERE ur.user_id = $1`,
         [userId]
       );
@@ -2053,8 +2053,8 @@ app.get('/api/section-assignments', async (req, res) => {
         hs.user_id as head_id,
         u.name as head_name
       FROM sections s
-      LEFT JOIN header_section hs ON s.id_sections = hs.id_section
-      LEFT JOIN users u ON hs.user_id = u.user_id
+      INNER JOIN header_section hs ON s.id_sections = hs.id_section
+      INNER JOIN users u ON hs.user_id = u.user_id
       WHERE s.conference_id = $1
     `;
     
@@ -2166,9 +2166,10 @@ app.get('/api/sections/head/:userId', (req, res) => {
       c.title as conference_title,
       COUNT(r.report_id) as reports_count
     FROM sections s
-    LEFT JOIN conferences c ON c.id = s.conference_id
+    INNER JOIN header_section hs ON s.id_sections = hs.id_section
+    INNER JOIN conferences c ON c.id = s.conference_id
     LEFT JOIN reports r ON r.id_sections = s.id_sections
-    WHERE s.user_id = $1
+    WHERE hs.user_id = $1  
     GROUP BY 
       s.id_sections, 
       s.name_section, 
@@ -2195,15 +2196,17 @@ app.get('/api/reports/section/:sectionId', (req, res) => {
   const query = `
     SELECT 
       r.report_id as id,
-      r.title_report as title,
+      r.title,
       r.abstract,
       r.keywords,
       r.status,
       r.created_at,
+      r.coauthors,
+      r.submitted_at,
       u.name as author_name,
       u.login as author_login
     FROM reports r
-    JOIN users u ON r.user_id = u.id
+    JOIN users u ON r.user_id = u.user_id
     WHERE r.id_sections = $1
     ORDER BY r.created_at DESC
   `;
@@ -2219,6 +2222,607 @@ app.get('/api/reports/section/:sectionId', (req, res) => {
 
 
 
+
+
+// НАЗНАЧЕНИЕ РЕЦЕНЗЕНТА//
+// ============================================
+
+// 1. Получить всех рецензентов (из таблицы resensent)
+app.get('/api/users/reviewers', async (req, res) => {
+  const query = `
+    SELECT 
+      id_resensent as id,
+      name_resensent as name,
+      email,
+      status,
+      user_id
+    FROM resensent
+    WHERE status = 'active' OR status IS NULL
+    ORDER BY name_resensent
+  `;
+  
+  try {
+    const result = await db.query(query);
+    console.log(`📋 Найдено рецензентов: ${result.rows.length}`);
+    console.log('Первый рецензент:', result.rows[0]);
+    res.json({ success: true, reviewers: result.rows });
+  } catch (error) {
+    console.error('Ошибка при получении рецензентов:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
+// 2. Назначить рецензента на доклад (заполняет reports_resensent)
+app.post('/api/reviews/assign', async (req, res) => {
+  const { report_id, reviewer_id, assigned_by } = req.body;
+  
+  console.log('=== НАЗНАЧЕНИЕ РЕЦЕНЗЕНТА ===');
+  console.log('report_id:', report_id);
+  console.log('reviewer_id:', reviewer_id);
+  console.log('assigned_by:', assigned_by);
+  
+  try {
+    // Проверяем, существует ли доклад
+    const checkReportQuery = `SELECT * FROM reports WHERE report_id = $1`;
+    const reportResult = await db.query(checkReportQuery, [report_id]);
+    
+    if (reportResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Доклад не найден' });
+    }
+    
+    // reviewer_id - это id_resensent из таблицы resensent
+    // Проверяем, существует ли рецензент
+    const checkReviewerQuery = `SELECT * FROM resensent WHERE id_resensent = $1`;
+    const reviewerResult = await db.query(checkReviewerQuery, [reviewer_id]);
+    
+    if (reviewerResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Рецензент не найден' });
+    }
+    
+    // Проверяем, не назначен ли уже этот рецензент на доклад
+    const checkAssignmentQuery = `
+      SELECT * FROM reports_resensent 
+      WHERE report_id = $1 AND id_resensent = $2
+    `;
+    const existingAssignment = await db.query(checkAssignmentQuery, [report_id, reviewer_id]);
+    
+    if (existingAssignment.rows.length > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Этот рецензент уже назначен на данный доклад' 
+      });
+    }
+    
+    // Создаем назначение в таблице reports_resensent
+    const insertQuery = `
+      INSERT INTO reports_resensent (report_id, id_resensent)
+      VALUES ($1, $2)
+      RETURNING *
+    `;
+    
+    const result = await db.query(insertQuery, [report_id, reviewer_id]);
+    
+    // Обновляем статус доклада на "under_review"
+    const updateReportQuery = `
+      UPDATE reports 
+      SET status = 'under_review' 
+      WHERE report_id = $1
+    `;
+    
+    await db.query(updateReportQuery, [report_id]);
+    
+    console.log('✅ Рецензент назначен успешно:', result.rows[0]);
+    
+    res.json({ 
+      success: true, 
+      message: 'Рецензент успешно назначен',
+      assignment: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Ошибка при назначении рецензента:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 3. Получить всех рецензентов для конкретного доклада
+app.get('/api/reviews/report/:reportId/reviewers', async (req, res) => {
+  const { reportId } = req.params;
+  
+  const query = `
+    SELECT 
+      rr.id,
+      rr.report_id,
+      rr.id_resensent,
+      r.name_resensent as name,
+      r.email,
+      r.status as reviewer_status
+    FROM reports_resensent rr
+    JOIN resensent r ON rr.id_resensent = r.id_resensent
+    WHERE rr.report_id = $1
+  `;
+  
+  try {
+    const result = await db.query(query, [reportId]);
+    console.log(`📋 Найдено рецензентов для доклада ${reportId}: ${result.rows.length}`);
+    res.json({ success: true, reviewers: result.rows });
+  } catch (error) {
+    console.error('Ошибка:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 4. Получить доклады для рецензента (через reports_resensent)
+app.get('/api/reports/for-review/:userId', async (req, res) => {
+  const { userId } = req.params;
+  
+  console.log('=== ПОЛУЧЕНИЕ ДОКЛАДОВ ДЛЯ РЕЦЕНЗЕНТА ===');
+  console.log('userId:', userId);
+  
+  try {
+    // Находим id_resensent по user_id
+    const findResensentQuery = `
+      SELECT id_resensent 
+      FROM resensent 
+      WHERE user_id = $1
+    `;
+    const resensentResult = await db.query(findResensentQuery, [userId]);
+    
+    if (resensentResult.rows.length === 0) {
+      console.log(`❌ Рецензент с user_id=${userId} не найден в таблице resensent`);
+      return res.json({ success: true, reports: [] });
+    }
+    
+    const id_resensent = resensentResult.rows[0].id_resensent;
+    console.log(`✅ Найден id_resensent: ${id_resensent} для user_id: ${userId}`);
+    
+    // Получаем доклады для этого рецензента
+    const query = `
+      SELECT 
+        r.report_id as id,
+        r.title,
+        r.abstract,
+        r.keywords,
+        r.status,
+        r.created_at,
+        r.submitted_at,
+        r.content,
+        r.coauthors,
+        c.title as conference_title,
+        s.name_section as section_name,
+        u.name as author_name,
+        rr.id as assignment_id
+      FROM reports r
+      INNER JOIN reports_resensent rr ON r.report_id = rr.report_id
+      LEFT JOIN conferences c ON r.conference_id = c.id
+      LEFT JOIN sections s ON r.id_sections = s.id_sections
+      LEFT JOIN users u ON r.user_id = u.user_id
+      WHERE rr.id_resensent = $1
+      ORDER BY r.submitted_at DESC
+    `;
+    
+    const result = await db.query(query, [id_resensent]);
+    console.log(`📋 Найдено ${result.rows.length} докладов для рецензента ${userId} (id_resensent: ${id_resensent})`);
+    
+    if (result.rows.length > 0) {
+      console.log('Первый доклад:', {
+        id: result.rows[0].id,
+        title: result.rows[0].title,
+        status: result.rows[0].status
+      });
+    }
+    
+    res.json({ success: true, reports: result.rows });
+  } catch (error) {
+    console.error('❌ Ошибка при получении докладов:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 5. Удалить рецензента с доклада (опционально)
+app.delete('/api/reviews/assign', async (req, res) => {
+  const { report_id, reviewer_id } = req.body;
+  
+  try {
+    const deleteQuery = `
+      DELETE FROM reports_resensent 
+      WHERE report_id = $1 AND id_resensent = $2
+      RETURNING *
+    `;
+    
+    const result = await db.query(deleteQuery, [report_id, reviewer_id]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Назначение не найдено' });
+    }
+    
+    // Проверяем, остались ли еще рецензенты
+    const checkQuery = `SELECT COUNT(*) FROM reports_resensent WHERE report_id = $1`;
+    const countResult = await db.query(checkQuery, [report_id]);
+    
+    // Если не осталось рецензентов, возвращаем статус в 'submitted'
+    if (parseInt(countResult.rows[0].count) === 0) {
+      await db.query(`UPDATE reports SET status = 'submitted' WHERE report_id = $1`, [report_id]);
+    }
+    
+    res.json({ success: true, message: 'Рецензент удален' });
+  } catch (error) {
+    console.error('Ошибка:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 6. Добавить пользователя в таблицу resensent (при назначении роли рецензента)
+app.post('/api/resensent/create', async (req, res) => {
+  const { user_id, name, email } = req.body;
+  
+  try {
+    // Проверяем, существует ли уже
+    const checkQuery = `SELECT * FROM resensent WHERE user_id = $1`;
+    const existing = await db.query(checkQuery, [user_id]);
+    
+    if (existing.rows.length > 0) {
+      return res.json({ success: true, message: 'Рецензент уже существует', resensent: existing.rows[0] });
+    }
+    
+    // Создаем запись
+    const insertQuery = `
+      INSERT INTO resensent (name_resensent, email, user_id, status, created_at)
+      VALUES ($1, $2, $3, 'active', NOW())
+      RETURNING *
+    `;
+    
+    const result = await db.query(insertQuery, [name || email, email, user_id]);
+    
+    console.log('✅ Создан рецензент:', result.rows[0]);
+    res.json({ success: true, resensent: result.rows[0] });
+  } catch (error) {
+    console.error('Ошибка:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
+
+
+
+// ПРОСМОТР ДОКЛАДА ДЛЯ РЕЦЕНЗИРОВАНИЯ//
+// server/index.js
+
+// Получение доклада по ID с информацией о рецензии
+app.get('/api/reports/:id', async (req, res) => {
+  const { id } = req.params;
+  
+  const query = `
+    SELECT 
+      r.report_id as id,
+      r.title,
+      r.abstract,
+      r.keywords,
+      r.status,
+      r.created_at,
+      r.submitted_at,
+      r.content,
+      r.literature,
+      r.additional_info,
+      r.coauthors,
+      r.conference_id,
+      r.id_sections as section_id,
+      c.title as conference_title,
+      s.name_section as section_name,
+      u.name as author_name,
+      rev.id_reviews as review_id,
+      rev.scientific_value,
+      rev.practical_value,
+      rev.relevance,
+      rev.novelty,
+      rev.quality,
+      rev.recommendation,
+      rev.comments_for_author,
+      rev.reviewed_at,
+      rev.is_final,
+      resensent.name_resensent as reviewer_name,
+      resensent.email as reviewer_email
+    FROM reports r
+    LEFT JOIN conferences c ON r.conference_id = c.id
+    LEFT JOIN sections s ON r.id_sections = s.id_sections
+    LEFT JOIN users u ON r.user_id = u.user_id
+    LEFT JOIN reviews rev ON r.report_id = rev.id_versions 
+    LEFT JOIN resensent ON rev.id_section_resensent = resensent.id_resensent
+    WHERE r.report_id = $1
+  `;
+  
+  try {
+    const result = await db.query(query, [id]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Доклад не найден' 
+      });
+    }
+    
+    const report = result.rows[0];
+    
+    // Парсим JSON поля
+    if (report.coauthors && typeof report.coauthors === 'string') {
+      try {
+        report.coauthors = JSON.parse(report.coauthors);
+      } catch (e) {
+        report.coauthors = [];
+      }
+    }
+    
+    if (report.content && typeof report.content === 'string') {
+      try {
+        report.content = JSON.parse(report.content);
+      } catch (e) {
+        // Оставляем как текст
+      }
+    }
+    
+    res.json({ success: true, report });
+  } catch (error) {
+    console.error('Ошибка при загрузке доклада:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
+
+// Сохранение рецензии - исправленная версия
+app.post('/api/reviews', async (req, res) => {
+  const { 
+    report_id, 
+    reviewer_id,
+    scientific_value,
+    practical_value,
+    relevance,
+    novelty,
+    quality,
+    recommendation,
+    comments_for_author,
+    is_final = false
+  } = req.body;
+  
+  console.log('=== СОХРАНЕНИЕ РЕЦЕНЗИИ ===');
+  console.log('report_id:', report_id);
+  console.log('reviewer_id:', reviewer_id);
+  
+  try {
+    // 1. Находим id_resensent по user_id
+    const reviewerResult = await db.query(
+      `SELECT id_resensent FROM resensent WHERE user_id = $1`,
+      [reviewer_id]
+    );
+    
+    if (reviewerResult.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Рецензент не найден' 
+      });
+    }
+    
+    const id_resensent = reviewerResult.rows[0].id_resensent;
+    
+    // 2. Получаем id_version из report_versions
+    let versionResult = await db.query(
+      `SELECT id_versions FROM report_versions WHERE report_id = $1 ORDER BY version_number DESC LIMIT 1`,
+      [report_id]
+    );
+    
+    let id_versions;
+    if (versionResult.rows.length === 0) {
+      const insertVersion = await db.query(`
+        INSERT INTO report_versions (report_id, version_number, is_current) 
+        VALUES ($1, 1, true) 
+        RETURNING id_versions
+      `, [report_id]);
+      id_versions = insertVersion.rows[0].id_versions;
+    } else {
+      id_versions = versionResult.rows[0].id_versions;
+    }
+    
+    // 3. Проверяем существование рецензии
+    const checkResult = await db.query(
+      `SELECT id_reviews FROM reviews 
+       WHERE id_versions = $1 AND id_resensent = $2`,
+      [id_versions, id_resensent]
+    );
+    
+    let result;
+    
+    if (checkResult.rows.length > 0) {
+      // Обновление
+      result = await db.query(`
+        UPDATE reviews 
+        SET 
+          scientific_value = $1,
+          practical_value = $2,
+          relevance = $3,
+          novelty = $4,
+          quality = $5,
+          recommendation = $6,
+          comments_for_author = $7,
+          reviewed_at = NOW(),
+          is_final = $8
+        WHERE id_versions = $9 AND id_resensent = $10
+        RETURNING *
+      `, [
+        scientific_value, practical_value, relevance, novelty, quality,
+        recommendation, comments_for_author,
+        is_final, id_versions, id_resensent
+      ]);
+    } else {
+      // Создание
+      result = await db.query(`
+        INSERT INTO reviews (
+          scientific_value,
+          practical_value,
+          relevance,
+          novelty,
+          quality,
+          recommendation,
+          comments_for_author,
+          reviewed_at,
+          is_final,
+          id_versions,
+          id_resensent
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8, $9, $10)
+        RETURNING *
+      `, [
+        scientific_value || 0,
+        practical_value || 0,
+        relevance || 0,
+        novelty || 0,
+        quality || 0,
+        recommendation || 'pending',
+        comments_for_author || '',
+        is_final,
+        id_versions,
+        id_resensent
+      ]);
+    }
+    
+    res.json({ 
+      success: true, 
+      review: result.rows[0]
+    });
+  } catch (error) {
+    console.error('❌ Ошибка при сохранении рецензии:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
+// Получение рецензии для доклада
+
+app.get('/api/reviews/report/:reportId/reviewer/:reviewerId', async (req, res) => {
+  const { reportId, reviewerId } = req.params;
+  
+  console.log('=== ПОЛУЧЕНИЕ РЕЦЕНЗИИ ===');
+  console.log('reportId:', reportId);
+  console.log('reviewerId:', reviewerId);
+  
+  try {
+    // 1. Находим id_resensent по user_id из таблицы resensent
+    const getResensentQuery = `SELECT id_resensent FROM resensent WHERE user_id = $1`;
+    const resensentResult = await db.query(getResensentQuery, [reviewerId]);
+    
+    if (resensentResult.rows.length === 0) {
+      console.log('❌ Рецензент не найден в таблице resensent');
+      return res.json({ success: true, review: null });
+    }
+    
+    const id_resensent = resensentResult.rows[0].id_resensent;
+    console.log('✅ Найден id_resensent:', id_resensent);
+    
+    // 2. Получаем id_versions из report_versions по report_id
+    const versionResult = await db.query(
+      `SELECT id_versions FROM report_versions WHERE report_id = $1 ORDER BY version_number DESC LIMIT 1`,
+      [reportId]
+    );
+    
+    if (versionResult.rows.length === 0) {
+      console.log('❌ Версия доклада не найдена');
+      return res.json({ success: true, review: null });
+    }
+    
+    const id_versions = versionResult.rows[0].id_versions;
+    console.log('✅ Найден id_versions:', id_versions);
+    
+    // 3. Ищем рецензию по id_versions и id_resensent
+    const query = `
+      SELECT 
+        id_reviews as id,
+        scientific_value,
+        practical_value,
+        relevance,
+        novelty,
+        quality,
+        recommendation,
+        comments_for_author,
+        reviewed_at as created_at,
+        reviewed_at as updated_at,
+        is_final
+      FROM reviews
+      WHERE id_versions = $1 AND id_resensent = $2
+    `;
+    
+    const result = await db.query(query, [id_versions, id_resensent]);
+    
+    console.log('📋 Результат запроса:', result.rows);
+    console.log('Найдена рецензия:', result.rows[0] ? '✅ да' : '❌ нет');
+    
+    if (result.rows[0]) {
+      console.log('Рецензия ID:', result.rows[0].id);
+      console.log('Комментарий:', result.rows[0].comments_for_author?.substring(0, 50));
+    }
+    
+    res.json({ 
+      success: true, 
+      review: result.rows[0] || null 
+    });
+  } catch (error) {
+    console.error('❌ Ошибка при получении рецензии:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
+// server/index.js - добавьте этот эндпоинт
+
+// Получение рецензии по ID доклада (для автора)
+app.get('/api/reviews/by-report/:reportId', async (req, res) => {
+  const { reportId } = req.params;
+  
+  console.log('=== ПОЛУЧЕНИЕ РЕЦЕНЗИИ ПО ID ДОКЛАДА ===');
+  console.log('reportId:', reportId);
+  
+  try {
+    // Получаем id_versions из report_versions
+    const versionResult = await db.query(
+      `SELECT id_versions FROM report_versions WHERE report_id = $1 ORDER BY version_number DESC LIMIT 1`,
+      [reportId]
+    );
+    
+    if (versionResult.rows.length === 0) {
+      console.log('❌ Версия доклада не найдена');
+      return res.json({ success: true, review: null });
+    }
+    
+    const id_versions = versionResult.rows[0].id_versions;
+    console.log('✅ Найден id_versions:', id_versions);
+    
+    // Получаем рецензию
+    const reviewResult = await db.query(
+      `SELECT 
+        id_reviews as id,
+        scientific_value,
+        practical_value,
+        relevance,
+        novelty,
+        quality,
+        recommendation,
+        comments_for_author,
+        reviewed_at as created_at,
+        is_final
+      FROM reviews 
+      WHERE id_versions = $1`,
+      [id_versions]
+    );
+    
+    console.log('Найдена рецензия:', reviewResult.rows[0] ? '✅ да' : '❌ нет');
+    
+    res.json({ 
+      success: true, 
+      review: reviewResult.rows[0] || null 
+    });
+  } catch (error) {
+    console.error('❌ Ошибка:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 // ============================================
 // СМЕНА EMAIL ПОЛЬЗОВАТЕЛЯ
@@ -2649,7 +3253,6 @@ app.post('/api/reports', async (req, res) => {
         abstract,
         keywords,
         additional_info,
-        coauthors,
         content,
         status,
         created_at,
