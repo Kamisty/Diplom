@@ -66,7 +66,7 @@ const Input = () => {
 
     setLoading(true);
     try {
-      const response = await fetch('https://diplom-k790.onrender.com/api/user/forgot-password', {
+      const response = await fetch('https://localhost:5000/api/user/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })
@@ -118,7 +118,7 @@ const Input = () => {
     try {
       const email = resetPasswordData.email;
 
-      const response = await fetch('https://diplom-k790.onrender.com/api/user/reset-password', {
+      const response = await fetch('https://localhost:5000/api/user/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -223,7 +223,7 @@ const Input = () => {
     };
 
     try {
-      const response = await fetch('https://diplom-k790.onrender.com/api/input', {
+      const response = await fetch('https://localhost:5000/api/input', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(userData)

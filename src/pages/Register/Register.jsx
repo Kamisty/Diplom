@@ -136,7 +136,7 @@ const Register = () => {
     console.log('📦 Отправка данных на сервер:', userData);
 
     try {
-      const response = await fetch('https://diplom-k790.onrender.com/api/register', {
+      const response = await fetch('https://localhost:5000/api/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

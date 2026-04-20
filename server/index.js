@@ -7,22 +7,13 @@ const bcrypt = require("bcryptjs");
 const db = require('./db');  // <-- ДОБАВЬТЕ ЭТУ СТРОКУ
 // Настройка CORS для React
 app.use(cors({
-    origin: function (origin, callback) {
-        // Разрешаем запросы без origin (например, из Postman или curl)
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.indexOf(origin) === -1) {
-            const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-            return callback(new Error(msg), false);
-        }
-        return callback(null, true);
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    origin: "http://localhost:3000",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true
 }));
 
-// Добавьте эту строку после CORS для обработки предварительных запросов
-app.options('*', cors());
+
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
@@ -2832,6 +2823,7 @@ app.get('/api/reviews/by-report/:reportId', async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
 
 // ============================================
 // СМЕНА EMAIL ПОЛЬЗОВАТЕЛЯ
