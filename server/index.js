@@ -7,13 +7,18 @@ const bcrypt = require("bcryptjs");
 const db = require('./db');  // <-- ДОБАВЬТЕ ЭТУ СТРОКУ
 // Настройка CORS для React
 app.use(cors({
-    origin: "http://localhost:3000",
-    methods: ["GET", "POST", "PUT", "DELETE"],
+    origin: [
+        "http://localhost:3000",
+        "https://mydiplom-taupe.vercel.app",
+        "https://mydiplom-taupe.vercel.app/",
+        /\.vercel\.app$/  // Разрешить все vercel.app поддомены
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true
 }));
 
-
+app.options('*', cors());
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
