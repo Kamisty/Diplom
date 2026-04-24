@@ -6,7 +6,6 @@ const bcrypt = require("bcryptjs");
 
 const db = require('./db');  // <-- ДОБАВЬТЕ ЭТУ СТРОКУ
 // Настройка CORS для React
-const cors = require('cors');
 
 app.use(cors({
     origin: [
