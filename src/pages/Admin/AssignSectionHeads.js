@@ -16,7 +16,7 @@ const AssignSectionHeads = () => {
   const fetchConferences = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:5000/api/conferences');
+      const response = await fetch('https://diplom-1-ss8u.onrender.com/api/conferences');
       if (!response.ok) throw new Error('Ошибка загрузки конференций');
       const data = await response.json();
       console.log('Полученные конференции:', data);

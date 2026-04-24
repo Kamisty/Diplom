@@ -24,7 +24,7 @@ const SectionHeadDashboard = () => {
       setLoading(true);
       const userId = user?.user_id || user?.id;
       
-      const response = await fetch(`http://localhost:5000/api/sections/head/${userId}`);
+      const response = await fetch(`https://diplom-1-ss8u.onrender.com/api/sections/head/${userId}`);
       const data = await response.json();
 
       if (response.ok && data.success) {
@@ -49,7 +49,7 @@ const SectionHeadDashboard = () => {
     if (!sectionId) return;
     
     try {
-      const response = await fetch(`http://localhost:5000/api/reports/section/${sectionId}`);
+      const response = await fetch(`https://diplom-1-ss8u.onrender.com/api/reports/section/${sectionId}`);
       const data = await response.json();
 
       if (response.ok && data.success) {
@@ -70,7 +70,7 @@ const SectionHeadDashboard = () => {
     try {
       const assignmentsData = {};
       for (const report of reportsList) {
-        const response = await fetch(`http://localhost:5000/api/reviews/report/${report.id}/reviewers`);
+        const response = await fetch(`https://diplom-1-ss8u.onrender.com/reviews/report/${report.id}/reviewers`);
         if (response.ok) {
           const data = await response.json();
           assignmentsData[report.id] = data.reviewers || [];
@@ -86,7 +86,7 @@ const SectionHeadDashboard = () => {
   const fetchReviewers = useCallback(async () => {
     try {
       console.log('Загрузка рецензентов...');
-      const response = await fetch('http://localhost:5000/api/users/reviewers');
+      const response = await fetch('https://diplom-1-ss8u.onrender.com/api/users/reviewers');
       const data = await response.json();
       console.log('Получены рецензенты:', data);
       
@@ -139,7 +139,7 @@ const SectionHeadDashboard = () => {
       };
       console.log('Отправка запроса:', requestBody);
       
-      const response = await fetch('http://localhost:5000/api/reviews/assign', {
+      const response = await fetch('https://diplom-1-ss8u.onrender.com/api/reviews/assign', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

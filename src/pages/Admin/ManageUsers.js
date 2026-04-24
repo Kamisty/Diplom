@@ -36,7 +36,7 @@ const ManageUsers = () => {
     setError(null);
     
     try {
-      const response = await fetch('http://localhost:5000/api/users');
+      const response = await fetch('https://diplom-1-ss8u.onrender.com/api/users');
       const data = await response.json();
 
       if (response.ok && data.success) {
@@ -137,7 +137,7 @@ const ManageUsers = () => {
     setShowProfileModal(true);
     
     try {
-      const response = await fetch(`http://localhost:5000/api/user-profile/${userId}`);
+      const response = await fetch(`https://diplom-1-ss8u.onrender.com/api/user-profile/${userId}`);
       const data = await response.json();
       
       if (response.ok && data.success) {
@@ -186,7 +186,7 @@ const ManageUsers = () => {
     setRoleMessage({ type: '', text: '' });
     
     try {
-      const response = await fetch('http://localhost:5000/api/user/update-roles', {
+      const response = await fetch('https://diplom-1-ss8u.onrender.com/api/user/update-roles', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

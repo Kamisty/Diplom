@@ -21,7 +21,7 @@ const ManageConferences = () => {
     setError(null);
     
     try {
-      const response = await fetch('http://localhost:5000/api/conferences');
+      const response = await fetch('https://diplom-1-ss8u.onrender.com/api/conferences');
       const data = await response.json();
 
       if (response.ok && data.success) {
@@ -115,7 +115,7 @@ const ManageConferences = () => {
   const handleDelete = async (id) => {
     if (window.confirm('Вы уверены, что хотите удалить эту конференцию?')) {
       try {
-        const response = await fetch(`http://localhost:5000/api/conferences/${id}`, {
+        const response = await fetch(`https://diplom-1-ss8u.onrender.com/api/conferences/${id}`, {
           method: 'DELETE'
         });
         
