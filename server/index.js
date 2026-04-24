@@ -3582,6 +3582,16 @@ app.delete('/api/reports/:reportId', async (req, res) => {
 // ЗАПУСК СЕРВЕРА
 // ============================================
 const PORT = 5000;
+
+// Health check для Render
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
 app.listen(PORT, () => {
     console.log("\n" + "=".repeat(60));
     console.log(`🚀 СЕРВЕР ЗАПУЩЕН НА ПОРТУ ${PORT}`);
