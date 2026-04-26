@@ -3,13 +3,15 @@ const app = express();
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
 
-const db = require('./db');  // <-- ДОБАВЬТЕ ЭТУ СТРОКУ
+const pool = require('./db');  // <-- ДОБАВЬТЕ ЭТУ СТРОКУ
 // Настройка CORS для React
 
 app.use(cors({
-    origin: [
+   origin: [
         "http://localhost:3000",
-        "https://mydiplom-taupe.vercel.app"  // ← ДОБАВЬТЕ ЭТУ СТРОКУ!
+        "https://diplom-lld7m9ok3-monterinas-projects.vercel.app",
+        "https://diplom-*.vercel.app",  // разрешить все vercel.app поддомены
+        /\.vercel\.app$/  // регулярное выражение для любых subdomain.vercel.app
     ],
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -2060,7 +2062,7 @@ app.get('/api/section-assignments', async (req, res) => {
       WHERE s.conference_id = $1
     `;
     
-    const result = await db.query(query, [conferenceId]);
+    const result = await pool.query(query, [conferenceId]);
     
     res.json({
       success: true,
@@ -2091,7 +2093,7 @@ app.post('/api/section-assignments', async (req, res) => {
       WHERE conference_id = $1 AND name_section = $2
     `;
     
-    const sectionResult = await db.query(findSectionQuery, [conferenceId, sectionName]);
+    const sectionResult = await pool.query(findSectionQuery, [conferenceId, sectionName]);
     
     if (sectionResult.rows.length === 0) {
       return res.status(404).json({ 
@@ -2109,7 +2111,7 @@ app.post('/api/section-assignments', async (req, res) => {
       WHERE id_section = $1
     `;
     
-    const existingResult = await db.query(checkQuery, [sectionId]);
+    const existingResult = await pool.query(checkQuery, [sectionId]);
     
     if (existingResult.rows.length > 0) {
       // Обновить
@@ -2120,7 +2122,7 @@ app.post('/api/section-assignments', async (req, res) => {
         RETURNING *
       `;
       
-      const updateResult = await db.query(updateQuery, [headId || null, sectionId]);
+      const updateResult = await pool.query(updateQuery, [headId || null, sectionId]);
       
       res.json({
         success: true,
@@ -2135,7 +2137,7 @@ app.post('/api/section-assignments', async (req, res) => {
         RETURNING *
       `;
       
-      const insertResult = await db.query(insertQuery, [headId || null, sectionId]);
+      const insertResult = await pool.query(insertQuery, [headId || null, sectionId]);
       
       res.json({
         success: true,
@@ -2180,7 +2182,7 @@ app.get('/api/sections/head/:userId', (req, res) => {
     ORDER BY s.name_section
   `;
   
-  db.query(query, [userId], (err, results) => {
+  pool.query(query, [userId], (err, results) => {
     if (err) {
       console.error('Ошибка:', err);
       return res.status(500).json({ success: false, error: err.message });
@@ -2213,7 +2215,7 @@ app.get('/api/reports/section/:sectionId', (req, res) => {
     ORDER BY r.created_at DESC
   `;
   
-  db.query(query, [sectionId], (err, results) => {
+  pool.query(query, [sectionId], (err, results) => {
     if (err) {
       console.error('Ошибка:', err);
       return res.status(500).json({ success: false, error: err.message });
@@ -2244,7 +2246,7 @@ app.get('/api/users/reviewers', async (req, res) => {
   `;
   
   try {
-    const result = await db.query(query);
+    const result = await pool.query(query);
     console.log(`📋 Найдено рецензентов: ${result.rows.length}`);
     console.log('Первый рецензент:', result.rows[0]);
     res.json({ success: true, reviewers: result.rows });
@@ -2267,7 +2269,7 @@ app.post('/api/reviews/assign', async (req, res) => {
   try {
     // Проверяем, существует ли доклад
     const checkReportQuery = `SELECT * FROM reports WHERE report_id = $1`;
-    const reportResult = await db.query(checkReportQuery, [report_id]);
+    const reportResult = await pool.query(checkReportQuery, [report_id]);
     
     if (reportResult.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Доклад не найден' });
@@ -2276,7 +2278,7 @@ app.post('/api/reviews/assign', async (req, res) => {
     // reviewer_id - это id_resensent из таблицы resensent
     // Проверяем, существует ли рецензент
     const checkReviewerQuery = `SELECT * FROM resensent WHERE id_resensent = $1`;
-    const reviewerResult = await db.query(checkReviewerQuery, [reviewer_id]);
+    const reviewerResult = await pool.query(checkReviewerQuery, [reviewer_id]);
     
     if (reviewerResult.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Рецензент не найден' });
@@ -2287,7 +2289,7 @@ app.post('/api/reviews/assign', async (req, res) => {
       SELECT * FROM reports_resensent 
       WHERE report_id = $1 AND id_resensent = $2
     `;
-    const existingAssignment = await db.query(checkAssignmentQuery, [report_id, reviewer_id]);
+    const existingAssignment = await pool.query(checkAssignmentQuery, [report_id, reviewer_id]);
     
     if (existingAssignment.rows.length > 0) {
       return res.status(400).json({ 
@@ -2303,7 +2305,7 @@ app.post('/api/reviews/assign', async (req, res) => {
       RETURNING *
     `;
     
-    const result = await db.query(insertQuery, [report_id, reviewer_id]);
+    const result = await pool.query(insertQuery, [report_id, reviewer_id]);
     
     // Обновляем статус доклада на "under_review"
     const updateReportQuery = `
@@ -2312,7 +2314,7 @@ app.post('/api/reviews/assign', async (req, res) => {
       WHERE report_id = $1
     `;
     
-    await db.query(updateReportQuery, [report_id]);
+    await pool.query(updateReportQuery, [report_id]);
     
     console.log('✅ Рецензент назначен успешно:', result.rows[0]);
     
@@ -2345,7 +2347,7 @@ app.get('/api/reviews/report/:reportId/reviewers', async (req, res) => {
   `;
   
   try {
-    const result = await db.query(query, [reportId]);
+    const result = await pool.query(query, [reportId]);
     console.log(`📋 Найдено рецензентов для доклада ${reportId}: ${result.rows.length}`);
     res.json({ success: true, reviewers: result.rows });
   } catch (error) {
@@ -2368,7 +2370,7 @@ app.get('/api/reports/for-review/:userId', async (req, res) => {
       FROM resensent 
       WHERE user_id = $1
     `;
-    const resensentResult = await db.query(findResensentQuery, [userId]);
+    const resensentResult = await pool.query(findResensentQuery, [userId]);
     
     if (resensentResult.rows.length === 0) {
       console.log(`❌ Рецензент с user_id=${userId} не найден в таблице resensent`);
@@ -2403,7 +2405,7 @@ app.get('/api/reports/for-review/:userId', async (req, res) => {
       ORDER BY r.submitted_at DESC
     `;
     
-    const result = await db.query(query, [id_resensent]);
+    const result = await pool.query(query, [id_resensent]);
     console.log(`📋 Найдено ${result.rows.length} докладов для рецензента ${userId} (id_resensent: ${id_resensent})`);
     
     if (result.rows.length > 0) {
@@ -2432,7 +2434,7 @@ app.delete('/api/reviews/assign', async (req, res) => {
       RETURNING *
     `;
     
-    const result = await db.query(deleteQuery, [report_id, reviewer_id]);
+    const result = await pool.query(deleteQuery, [report_id, reviewer_id]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Назначение не найдено' });
@@ -2440,11 +2442,11 @@ app.delete('/api/reviews/assign', async (req, res) => {
     
     // Проверяем, остались ли еще рецензенты
     const checkQuery = `SELECT COUNT(*) FROM reports_resensent WHERE report_id = $1`;
-    const countResult = await db.query(checkQuery, [report_id]);
+    const countResult = await pool.query(checkQuery, [report_id]);
     
     // Если не осталось рецензентов, возвращаем статус в 'submitted'
     if (parseInt(countResult.rows[0].count) === 0) {
-      await db.query(`UPDATE reports SET status = 'submitted' WHERE report_id = $1`, [report_id]);
+      await pool.query(`UPDATE reports SET status = 'submitted' WHERE report_id = $1`, [report_id]);
     }
     
     res.json({ success: true, message: 'Рецензент удален' });
@@ -2461,7 +2463,7 @@ app.post('/api/resensent/create', async (req, res) => {
   try {
     // Проверяем, существует ли уже
     const checkQuery = `SELECT * FROM resensent WHERE user_id = $1`;
-    const existing = await db.query(checkQuery, [user_id]);
+    const existing = await pool.query(checkQuery, [user_id]);
     
     if (existing.rows.length > 0) {
       return res.json({ success: true, message: 'Рецензент уже существует', resensent: existing.rows[0] });
@@ -2474,7 +2476,7 @@ app.post('/api/resensent/create', async (req, res) => {
       RETURNING *
     `;
     
-    const result = await db.query(insertQuery, [name || email, email, user_id]);
+    const result = await pool.query(insertQuery, [name || email, email, user_id]);
     
     console.log('✅ Создан рецензент:', result.rows[0]);
     res.json({ success: true, resensent: result.rows[0] });
@@ -2535,7 +2537,7 @@ app.get('/api/reports/:id', async (req, res) => {
   `;
   
   try {
-    const result = await db.query(query, [id]);
+    const result = await pool.query(query, [id]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ 
@@ -2593,7 +2595,7 @@ app.post('/api/reviews', async (req, res) => {
   
   try {
     // 1. Находим id_resensent по user_id
-    const reviewerResult = await db.query(
+    const reviewerResult = await pool.query(
       `SELECT id_resensent FROM resensent WHERE user_id = $1`,
       [reviewer_id]
     );
@@ -2608,14 +2610,14 @@ app.post('/api/reviews', async (req, res) => {
     const id_resensent = reviewerResult.rows[0].id_resensent;
     
     // 2. Получаем id_version из report_versions
-    let versionResult = await db.query(
+    let versionResult = await pool.query(
       `SELECT id_versions FROM report_versions WHERE report_id = $1 ORDER BY version_number DESC LIMIT 1`,
       [report_id]
     );
     
     let id_versions;
     if (versionResult.rows.length === 0) {
-      const insertVersion = await db.query(`
+      const insertVersion = await pool.query(`
         INSERT INTO report_versions (report_id, version_number, is_current) 
         VALUES ($1, 1, true) 
         RETURNING id_versions
@@ -2626,7 +2628,7 @@ app.post('/api/reviews', async (req, res) => {
     }
     
     // 3. Проверяем существование рецензии
-    const checkResult = await db.query(
+    const checkResult = await pool.query(
       `SELECT id_reviews FROM reviews 
        WHERE id_versions = $1 AND id_resensent = $2`,
       [id_versions, id_resensent]
@@ -2636,7 +2638,7 @@ app.post('/api/reviews', async (req, res) => {
     
     if (checkResult.rows.length > 0) {
       // Обновление
-      result = await db.query(`
+      result = await pool.query(`
         UPDATE reviews 
         SET 
           scientific_value = $1,
@@ -2657,7 +2659,7 @@ app.post('/api/reviews', async (req, res) => {
       ]);
     } else {
       // Создание
-      result = await db.query(`
+      result = await pool.query(`
         INSERT INTO reviews (
           scientific_value,
           practical_value,
@@ -2709,7 +2711,7 @@ app.get('/api/reviews/report/:reportId/reviewer/:reviewerId', async (req, res) =
   try {
     // 1. Находим id_resensent по user_id из таблицы resensent
     const getResensentQuery = `SELECT id_resensent FROM resensent WHERE user_id = $1`;
-    const resensentResult = await db.query(getResensentQuery, [reviewerId]);
+    const resensentResult = await pool.query(getResensentQuery, [reviewerId]);
     
     if (resensentResult.rows.length === 0) {
       console.log('❌ Рецензент не найден в таблице resensent');
@@ -2720,7 +2722,7 @@ app.get('/api/reviews/report/:reportId/reviewer/:reviewerId', async (req, res) =
     console.log('✅ Найден id_resensent:', id_resensent);
     
     // 2. Получаем id_versions из report_versions по report_id
-    const versionResult = await db.query(
+    const versionResult = await pool.query(
       `SELECT id_versions FROM report_versions WHERE report_id = $1 ORDER BY version_number DESC LIMIT 1`,
       [reportId]
     );
@@ -2751,7 +2753,7 @@ app.get('/api/reviews/report/:reportId/reviewer/:reviewerId', async (req, res) =
       WHERE id_versions = $1 AND id_resensent = $2
     `;
     
-    const result = await db.query(query, [id_versions, id_resensent]);
+    const result = await pool.query(query, [id_versions, id_resensent]);
     
     console.log('📋 Результат запроса:', result.rows);
     console.log('Найдена рецензия:', result.rows[0] ? '✅ да' : '❌ нет');
@@ -2783,7 +2785,7 @@ app.get('/api/reviews/by-report/:reportId', async (req, res) => {
   
   try {
     // Получаем id_versions из report_versions
-    const versionResult = await db.query(
+    const versionResult = await pool.query(
       `SELECT id_versions FROM report_versions WHERE report_id = $1 ORDER BY version_number DESC LIMIT 1`,
       [reportId]
     );
@@ -2797,7 +2799,7 @@ app.get('/api/reviews/by-report/:reportId', async (req, res) => {
     console.log('✅ Найден id_versions:', id_versions);
     
     // Получаем рецензию
-    const reviewResult = await db.query(
+    const reviewResult = await pool.query(
       `SELECT 
         id_reviews as id,
         scientific_value,
