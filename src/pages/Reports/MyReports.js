@@ -23,7 +23,7 @@ const MyReports = () => {
 
       console.log('Загрузка докладов для пользователя:', user.id);
       
-      const response = await fetch(`https://diplom-1-ss8u.onrender.com/api/reports/user/${user.id}`);
+      const response = await fetch(`https://diplom-j6uo.onrender.com/api/reports/user/${user.id}`);
       const data = await response.json();
       
       console.log('Получены доклады:', data);

@@ -36,7 +36,7 @@ const Dashboard = () => {
       
       // ✅ Используем прямое сравнение вместо isActiveRole для избежания лишних зависимостей
       if (activeRole === ROLES.AUTHOR) {
-        const reportsResponse = await fetch(`http://localhost:5000/api/reports/user/${userId}`);
+        const reportsResponse = await fetch(`https://diplom-j6uo.onrender.com/api/reports/user/${userId}`);
         const reportsData = await reportsResponse.json();
         if (reportsData.success) {
           setStats(prev => ({ ...prev, myReports: reportsData.reports?.length || 0 }));
@@ -44,7 +44,7 @@ const Dashboard = () => {
       }
       
       if (activeRole === ROLES.ADMIN) {
-        const confResponse = await fetch('http://localhost:5000/api/conferences');
+        const confResponse = await fetch('https://diplom-j6uo.onrender.com/api/conferences');
         const confData = await confResponse.json();
         if (confData.success) {
           setStats(prev => ({ ...prev, activeConferences: confData.conferences?.length || 0 }));
@@ -52,7 +52,7 @@ const Dashboard = () => {
       }
       
       if (activeRole === ROLES.REVIEWER) {
-        const reviewsResponse = await fetch(`http://localhost:5000/api/reviews/pending/${userId}`);
+        const reviewsResponse = await fetch(`https://diplom-j6uo.onrender.com/api/reviews/pending/${userId}`);
         const reviewsData = await reviewsResponse.json();
         if (reviewsData.success) {
           setStats(prev => ({ ...prev, pendingReviews: reviewsData.count || 0 }));

@@ -30,7 +30,7 @@ const EditConference = () => {
 
   const loadSections = useCallback(async () => {
     try {
-      const response = await fetch(`https://diplom-1-ss8u.onrender.com/api/conferences/${id}/sections`);
+      const response = await fetch(`https://diplom-j6uo.onrender.com/api/conferences/${id}/sections`);
       const data = await response.json();
       
       console.log('📦 Загружены секции:', data);
@@ -51,7 +51,7 @@ const EditConference = () => {
     setError(null);
     
     try {
-      const response = await fetch(`https://diplom-1-ss8u.onrender.com/api/conferences/${id}`);
+      const response = await fetch(`https://diplom-j6uo.onrender.com/api/conferences/${id}`);
       const data = await response.json();
 
       if (response.ok && data.success) {
@@ -98,7 +98,7 @@ const EditConference = () => {
     setSuccess(null);
 
     try {
-      const response = await fetch(`https://diplom-1-ss8u.onrender.com/api/conferences/${id}`, {
+      const response = await fetch(`https://diplom-j6uo.onrender.com/api/conferences/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -143,7 +143,7 @@ const EditConference = () => {
     }
     
     try {
-      const response = await fetch(`https://diplom-1-ss8u.onrender.com/api/conferences/${id}/sections`, {
+      const response = await fetch(`https://diplom-j6uo.onrender.com/api/conferences/${id}/sections`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -179,7 +179,7 @@ const EditConference = () => {
     if (!window.confirm('Удалить эту секцию?')) return;
 
     try {
-      const response = await fetch(`https://diplom-1-ss8u.onrender.com/api/sections/${sectionId}`, {
+      const response = await fetch(`https://diplom-j6uo.onrender.com/api/sections/${sectionId}`, {
         method: 'DELETE'
       });
 

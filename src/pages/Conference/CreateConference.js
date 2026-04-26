@@ -106,7 +106,7 @@ const CreateConference = () => {
 
       console.log('Отправка данных на сервер:', conferenceData);
 
-      const response = await fetch('https://diplom-1-ss8u.onrender.com/api/conferences', {
+      const response = await fetch('https://diplom-j6uo.onrender.com/api/conferences', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

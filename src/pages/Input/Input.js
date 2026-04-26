@@ -66,7 +66,7 @@ const Input = () => {
 
     setLoading(true);
     try {
-      const response = await fetch('https://diplom-1-ss8u.onrender.com/api/user/forgot-password', {
+      const response = await fetch('https://diplom-j6uo.onrender.com/api/user/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })
@@ -118,7 +118,7 @@ const Input = () => {
     try {
       const email = resetPasswordData.email;
 
-      const response = await fetch('https://diplom-1-ss8u.onrender.com/api/user/reset-password', {
+      const response = await fetch('https://diplom-j6uo.onrender.com/api/user/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -223,7 +223,7 @@ const Input = () => {
     };
 
     try {
-      const response = await fetch('https://diplom-1-ss8u.onrender.com/api/input', {
+      const response = await fetch('https://diplom-j6uo.onrender.com/api/input', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(userData)
