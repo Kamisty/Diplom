@@ -1,26 +1,39 @@
-// src/pages/Reports/SubmitReport.js
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
-import TableManager from '../../components/article/TableManager.jsx';
-import ImageManager from '../../components/article/ImageManager.jsx';
-import FormulaManager from '../../components/article/FormulaManager.jsx';
-// import wordStyles from '../../wordStyles.json';
+import TableManager from '../../components/article/TableManager';
+import ImageManager from '../../components/article/ImageManager';
+import FormulaManager from '../../components/article/FormulaManager';
+import TextEditor from '../../components/article/TextEditor';
+
 import './Reports.css';
+
+
+console.log('=== RENDER DEBUG ===');
+console.log('ReactQuill:', ReactQuill);
+console.log('TableManager:', TableManager);
+console.log('ImageManager:', ImageManager);
+console.log('FormulaManager:', FormulaManager);
+console.log('TextEditor:', TextEditor);
+
 
 const SubmitReport = () => {
   const navigate = useNavigate();
   
-  // Состояния для отправки
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [conferences, setConferences] = useState([]);
   const [loadingConferences, setLoadingConferences] = useState(true);
+  const [sections, setSections] = useState([]);
+  const [loadingSections, setLoadingSections] = useState(false);
   const [reportFile, setReportFile] = useState(null);
-  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [literature, setLiterature] = useState('');
   const [errors, setErrors] = useState({});
+  const [template, setTemplate] = useState(null);
+  const [conferenceTemplate, setConferenceTemplate] = useState(null);
   
-  // Состояния для статьи
   const [article, setArticle] = useState({
     annotation: '',
     keywords: '',
@@ -30,7 +43,6 @@ const SubmitReport = () => {
   const [editingBlock, setEditingBlock] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
   
-  // Состояния для менеджеров
   const [isTableManagerOpen, setIsTableManagerOpen] = useState(false);
   const [isImageManagerOpen, setIsImageManagerOpen] = useState(false);
   const [isFormulaManagerOpen, setIsFormulaManagerOpen] = useState(false);
@@ -43,17 +55,17 @@ const SubmitReport = () => {
   const [showSaveMessage, setShowSaveMessage] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   
-  // Состояния для формы доклада
   const [formData, setFormData] = useState({
     title: '',
     conferenceId: '',
+    sectionId: '',
     authors: [''],
     additionalInfo: ''
   });
   
   const quillRef = useRef(null);
   
-  // Настройки редактора
+  // ==================== 2. НАСТРОЙКИ РЕДАКТОРА ====================
   const modules = {
     toolbar: [
       [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
@@ -73,33 +85,24 @@ const SubmitReport = () => {
     'link', 'color', 'background'
   ];
   
+  // ==================== 3. ВСЕ useEffect ====================
+  
   // Загрузка конференций
   useEffect(() => {
     fetchConferences();
   }, []);
   
-  const fetchConferences = async () => {
-    setLoadingConferences(true);
-    try {
-      const response = await fetch('http://localhost:5000/api/conferences');
-      const data = await response.json();
-      
-      if (response.ok) {
-        let conferencesList = Array.isArray(data) ? data : (data.conferences || []);
-        const now = new Date();
-        const activeConferences = conferencesList.filter(conf => {
-          if (!conf.deadline) return true;
-          const deadline = new Date(conf.deadline);
-          return isNaN(deadline.getTime()) || deadline > now;
-        });
-        setConferences(activeConferences);
-      }
-    } catch (error) {
-      console.error('Ошибка загрузки конференций:', error);
-    } finally {
-      setLoadingConferences(false);
+  // Загрузка секций и шаблона при выборе конференции
+  useEffect(() => {
+    if (formData.conferenceId) {
+      fetchSections(formData.conferenceId);
+      loadConferenceTemplate(formData.conferenceId);
+      setFormData(prev => ({ ...prev, sectionId: '' }));
+    } else {
+      setSections([]);
+      setConferenceTemplate(null);
     }
-  };
+  }, [formData.conferenceId]);
   
   // Загрузка черновика
   useEffect(() => {
@@ -115,6 +118,9 @@ const SubmitReport = () => {
         if (parsed.formData) {
           setFormData(prev => ({ ...prev, ...parsed.formData }));
         }
+        if (parsed.literature) {
+          setLiterature(parsed.literature);
+        }
         showTemporaryMessage('📂 Черновик загружен');
       } catch (error) {
         console.error('Ошибка загрузки черновика:', error);
@@ -122,10 +128,103 @@ const SubmitReport = () => {
     }
   }, []);
   
+  // ==================== 4. ВСЕ ФУНКЦИИ ====================
+  
   const showTemporaryMessage = (message) => {
     setSaveMessage(message);
     setShowSaveMessage(true);
     setTimeout(() => setShowSaveMessage(false), 3000);
+  };
+  
+  const fetchConferences = async () => {
+    setLoadingConferences(true);
+    try {
+      const response = await fetch('https://diplom-1-ss8u.onrender.com/api/conferences');
+      const data = await response.json();
+      
+      if (response.ok) {
+        let conferencesList = Array.isArray(data) ? data : (data.conferences || []);
+        const now = new Date();
+        const activeConferences = conferencesList.filter(conf => {
+          if (!conf.deadline) return true;
+          const deadline = new Date(conf.deadline);
+          return isNaN(deadline.getTime()) || deadline > now;
+        });
+        setConferences(activeConferences);
+      } else {
+        console.error('Ошибка сервера:', data);
+        setConferences([]);
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки конференций:', error);
+      setConferences([]);
+    } finally {
+      setLoadingConferences(false);
+    }
+  };
+  
+  const fetchSections = async (conferenceId) => {
+    if (!conferenceId) {
+      setSections([]);
+      return;
+    }
+    
+    setLoadingSections(true);
+    try {
+      const response = await fetch(`https://diplom-1-ss8u.onrender.com/api/sections?conferenceId=${conferenceId}`);
+      const data = await response.json();
+      
+      if (response.ok) {
+        let sectionsList = [];
+        if (Array.isArray(data)) {
+          sectionsList = data;
+        } else if (data.sections) {
+          sectionsList = data.sections;
+        } else if (data.data) {
+          sectionsList = data.data;
+        }
+        
+        const formattedSections = sectionsList.map(section => ({
+          id: section.id_sections || section.id,
+          name: section.name_section || section.name,
+          conference_id: section.conference_id
+        }));
+        
+        setSections(formattedSections);
+      } else {
+        console.error('Ошибка загрузки секций:', data);
+        setSections([]);
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки секций:', error);
+      setSections([]);
+    } finally {
+      setLoadingSections(false);
+    }
+  };
+  
+  const loadConferenceTemplate = async (conferenceId) => {
+    try {
+      const response = await fetch(`https://diplom-1-ss8u.onrender.com/api/conferences/${conferenceId}/template`);
+      const data = await response.json();
+      if (data.success) {
+        setConferenceTemplate(data.template);
+        console.log('Шаблон загружен:', data.template);
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки шаблона:', error);
+    }
+  };
+  
+  const loadTemplate = async () => {
+    const response = await fetch(`https://diplom-1-ss8u.onrender.com/api/conferences/${formData.conferenceId}/template`);
+    const data = await response.json();
+    if (data.success) {
+      setTemplate(data.template);
+      if (data.template.rules) {
+        // Обновляем правила валидации
+      }
+    }
   };
   
   // Функции для работы с авторами
@@ -284,10 +383,14 @@ const SubmitReport = () => {
     }
   };
   
+  // ... остальные функции (handleSubmit, validateForm, renderTableBlock, saveDraft и т.д.)
+  
+  // ==================== 5. RETURN ====================
+
+
   // Обработчик для таблиц
   const handleSaveTable = (tableData) => {
     if (editingBlock?.type === 'table') {
-      // Обновление существующей таблицы
       const updatedBlocks = contentBlocks.map(block => 
         block.id === editingBlock.id 
           ? { 
@@ -304,7 +407,6 @@ const SubmitReport = () => {
       setEditingBlock(null);
       showTemporaryMessage('✅ Таблица обновлена');
     } else {
-      // Создание новой таблицы
       const newBlock = {
         id: Date.now(),
         type: 'table',
@@ -326,7 +428,6 @@ const SubmitReport = () => {
   // Обработчик для изображений
   const handleSaveImage = (imageData) => {
     if (editingBlock?.type === 'image') {
-      // Обновление существующего изображения
       const updatedBlocks = contentBlocks.map(block => 
         block.id === editingBlock.id 
           ? { 
@@ -342,7 +443,6 @@ const SubmitReport = () => {
       setEditingBlock(null);
       showTemporaryMessage('✅ Изображение обновлено');
     } else {
-      // Создание нового изображения
       const newBlock = {
         id: Date.now(),
         type: 'image',
@@ -363,7 +463,6 @@ const SubmitReport = () => {
   // Обработчик для формул
   const handleSaveFormula = (formulaData) => {
     if (editingBlock?.type === 'formula') {
-      // Обновление существующей формулы
       const updatedBlocks = contentBlocks.map(block => 
         block.id === editingBlock.id 
           ? { 
@@ -380,7 +479,6 @@ const SubmitReport = () => {
       setEditingBlock(null);
       showTemporaryMessage('✅ Формула обновлена');
     } else {
-      // Создание новой формулы
       const newBlock = {
         id: Date.now(),
         type: 'formula',
@@ -450,7 +548,14 @@ const SubmitReport = () => {
       article, 
       contentBlocks, 
       counters: { table: tableCounter, image: imageCounter, formula: formulaCounter },
-      formData: { title: formData.title, authors: formData.authors, additionalInfo: formData.additionalInfo },
+      formData: { 
+        title: formData.title, 
+        conferenceId: formData.conferenceId,
+        sectionId: formData.sectionId,
+        authors: formData.authors, 
+        additionalInfo: formData.additionalInfo 
+      },
+       literature: literature,
       lastModified: new Date().toISOString()
     };
     localStorage.setItem('articleDraft', JSON.stringify(articleData));
@@ -463,6 +568,7 @@ const SubmitReport = () => {
     
     if (!formData.title.trim()) newErrors.title = 'Введите название доклада';
     if (!formData.conferenceId) newErrors.conferenceId = 'Выберите конференцию';
+    if (!formData.sectionId) newErrors.sectionId = 'Выберите секцию';
     if (!article.annotation.trim()) {
       newErrors.annotation = 'Введите аннотацию';
     } else if (article.annotation.length < 50) {
@@ -473,11 +579,7 @@ const SubmitReport = () => {
     const hasEmptyAuthor = formData.authors.some(author => !author.trim());
     if (hasEmptyAuthor) newErrors.authors = 'Заполните ФИО всех авторов';
     
-    if (!reportFile) {
-      newErrors.file = 'Загрузите файл доклада';
-    } else if (reportFile.size > 10 * 1024 * 1024) {
-      newErrors.file = 'Файл не должен превышать 10MB';
-    }
+   
     
     if (contentBlocks.length === 0) {
       newErrors.content = 'Добавьте хотя бы один блок контента';
@@ -487,59 +589,99 @@ const SubmitReport = () => {
     return Object.keys(newErrors).length === 0;
   };
   
-  // Отправка доклада
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+// Отправка доклада
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  
+  console.log('🔴 Функция handleSubmit ВЫЗВАНА!');
+  
+  if (!validateForm()) {
+    console.log('❌ Валидация не пройдена');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+  
+  console.log('✅ Валидация пройдена');
+  setLoading(true);
+  
+  try {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    if (!user.id) {
+      alert('Необходимо авторизоваться');
+      navigate('/input');
       return;
     }
     
-    setLoading(true);
+    // ✅ ФОРМИРУЕМ МАССИВ АВТОРОВ
+    const authorsArray = [];
     
-    try {
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
-      if (!user.id) {
-        alert('Необходимо авторизоваться');
-        navigate('/input');
-        return;
+    for (let i = 0; i < formData.authors.length; i++) {
+      const name = formData.authors[i];
+      if (name && name.trim()) {
+        authorsArray.push({
+          name: name.trim(),
+          academic_degree: null,
+          academic_title: null,
+          position: null,
+          workplace: null,
+          email: null
+        });
       }
-      
-      const formDataToSend = new FormData();
-      formDataToSend.append('title', formData.title);
-      formDataToSend.append('conference_id', formData.conferenceId);
-      formDataToSend.append('user_id', user.id);
-      formDataToSend.append('abstract', article.annotation);
-      formDataToSend.append('keywords', article.keywords);
-      formDataToSend.append('authors', JSON.stringify(formData.authors.filter(a => a.trim())));
-      formDataToSend.append('content', JSON.stringify(contentBlocks));
-      formDataToSend.append('additional_info', formData.additionalInfo);
-      formDataToSend.append('file', reportFile);
-      
-      const response = await fetch('http://localhost:5000/api/reports', {
-        method: 'POST',
-        body: formDataToSend
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        setSubmitSuccess(true);
-        localStorage.removeItem('articleDraft');
-        setTimeout(() => {
-          navigate('/my-reports');
-        }, 2000);
-      } else {
-        alert(data.error || 'Ошибка при отправке доклада');
-      }
-    } catch (error) {
-      console.error('Ошибка:', error);
-      alert('Ошибка подключения к серверу');
-    } finally {
-      setLoading(false);
     }
-  };
+    
+    console.log('📝 ОТПРАВЛЯЕМЫЕ АВТОРЫ:', authorsArray);
+    console.log('📝 КОЛИЧЕСТВО АВТОРОВ:', authorsArray.length);
+    
+    // Проверка: должен быть хотя бы один автор
+    if (authorsArray.length === 0) {
+      alert('Добавьте хотя бы одного автора');
+      setLoading(false);
+      return;
+    }
+    
+    const requestData = {
+      title: formData.title,
+      section_id: parseInt(formData.sectionId),
+      user_id: user.id,
+      abstract: article.annotation,
+      keywords: article.keywords,
+      content: contentBlocks,
+      additional_info: formData.additionalInfo,
+      literature: literature || '',
+      coauthors: authorsArray  // ✅ Отправляем всех авторов
+    };
+    
+    console.log('📤 ПОЛНЫЕ ДАННЫЕ ДЛЯ ОТПРАВКИ:', JSON.stringify(requestData, null, 2));
+    
+    const response = await fetch('https://diplom-1-ss8u.onrender.com/api/reports', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestData)
+    });
+    
+    const data = await response.json();
+    
+    if (response.ok) {
+      setSuccessMessage(data.message || 'Доклад успешно отправлен!');
+      setSubmitSuccess(true);
+      localStorage.removeItem('articleDraft');
+      setTimeout(() => {
+        navigate('/my-reports');
+      }, 3000);
+    } else {
+      console.error('❌ Ошибка сервера:', data);
+      alert(data.error || 'Ошибка при отправке доклада');
+    }
+  } catch (error) {
+    console.error('❌ Ошибка подключения:', error);
+    alert('Ошибка подключения к серверу. Убедитесь, что сервер запущен на порту 5000');
+  } finally {
+    setLoading(false);
+  }
+};
   
   const formatDate = (dateString) => {
     if (!dateString) return 'Дата не указана';
@@ -558,7 +700,6 @@ const SubmitReport = () => {
     const rows = tableData.length;
     const cols = tableData[0]?.length || 0;
     
-    // Функция для получения реальных координат с учетом объединения
     const getActualCell = (row, col) => {
       for (const [key, info] of Object.entries(mergedCells)) {
         const [startRow, startCol] = key.split('-').map(Number);
@@ -570,7 +711,6 @@ const SubmitReport = () => {
       return { row, col, merged: false };
     };
     
-    // Функция для получения значения ячейки
     const getCellValue = (row, col) => {
       const actual = getActualCell(row, col);
       if (actual.merged) {
@@ -580,7 +720,6 @@ const SubmitReport = () => {
       return tableData[row]?.[col] || '';
     };
     
-    // Функция для проверки, нужно ли рендерить ячейку
     const shouldRenderCell = (row, col) => {
       const actual = getActualCell(row, col);
       if (actual.merged) {
@@ -589,7 +728,6 @@ const SubmitReport = () => {
       return true;
     };
     
-    // Функция для проверки поворота ячейки
     const isRotated = (row, col) => {
       const actual = getActualCell(row, col);
       return rotatedCells[`${actual.row}-${actual.col}`] || false;
@@ -1131,6 +1269,41 @@ const SubmitReport = () => {
             )}
           </div>
           
+          {/* Выбор секции */}
+          {formData.conferenceId && (
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Секция *</label>
+              {loadingSections ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={styles.loadingSpinner}></div>
+                  <span>Загрузка секций...</span>
+                </div>
+              ) : sections.length > 0 ? (
+                <>
+                  <select
+                    name="sectionId"
+                    value={formData.sectionId}
+                    onChange={handleChange}
+                    style={styles.input}
+                    disabled={loading}
+                  >
+                    <option value="">-- Выберите секцию --</option>
+                    {sections.map(section => (
+                      <option key={section.id} value={section.id}>
+                        {section.name}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.sectionId && <span style={styles.errorMessage}>{errors.sectionId}</span>}
+                </>
+              ) : (
+                <div style={{ padding: '10px', backgroundColor: '#fff3f3', borderRadius: '8px', color: '#e74c3c' }}>
+                  ⚠️ Нет доступных секций для этой конференции
+                </div>
+              )}
+            </div>
+          )}
+          
           {/* Название доклада */}
           <div style={styles.formGroup}>
             <label style={styles.label}>Название доклада *</label>
@@ -1147,35 +1320,77 @@ const SubmitReport = () => {
           </div>
           
           {/* Авторы */}
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Авторы *</label>
-            {formData.authors.map((author, index) => (
-              <div key={index} style={styles.authorInput}>
-                <input
-                  type="text"
-                  value={author}
-                  onChange={(e) => updateAuthor(index, e.target.value)}
-                  placeholder={`Автор ${index + 1} (ФИО полностью)`}
-                  style={styles.input}
-                  disabled={loading}
-                />
-                {formData.authors.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeAuthor(index)}
-                    style={styles.removeAuthor}
-                    disabled={loading}
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-            ))}
-            <button type="button" onClick={addAuthor} style={styles.addAuthorBtn} disabled={loading}>
-              + Добавить соавтора
-            </button>
-            {errors.authors && <span style={styles.errorMessage}>{errors.authors}</span>}
-          </div>
+<div style={styles.formGroup}>
+  <label style={styles.label}>Авторы *</label>
+  <div style={{ marginBottom: '10px', fontSize: '14px', color: '#666' }}>
+    Первый автор будет основным, остальные - соавторами
+  </div>
+  
+  {formData.authors.map((author, index) => (
+    <div key={index} style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'center' }}>
+      <input
+        type="text"
+        value={author}
+        onChange={(e) => {
+          const newAuthors = [...formData.authors];
+          newAuthors[index] = e.target.value;
+          setFormData(prev => ({ ...prev, authors: newAuthors }));
+        }}
+        placeholder={`ФИО автора ${index + 1}`}
+        style={{ ...styles.input, flex: 1 }}
+        disabled={loading}
+      />
+      {formData.authors.length > 1 && (
+        <button
+          type="button"
+          onClick={() => {
+            const newAuthors = formData.authors.filter((_, i) => i !== index);
+            setFormData(prev => ({ ...prev, authors: newAuthors }));
+          }}
+          style={{
+            padding: '8px 15px',
+            backgroundColor: '#e74c3c',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            fontSize: '14px'
+          }}
+          disabled={loading}
+        >
+          Удалить
+        </button>
+      )}
+    </div>
+  ))}
+  
+  <button
+    type="button"
+    onClick={() => {
+      setFormData(prev => ({
+        ...prev,
+        authors: [...prev.authors, '']
+      }));
+    }}
+    style={{
+      marginTop: '10px',
+      padding: '10px 20px',
+      backgroundColor: '#27ae60',
+      color: '#fff',
+      border: 'none',
+      borderRadius: '8px',
+      cursor: 'pointer',
+      fontSize: '14px'
+    }}
+    disabled={loading}
+  >
+    + Добавить соавтора
+  </button>
+  
+  {errors.authors && <span style={{ color: '#e74c3c', fontSize: '12px', marginTop: '5px', display: 'block' }}>
+    {errors.authors}
+  </span>}
+</div>
           
           {/* Аннотация */}
           <div style={styles.formGroup}>
@@ -1403,8 +1618,26 @@ const SubmitReport = () => {
               </div>
             </div>
           </div>
-          
-         
+
+          {/* Список литературы */}
+<div style={styles.formGroup}>
+  <label style={styles.label}>Список литературы</label>
+  <textarea
+    value={literature}
+    onChange={(e) => setLiterature(e.target.value)}
+    rows="6"
+    style={styles.textarea}
+    placeholder={`Пример оформления:
+1. Иванов И.И. Название книги. - М.: Издательство, 2024. - 300 с.
+2. Петров П.П. Название статьи // Журнал. - 2023. - №5. - С. 10-15.
+3. Сидоров С.С. Название // Сборник трудов конференции. - 2022. - С. 100-105.`}
+    disabled={loading}
+  />
+  <div style={{ fontSize: '12px', color: '#999', marginTop: '5px' }}>
+    Оформите список литературы в соответствии с ГОСТ
+  </div>
+</div>
+
           {/* Дополнительная информация */}
           <div style={styles.formGroup}>
             <label style={styles.label}>Дополнительная информация</label>
@@ -1439,8 +1672,9 @@ const SubmitReport = () => {
                 setTableCounter(1);
                 setImageCounter(1);
                 setFormulaCounter(1);
-                setFormData({ title: '', conferenceId: '', authors: [''], additionalInfo: '' });
+                setFormData({ title: '', conferenceId: '', sectionId: '', authors: [''], additionalInfo: '' });
                 setReportFile(null);
+                setLiterature('');
                 setEditingBlock(null);
                 localStorage.removeItem('articleDraft');
               }
@@ -1455,82 +1689,153 @@ const SubmitReport = () => {
           {errors.content && <span style={styles.errorMessage}>{errors.content}</span>}
         </form>
       ) : (
-        <div style={styles.previewContainer}>
-          <h2 style={styles.previewTitle}>Научная статья</h2>
-          
-          <div style={styles.previewSection}>
-            <div style={styles.previewLabel}>Авторы</div>
-            <div>{formData.authors.filter(a => a.trim()).join(', ') || 'Не указаны'}</div>
-          </div>
-          
-          <div style={styles.previewSection}>
-            <div style={styles.previewLabel}>Аннотация</div>
-            <div>{article.annotation || 'Аннотация отсутствует'}</div>
-          </div>
-          
-          {article.keywords && (
-            <div style={styles.previewSection}>
-              <div style={styles.previewLabel}>Ключевые слова</div>
-              <div>{article.keywords}</div>
-            </div>
-          )}
-          
-          <div style={styles.previewSection}>
-            <div style={styles.previewLabel}>Содержание</div>
-            <div>
-              {contentBlocks.length > 0 ? (
-                contentBlocks.map((block) => {
-                  switch (block.type) {
-                    case 'text':
-                      return (
-                        <div key={block.id} style={{ margin: '20px 0' }}>
-                          <div dangerouslySetInnerHTML={{ __html: block.content }} />
-                        </div>
-                      );
-                    case 'table':
-                      return renderTableBlock(block);
-                    case 'image':
-                      return (
-                        <div key={block.id} style={{ textAlign: block.align, margin: '30px 0' }}>
-                          <img src={block.src} alt={block.caption} style={{ maxWidth: '100%', width: block.width }} />
-                          <div style={{ marginTop: '8px', fontSize: '12px', color: '#666' }}>
-                            Рисунок {block.number} — {block.caption}
-                          </div>
-                        </div>
-                      );
-                    case 'formula':
-                      return (
-                        <div key={block.id} style={{ textAlign: block.align || 'center', margin: '30px 0', fontSize: block.size || 16 }}>
-                          <strong>Формула {block.number}:</strong> {block.formulaString || block.content}
-                        </div>
-                      );
-                    default:
-                      return null;
-                  }
-                })
-              ) : (
-                <div style={styles.emptyState}>Содержание статьи пусто</div>
-              )}
-            </div>
-          </div>
-          
-          {contentBlocks.length > 0 && (
-            <div style={{ marginTop: '30px', padding: '20px', borderTop: '2px solid #fff0e0' }}>
-              <strong>Статистика:</strong> Всего: {contentBlocks.length},
-              Таблиц: {contentBlocks.filter(b => b.type === 'table').length},
-              Рисунков: {contentBlocks.filter(b => b.type === 'image').length},
-              Формул: {contentBlocks.filter(b => b.type === 'formula').length}
-            </div>
-          )}
-          
-          <div style={{ marginTop: '30px', textAlign: 'center' }}>
-            <button onClick={() => setShowPreview(false)} style={styles.previewButton}>
-              ← Вернуться к редактированию
-            </button>
-          </div>
+  <div style={styles.previewContainer}>
+    <h2 style={styles.previewTitle}>Научная статья</h2>
+    
+    {/* ✅ Добавьте название конференции, если выбрана */}
+    {formData.conferenceId && conferenceTemplate && (
+      <div style={styles.previewSection}>
+        <div style={styles.previewLabel}>Конференция</div>
+        <div>{conferences.find(c => c.id === parseInt(formData.conferenceId))?.title || 'Не указана'}</div>
+      </div>
+    )}
+    
+    {/* ✅ Применяем стили из шаблона к авторам */}
+    <div style={styles.previewSection}>
+      <div style={styles.previewLabel}>Авторы</div>
+      <div style={conferenceTemplate?.styles?.authors}>
+        {formData.authors.filter(a => a.trim()).join(', ') || 'Не указаны'}
+      </div>
+    </div>
+    
+    {/* ✅ Применяем стили из шаблона к аннотации */}
+    <div style={styles.previewSection}>
+      <div style={styles.previewLabel}>Аннотация</div>
+      <div style={conferenceTemplate?.styles?.abstract}>
+        {article.annotation || 'Аннотация отсутствует'}
+      </div>
+    </div>
+    
+    {/* ✅ Применяем стили из шаблона к ключевым словам */}
+    {article.keywords && (
+      <div style={styles.previewSection}>
+        <div style={styles.previewLabel}>Ключевые слова</div>
+        <div style={conferenceTemplate?.styles?.keywords}>
+          {article.keywords}
         </div>
-      )}
-      
+      </div>
+    )}
+    
+    {/* ✅ Применяем стили из шаблона к содержанию */}
+    <div style={styles.previewSection}>
+      <div style={styles.previewLabel}>Содержание</div>
+      <div style={conferenceTemplate?.styles?.content}>
+        {contentBlocks.length > 0 ? (
+          contentBlocks.map((block) => {
+            switch (block.type) {
+              case 'text':
+                return (
+                  <div key={block.id} style={{ margin: '20px 0', ...(conferenceTemplate?.styles?.textBlock || {}) }}>
+                    <div dangerouslySetInnerHTML={{ __html: block.content }} />
+                  </div>
+                );
+              case 'table':
+                return (
+                  <div key={block.id}>
+                    <div style={conferenceTemplate?.styles?.tableCaption}>
+                      Таблица {block.number} — {block.caption}
+                    </div>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ 
+                        borderCollapse: 'collapse', 
+                        width: '100%',
+                        ...(conferenceTemplate?.styles?.table || {})
+                      }}>
+                        <thead>
+                          <tr>
+                            {block.headers?.map((header, i) => (
+                              <th key={i} style={{ 
+                                border: '1px solid black', 
+                                padding: '8px',
+                                ...(conferenceTemplate?.styles?.tableHeader || {})
+                              }}>{header}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {block.data?.map((row, i) => (
+                            <tr key={i}>
+                              {row.map((cell, j) => (
+                                <td key={j} style={{ 
+                                  border: '1px solid black', 
+                                  padding: '8px',
+                                  ...(conferenceTemplate?.styles?.tableCell || {})
+                                }}>{cell}</td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              case 'image':
+                return (
+                  <div key={block.id} style={{ textAlign: block.align, margin: '30px 0' }}>
+                    <img src={block.src} alt={block.caption} style={{ maxWidth: '100%', width: block.width }} />
+                    <div style={{ 
+                      marginTop: '8px', 
+                      fontSize: '12px', 
+                      color: '#666',
+                      ...(conferenceTemplate?.styles?.figureCaption || {})
+                    }}>
+                      Рисунок {block.number} — {block.caption}
+                    </div>
+                  </div>
+                );
+              case 'formula':
+                return (
+                  <div key={block.id} style={{ 
+                    textAlign: block.align || 'center', 
+                    margin: '30px 0', 
+                    fontSize: block.size || 16,
+                    ...(conferenceTemplate?.styles?.formula || {})
+                  }}>
+                    <strong>Формула {block.number}:</strong> {block.formulaString || block.content}
+                  </div>
+                );
+              default:
+                return null;
+            }
+          })
+        ) : (
+          <div style={styles.emptyState}>Содержание статьи пусто</div>
+        )}
+      </div>
+    </div>
+    
+    {/* ✅ Применяем стили из шаблона к литературе */}
+    {literature && (
+      <div style={styles.previewSection}>
+        <div style={styles.previewLabel}>Список литературы</div>
+        <div style={{ 
+          whiteSpace: 'pre-wrap', 
+          fontSize: '14px', 
+          lineHeight: '1.5',
+          ...(conferenceTemplate?.styles?.references || {})
+        }}>
+          {literature}
+        </div>
+      </div>
+    )}
+    
+    <div style={{ marginTop: '30px', textAlign: 'center' }}>
+      <button onClick={() => setShowPreview(false)} style={styles.previewButton}>
+        ← Вернуться к редактированию
+      </button>
+    </div>
+  </div>
+)}
       {/* Модальные окна */}
       <TableManager
         isOpen={isTableManagerOpen}
@@ -1567,5 +1872,7 @@ const SubmitReport = () => {
     </div>
   );
 };
+ 
 
 export default SubmitReport;
+

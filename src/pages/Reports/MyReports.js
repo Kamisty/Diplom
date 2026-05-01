@@ -9,11 +9,7 @@ const MyReports = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    loadReports();
-  }, []);
-
-  const loadReports = async () => {
+  const loadReports = useCallback(async () => {
     setLoading(true);
     setError(null);
     
@@ -27,12 +23,17 @@ const MyReports = () => {
 
       console.log('Загрузка докладов для пользователя:', user.id);
       
-      const response = await fetch(`http://localhost:5000/api/reports/user/${user.id}`);
+      const response = await fetch(`https://diplom-1-ss8u.onrender.com/api/reports/user/${user.id}`);
       const data = await response.json();
       
       console.log('Получены доклады:', data);
       
       if (response.ok && data.success) {
+        // Выводим структуру первого доклада для отладки
+        if (data.reports && data.reports.length > 0) {
+          console.log('Структура доклада:', Object.keys(data.reports[0]));
+          console.log('ID доклада:', data.reports[0].id || data.reports[0].report_id);
+        }
         setReports(data.reports || []);
       } else {
         setError(data.error || 'Ошибка при загрузке докладов');
@@ -43,13 +44,18 @@ const MyReports = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [navigate]);
+
+  useEffect(() => {
+    loadReports();
+  }, [loadReports]);
 
   const getStatusLabel = (status) => {
     const statusMap = {
       'draft': 'Черновик',
+      'pending': 'На рассмотрении',
       'submitted': 'На рассмотрении',
-      'under_review': 'На рецензировании',
+      'under_review': 'Принят к рецензированию',
       'revision_required': 'Требуется доработка',
       'accepted': 'Принят',
       'rejected': 'Отклонен',
@@ -61,6 +67,7 @@ const MyReports = () => {
   const getStatusClass = (status) => {
     const classMap = {
       'draft': 'status-draft',
+      'pending': 'status-pending',
       'submitted': 'status-pending',
       'under_review': 'status-review',
       'revision_required': 'status-revision',
@@ -86,6 +93,11 @@ const MyReports = () => {
     }
   };
 
+  // Функция для получения ID доклада (работает с разными форматами)
+  const getReportId = (report) => {
+    return report.id || report.report_id || report.reportId;
+  };
+
   return (
     <div className="reports-page">
       <div className="container">
@@ -95,7 +107,7 @@ const MyReports = () => {
             className="btn-primary"
             onClick={() => navigate('/submit-report')}
           >
-            + Подать новый доклад
+            Подать новый доклад
           </button>
         </div>
 
@@ -119,50 +131,68 @@ const MyReports = () => {
           </div>
         ) : (
           <div className="reports-grid">
-            {reports.map(report => (
-              <div key={report.id} className="report-card">
-                <div className="report-header">
-                  <h3>{report.title}</h3>
-                  <span className={`status-badge ${getStatusClass(report.status)}`}>
-                    {getStatusLabel(report.status)}
-                  </span>
-                </div>
-                
-                <div className="report-details">
-                  <p>
-                    <strong>Конференция:</strong> {report.conference_name || 'Не указана'}
-                  </p>
-                  <p>
-                    <strong>Авторы:</strong> {report.authors?.join(', ') || 'Не указаны'}
-                  </p>
-                  <p>
-                    <strong>Дата подачи:</strong> {formatDate(report.created_at)}
-                  </p>
-                  <p>
-                    <strong>Версия:</strong> {report.version || 1}
-                  </p>
-                </div>
+            {reports.map(report => {
+              const reportId = getReportId(report);
+              console.log('Рендер доклада:', { title: report.title, reportId });
+              
+              return (
+                <div key={reportId || Math.random()} className="report-card">
+                  <div className="report-header">
+                    <h3>{report.title}</h3>
+                    <span className={`status-badge ${getStatusClass(report.status)}`}>
+                      {getStatusLabel(report.status)}
+                    </span>
+                  </div>
+                  
+                  <div className="report-details">
+                    <p>
+                      <strong>Конференция:</strong> {report.conference_title || 'Не указана'}
+                    </p>
+                    <p>
+                      <strong>Авторы:</strong> {report.authors_list || 'Не указаны'}
+                    </p>
+                    <p>
+                      <strong>Дата подачи:</strong> {formatDate(report.created_at)}
+                    </p>
+                    <p>
+                      <strong>Версия:</strong> {report.version || 1}
+                    </p>
+                  </div>
 
-                <div className="report-actions">
-                  <button 
-                    className="btn-icon view"
-                    onClick={() => navigate(`/report/${report.id}`)}
-                    title="Просмотр"
-                  >
-                    👁️
-                  </button>
-                  {report.status === 'draft' && (
+                  <div className="report-actions">
                     <button 
-                      className="btn-icon edit"
-                      onClick={() => navigate(`/edit-report/${report.id}`)}
-                      title="Редактировать"
+                      className="btn-icon view"
+                      onClick={() => {
+                        if (reportId) {
+                          console.log(`Переход к докладу ${reportId}`);
+                          navigate(`/report/${reportId}`);
+                        } else {
+                          console.error('Нет ID у доклада:', report);
+                          alert('Ошибка: ID доклада не найден');
+                        }
+                      }}
+                      title="Просмотр"
                     >
-                      ✏️
+                      Просмотр статьи
+                      
                     </button>
-                  )}
+                    {report.status === 'draft' && (
+                      <button 
+                        className="btn-icon edit"
+                        onClick={() => {
+                          if (reportId) {
+                            navigate(`/edit-report/${reportId}`);
+                          }
+                        }}
+                        title="Редактировать"
+                      >
+                        ✏️
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

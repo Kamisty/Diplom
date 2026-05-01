@@ -41,7 +41,7 @@ const ManageUsers = () => {
     setError(null);
     
     try {
-      const response = await fetch('http://localhost:5000/api/users');
+      const response = await fetch('https://diplom-1-ss8u.onrender.com/api/users');
       const data = await response.json();
 
       console.log('Загруженные пользователи:', data);
@@ -140,8 +140,7 @@ const ManageUsers = () => {
     setShowProfileModal(true);
     
     try {
-      // Загружаем дополнительные данные профиля
-      const response = await fetch(`http://localhost:5000/api/user-profile/${userId}`);
+      const response = await fetch(`https://diplom-1-ss8u.onrender.com/api/user-profile/${userId}`);
       const data = await response.json();
       
       if (response.ok && data.success) {
@@ -193,7 +192,7 @@ const ManageUsers = () => {
     setRoleMessage({ type: '', text: '' });
     
     try {
-      const response = await fetch('http://localhost:5000/api/user/update-roles', {
+      const response = await fetch('https://diplom-1-ss8u.onrender.com/api/user/update-roles', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -253,14 +252,6 @@ const ManageUsers = () => {
     setShowProfileModal(false);
     setProfileUser(null);
     setProfileData(null);
-  };
-
-  const handleEditUser = async (userId) => {
-    console.log('Редактирование пользователя:', userId);
-  };
-
-  const handleToggleStatus = async (userId, currentStatus) => {
-    console.log('Изменение статуса пользователя:', userId);
   };
 
   return (

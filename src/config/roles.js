@@ -48,6 +48,7 @@ export const PERMISSIONS = {
     'delete_own_reports'
   ],
   [ROLES.SECTION_HEAD]: [
+     'section_head_access',
     'view_section_reports',
     'assign_reviewers',
     'view_assigned_reports',

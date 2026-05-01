@@ -110,7 +110,7 @@ const Header = () => {
             {/* Ссылки для руководителей секций */}
             {user?.activeRole === ROLES.SECTION_HEAD && (
               <>
-                <Link to="/section/manage" className="nav-link">Управление секцией</Link>
+                <Link to="section-head/dashboard" className="nav-link">Управление секцией</Link>
                 <Link to="/section/reports" className="nav-link">Доклады секции</Link>
               </>
             )}

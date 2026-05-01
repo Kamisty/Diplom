@@ -1,7 +1,7 @@
 // src/components/common/RoleSwitcher/RoleSwitcher.jsx
 import React, { useContext, useState } from 'react';
 import { AuthContext } from '../../../context/AuthContext/Auth';
-import { getRoleName, getRoleIcon, ROLES } from '../../../config/roles';
+import { getRoleName, getRoleIcon, getAllRoles } from '../../../config/roles';
 import './RoleSwitcher.css';
 
 const RoleSwitcher = ({ closeDropdown }) => {
@@ -68,16 +68,9 @@ const RoleSwitcher = ({ closeDropdown }) => {
   };
 
   const redirectBasedOnRole = (role) => {
-    const roleRoutes = {
-      'admin': '/admin/dashboard',
-      'section_head': '/section-head/dashboard',
-      'reviewer': '/reviewer/dashboard',
-      'author': '/author/dashboard'
-    };
-    
-    const redirectPath = roleRoutes[role] || '/dashboard';
-    window.location.href = redirectPath;
-  };
+  console.log('Перенаправление для роли:', role);
+  window.location.href = '/dashboard';
+};
 
   // Функция для добавления новой роли
   const handleAddRole = async () => {

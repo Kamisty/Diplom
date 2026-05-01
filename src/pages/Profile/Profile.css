@@ -202,7 +202,7 @@
 
 .btn-edit {
   background: #ffffff;
-  color: rgb(0, 0, 0);
+  color: #000000;
 }
 
 .btn-edit:hover {
@@ -224,7 +224,7 @@
 
 .btn-logout {
   background: #ffffff;
-  color: rgb(0, 0, 0);
+  color: #000000;
 }
 
 .btn-logout:hover {
@@ -234,8 +234,8 @@
 }
 
 .btn-save {
-  background: #48bb78;
-  color: white;
+  background: #ffffff;
+  color: #000000;
 }
 
 .btn-save:hover:not(:disabled) {
