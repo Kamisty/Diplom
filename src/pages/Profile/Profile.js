@@ -28,7 +28,7 @@ const Profile = () => {
   // Обернем loadUserProfile в useCallback
   const loadUserProfile = useCallback(async (userId) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/user-profile/${userId}`);
+      const response = await fetch(`https://diplom-j6uo.onrender.com/api/user-profile/${userId}`);
       const data = await response.json();
 
       if (response.ok && data.success) {
@@ -171,7 +171,7 @@ const Profile = () => {
         avatar_url: editFormData.avatar_url || ''
       };
 
-      const response = await fetch('http://localhost:5000/api/user-profile/update', {
+      const response = await fetch('https://diplom-j6uo.onrender.com/api/user-profile/update', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -238,7 +238,7 @@ const Profile = () => {
         setLoading(true);
         const userId = user?.user_id || user?.id;
 
-        const response = await fetch('http://localhost:5000/api/user/change-email', {
+        const response = await fetch('https://diplom-j6uo.onrender.com/api/user/change-email', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -296,7 +296,7 @@ const Profile = () => {
 
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:5000/api/user/forgot-password', {
+      const response = await fetch('https://diplom-j6uo.onrender.com/api/user/forgot-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -368,7 +368,7 @@ const Profile = () => {
       setLoading(true);
       const email = resetPasswordData.email || user?.email;
 
-      const response = await fetch('http://localhost:5000/api/user/reset-password', {
+      const response = await fetch('https://diplom-j6uo.onrender.com/api/user/reset-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

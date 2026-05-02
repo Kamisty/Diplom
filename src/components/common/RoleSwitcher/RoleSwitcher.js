@@ -3,6 +3,7 @@ import React, { useContext, useState } from 'react';
 import { AuthContext } from '../../../context/AuthContext/Auth';
 import { getRoleName, getRoleIcon, getAllRoles } from '../../../config/roles';
 import './RoleSwitcher.css';
+import { ROLES } from '../../../config/roles';
 
 const RoleSwitcher = ({ closeDropdown }) => {
   const { user, login } = useContext(AuthContext);

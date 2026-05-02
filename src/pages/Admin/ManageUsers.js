@@ -41,7 +41,7 @@ const ManageUsers = () => {
     setError(null);
     
     try {
-      const response = await fetch('https://diplom-1-ss8u.onrender.com/api/users');
+      const response = await fetch('https://diplom-j6uo.onrender.com/api/users');
       const data = await response.json();
 
       console.log('Загруженные пользователи:', data);
@@ -140,7 +140,7 @@ const ManageUsers = () => {
     setShowProfileModal(true);
     
     try {
-      const response = await fetch(`https://diplom-1-ss8u.onrender.com/api/user-profile/${userId}`);
+      const response = await fetch(`https://diplom-j6uo.onrender.com/api/user-profile/${userId}`);
       const data = await response.json();
       
       if (response.ok && data.success) {
@@ -170,6 +170,23 @@ const ManageUsers = () => {
     setShowRoleModal(true);
   };
 
+  // Функция для редактирования статуса руководителя
+const handleEditUser = async (userId) => {
+  console.log('Редактирование статуса руководителя для пользователя:', userId);
+  
+  // Находим пользователя
+  const user = users.find(u => u.user_id === userId);
+  if (!user) return;
+  
+  // Здесь можно добавить логику для изменения статуса руководителя
+  // Например, открыть модальное окно или отправить запрос на сервер
+  
+  // Временное решение - показать alert (можно заменить на модальное окно)
+  alert(`Редактирование статуса руководителя для: ${getFullName(user)}\nФункция в разработке`);
+  
+  // TODO: Реализовать изменение статуса руководителя секции
+  // Пользователь с ролью "Руководитель секции" может управлять своей секцией
+};
   // Функция для переключения роли (добавление/удаление)
   const toggleRole = (roleId) => {
     const role = allRoles.find(r => r.id === roleId);
@@ -192,7 +209,7 @@ const ManageUsers = () => {
     setRoleMessage({ type: '', text: '' });
     
     try {
-      const response = await fetch('https://diplom-1-ss8u.onrender.com/api/user/update-roles', {
+      const response = await fetch('https://diplom-j6uo.onrender.com/api/user/update-roles', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

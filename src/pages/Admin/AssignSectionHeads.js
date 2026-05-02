@@ -16,7 +16,7 @@ const AssignSectionHeads = () => {
   const fetchConferences = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch('https://diplom-1-ss8u.onrender.com/api/conferences');
+      const response = await fetch('https://diplom-j6uo.onrender.com/api/conferences');
       if (!response.ok) throw new Error('Ошибка загрузки конференций');
       const data = await response.json();
       console.log('Полученные конференции:', data);
@@ -38,7 +38,7 @@ const AssignSectionHeads = () => {
   const fetchSectionHeads = useCallback(async () => {
     try {
       setLoadingHeads(true);
-      const response = await fetch('http://localhost:5000/api/users/section-heads');
+      const response = await fetch('https://diplom-j6uo.onrender.com/api/users/section-heads');
       
       if (!response.ok) {
         throw new Error('Не удалось загрузить руководителей');
@@ -64,14 +64,14 @@ const AssignSectionHeads = () => {
   const loadSectionsAndAssignments = useCallback(async (conferenceId) => {
     try {
       // Загружаем секции конференции
-      const sectionsResponse = await fetch(`http://localhost:5000/api/conferences/${conferenceId}/sections`);
+      const sectionsResponse = await fetch(`https://diplom-j6uo.onrender.com/api/conferences/${conferenceId}/sections`);
       const sectionsData = await sectionsResponse.json();
       
       console.log('Загруженные секции:', sectionsData);
       
       if (sectionsData.success && Array.isArray(sectionsData.sections)) {
         // Загружаем назначения
-        const assignmentsResponse = await fetch(`http://localhost:5000/api/section-assignments?conferenceId=${conferenceId}`);
+        const assignmentsResponse = await fetch(`https://diplom-j6uo.onrender.com/api/section-assignments?conferenceId=${conferenceId}`);
         let assignments = [];
         
         if (assignmentsResponse.ok) {
@@ -134,7 +134,7 @@ const AssignSectionHeads = () => {
     setError(null);
     
     try {
-      const response = await fetch('http://localhost:5000/api/section-assignments', {
+      const response = await fetch('https://diplom-j6uo.onrender.com/api/section-assignments', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

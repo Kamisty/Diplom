@@ -11,7 +11,7 @@ const ConferenceDetails = () => {
 
   const fetchConference = useCallback(async () => {
     try {
-      const response = await fetch(`https://diplom-1-ss8u.onrender.com/api/conferences/${id}`);
+      const response = await fetch(`https://diplom-j6uo.onrender.com/api/conferences/${id}`);
       const data = await response.json();
       
       if (response.ok && data.success) {

@@ -24,7 +24,7 @@ const ReviewReports = () => {
       console.log('Загрузка докладов для рецензирования, рецензент ID:', user.id);
       
       // ✅ ИСПРАВЛЕНО: Загружаем доклады, назначенные на рецензирование
-      const response = await fetch(`https://diplom-1-ss8u.onrender.com/api/reports/for-review/${user.id}`);
+      const response = await fetch(`https://diplom-j6uo.onrender.com/api/reports/for-review/${user.id}`);
       const data = await response.json();
       
       console.log('Получены доклады для рецензирования:', data);

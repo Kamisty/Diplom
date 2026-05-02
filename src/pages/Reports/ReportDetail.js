@@ -49,7 +49,7 @@ const ReportDetail = () => {
   const loadReport = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`https://diplom-1-ss8u.onrender.com/api/reports/${id}`);
+      const response = await fetch(`https://diplom-j6uo.onrender.com/api/reports/${id}`);
       const data = await response.json();
       
       console.log('Загружен доклад:', data);
@@ -87,9 +87,9 @@ const ReportDetail = () => {
     try {
       const userId = user?.user_id || user?.id;
       console.log('=== ЗАГРУЗКА РЕЦЕНЗИИ ДЛЯ РЕЦЕНЗЕНТА ===');
-      console.log('URL:', `http://localhost:5000/api/reviews/report/${id}/reviewer/${userId}`);
+      console.log('URL:', `https://diplom-j6uo.onrender.com/api/reviews/report/${id}/reviewer/${userId}`);
       
-      const response = await fetch(`https://diplom-1-ss8u.onrender.com/api/reviews/report/${id}/reviewer/${userId}`);
+      const response = await fetch(`https://diplom-j6uo.onrender.com/api/reviews/report/${id}/reviewer/${userId}`);
       const data = await response.json();
       
       console.log('Ответ сервера:', data);
@@ -120,9 +120,9 @@ const ReportDetail = () => {
   const loadReviewForAuthor = async () => {
     try {
       console.log('=== ЗАГРУЗКА РЕЦЕНЗИИ ДЛЯ АВТОРА ===');
-      console.log('URL:', `https://diplom-1-ss8u.onrender.com0/api/reviews/by-report/${id}`);
+      console.log('URL:', `https://diplom-j6uo.onrender.com0/api/reviews/by-report/${id}`);
       
-      const response = await fetch(`https://diplom-1-ss8u.onrender.com/api/reviews/by-report/${id}`);
+      const response = await fetch(`https://diplom-j6uo.onrender.com/api/reviews/by-report/${id}`);
       const data = await response.json();
       
       console.log('Ответ сервера:', data);
@@ -159,7 +159,7 @@ const ReportDetail = () => {
     try {
       const userId = user?.user_id || user?.id;
       
-      const response = await fetch('https://diplom-1-ss8u.onrender.com/api/reviews', {
+      const response = await fetch('https://diplom-j6uo.onrender.com/api/reviews', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
