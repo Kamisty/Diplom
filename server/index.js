@@ -24,46 +24,43 @@ app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
 
 // ============================================
-// НАСТРОЙКА ПОЧТЫ (Яндекс)
+// НАСТРОЙКА ПОЧТЫ (Mail.ru)
 // ============================================
 const nodemailer = require('nodemailer');
 
-// Настройка транспортера для Яндекс.Почты
 const emailTransporter = nodemailer.createTransport({
-    host: 'smtp.yandex.ru',
-    port: 465,
-    secure: true,          // true для порта 465
+    host: 'smtp.mail.ru',
+    port: 587,
+    secure: false,          // для порта 587 — false
+    family: 4,              // принудительно IPv4
     auth: {
-        user: 'k.montseva@yandex.ru',     // ваш email (например, k.montseva@yandex.ru)
-        pass: 'egsnwzvnarlhjlua'     // пароль приложения, который скопировали
+        user: 'ik.montseva@mail.ru',
+        pass: 'juFlds7NSukSFKPHqwsI'
     },
-    // Дополнительные настройки для надёжности
+    tls: {
+        rejectUnauthorized: false,
+        ciphers: 'SSLv3'
+    },
     connectionTimeout: 10000,
     greetingTimeout: 10000,
     socketTimeout: 20000,
 });
 
-// ============================================
-//  ФУНКЦИЯ ОТПРАВКИ EMAIL
-// ============================================
+// Функция отправки
 async function sendResetCodeEmail(email, code) {
     try {
         const info = await emailTransporter.sendMail({
-            from: '"Платформа конференций" <k.montseva@yandex.ru>',
+            from: '"Платформа конференций" <ik.montseva@mail.ru>',  // отправитель должен совпадать с auth.user
             to: email,
             subject: 'Восстановление пароля',
             html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
-                        <h2>Восстановление пароля</h2>
+                    <h2 style="color: #667eea;">Восстановление пароля</h2>
+                    <p>Ваш код подтверждения:</p>
+                    <div style="font-size: 32px; font-weight: bold; color: #667eea; padding: 20px; background: #f0f0f0; border-radius: 10px; text-align: center;">
+                        ${code}
                     </div>
-                    <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px;">
-                        <p>Ваш код подтверждения:</p>
-                        <div style="font-size: 36px; font-weight: bold; color: #667eea; text-align: center; padding: 20px; letter-spacing: 5px; background: white; border-radius: 10px; margin: 20px 0;">
-                            ${code}
-                        </div>
-                        <p>Код действителен в течение 15 минут.</p>
-                    </div>
+                    <p>Код действителен в течение 15 минут.</p>
                 </div>
             `
         });
@@ -75,8 +72,7 @@ async function sendResetCodeEmail(email, code) {
     }
 }
 
-
-// Проверка соединения при запуске
+// Проверка подключения
 emailTransporter.verify((error, success) => {
     if (error) {
         console.error('❌ Ошибка подключения к почтовому серверу:', error);
@@ -1556,45 +1552,42 @@ app.post('/api/conferences/:id/sections', async (req, res) => {
 // ============================================
 // УДАЛЕНИЕ СЕКЦИИ - http://localhost:5000/api/sections/:id
 // ============================================
+
 app.delete('/api/sections/:id', async (req, res) => {
-  console.log("\n" + "=".repeat(60));
-  console.log("🔥 DELETE /api/sections/:id ВЫЗВАН!");
-  console.log(`📦 ID секции: ${req.params.id}`);
-  console.log("=".repeat(60) + "\n");
-
-  try {
     const { id } = req.params;
-
-    // Проверяем, существует ли секция
-    const checkQuery = 'SELECT id_sections FROM sections WHERE id_sections = $1';
-    const checkResult = await pool.query(checkQuery, [id]);
-
-    if (checkResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'Секция не найдена'
-      });
+    
+    try {
+        // 1. Проверить, есть ли доклады в этой секции
+        const reportsCheck = await pool.query(
+            'SELECT COUNT(*) FROM reports WHERE id_sections = $1',
+            [id]
+        );
+        
+        const reportsCount = parseInt(reportsCheck.rows[0].count);
+        
+        if (reportsCount > 0) {
+            return res.status(400).json({
+                success: false,
+                error: `Невозможно удалить секцию: в ней содержится ${reportsCount} доклад(ов). Сначала удалите или переместите доклады.`
+            });
+        }
+        
+        // 2. Если докладов нет — удаляем секцию
+        const result = await pool.query(
+            'DELETE FROM sections WHERE id_sections = $1 RETURNING *',
+            [id]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Секция не найдена' });
+        }
+        
+        res.json({ success: true, message: 'Секция успешно удалена' });
+        
+    } catch (error) {
+        console.error('❌ Ошибка при удалении секции:', error);
+        res.status(500).json({ success: false, error: error.message });
     }
-
-    // Удаляем секцию
-    const deleteQuery = 'DELETE FROM sections WHERE id_sections = $1';
-    await pool.query(deleteQuery, [id]);
-
-    console.log(`✅ Секция ${id} удалена`);
-
-    res.json({
-      success: true,
-      message: 'Секция успешно удалена'
-    });
-
-  } catch (error) {
-    console.error('❌ Ошибка при удалении секции:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Ошибка при удалении секции',
-      details: error.message
-    });
-  }
 });
 
 

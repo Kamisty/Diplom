@@ -249,12 +249,26 @@
 }
 
 .btn-icon.view {
-  background: #f57c00;
+  background: #f3f3f3;
   color: #ffffff;
-  width: 250px;
   font-size: 16px;
   cursor: pointer;
   font-weight: 600;
+}
+
+
+.btn-icon-view{
+  background-color: #f57c00;;
+  color: #ffffff;
+  width: 200px;
+  height: 36px;
+  border: none;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: background-color 0.2s;
 }
 
 .btn-icon.edit {

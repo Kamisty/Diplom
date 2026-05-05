@@ -161,7 +161,7 @@ const MyReports = () => {
 
                   <div className="report-actions">
                     <button 
-                      className="btn-icon view"
+                      className="btn-icon-view"
                       onClick={() => {
                         if (reportId) {
                           console.log(`Переход к докладу ${reportId}`);
