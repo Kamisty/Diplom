@@ -21,7 +21,31 @@ const ManageConferences = () => {
     setError(null);
     
     try {
-      const response = await fetch('https://diplom-j6uo.onrender.com/api/conferences');
+      // ✅ ПОЛУЧАЕМ userId из localStorage или context
+      const userId = localStorage.getItem('userId') || sessionStorage.getItem('userId');
+      
+      // ✅ Если userId нет, пробуем получить из user данных
+      const userStr = localStorage.getItem('user');
+      let userIdFromStorage = userId;
+      
+      if (!userIdFromStorage && userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          userIdFromStorage = user.id || user.user_id;
+        } catch (e) {
+          console.error('Ошибка парсинга user:', e);
+        }
+      }
+      
+      console.log('📤 Загрузка конференций для userId:', userIdFromStorage);
+      
+      // ✅ Формируем URL с параметром userId
+      let url = 'https://diplom-j6uo.onrender.com/api/conferences';
+      if (userIdFromStorage) {
+        url += `?userId=${userIdFromStorage}`;
+      }
+      
+      const response = await fetch(url);
       const data = await response.json();
 
       if (response.ok && data.success) {
@@ -47,16 +71,12 @@ const ManageConferences = () => {
       const submissionDeadline = new Date(conf.submission_deadline);
 
       if (filter === 'active') {
-        // Активные - сейчас идут
         if (!(startDate <= today && endDate >= today)) return false;
       } else if (filter === 'registration') {
-        // Регистрация открыта
         if (!(today <= submissionDeadline)) return false;
       } else if (filter === 'completed') {
-        // Завершенные
         if (!(endDate < today)) return false;
       } else if (filter === 'upcoming') {
-        // Предстоящие
         if (!(startDate > today)) return false;
       }
     }
@@ -73,7 +93,6 @@ const ManageConferences = () => {
     return true;
   });
 
-  // Определение статуса конференции на основе дат
   const getConferenceStatus = (conf) => {
     const today = new Date();
     const startDate = new Date(conf.start_date);
@@ -122,7 +141,6 @@ const ManageConferences = () => {
         const data = await response.json();
 
         if (response.ok && data.success) {
-          // Обновляем список после удаления
           setConferences(conferences.filter(conf => conf.id !== id));
           alert('Конференция успешно удалена');
         } else {
@@ -144,7 +162,6 @@ const ManageConferences = () => {
     return new Date(dateString).toLocaleDateString('ru-RU', options);
   };
 
-  // Получение информации о создателе
   const getCreatorName = (conf) => {
     if (conf.created_by?.name) return conf.created_by.name;
     if (conf.creator_login) return conf.creator_login;
@@ -152,7 +169,6 @@ const ManageConferences = () => {
     return 'Не указан';
   };
 
-  // Подсчет количества секций
   const getSectionsCount = (conf) => {
     if (conf.sections && Array.isArray(conf.sections)) {
       return conf.sections.length;
@@ -274,35 +290,28 @@ const ManageConferences = () => {
                       <td>{getSectionsCount(conf)}</td>
                       <td>{getCreatorName(conf)}</td>
                       <td className="actions">
-  <button 
-    className="btn-icon template" 
-    onClick={() => navigate(`/admin/conferences/${conf.id}/template`)}
-    title="Настроить шаблон оформления"
-  >
-    🎨
-  </button>
-  <button 
-    className="btn-icon view" 
-    onClick={() => handleView(conf.id)}
-    title="Просмотр"
-  >
-    👁️
-  </button>
-  <button 
-    className="btn-icon edit" 
-    onClick={() => handleEdit(conf.id)}
-    title="Редактировать"
-  >
-    ✏️
-  </button>
-  <button 
-    className="btn-icon delete" 
-    onClick={() => handleDelete(conf.id)}
-    title="Удалить"
-  >
-    🗑️
-  </button>
-</td>
+                        <button 
+                          className="btn-icon view" 
+                          onClick={() => handleView(conf.id)}
+                          title="Просмотр"
+                        >
+                          👁️
+                        </button>
+                        <button 
+                          className="btn-icon edit" 
+                          onClick={() => handleEdit(conf.id)}
+                          title="Редактировать"
+                        >
+                          ✏️
+                        </button>
+                        <button 
+                          className="btn-icon delete" 
+                          onClick={() => handleDelete(conf.id)}
+                          title="Удалить"
+                        >
+                          🗑️
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
