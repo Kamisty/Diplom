@@ -1227,7 +1227,7 @@ app.post('/api/conferences', async (req, res) => {
 // ============================================
 app.get('/api/conferences', async (req, res) => {
   try {
-    const query = `
+     const query = `
       SELECT 
         c.*, 
         u.login as creator_login, 
@@ -1241,10 +1241,9 @@ app.get('/api/conferences', async (req, res) => {
         ) as sections
       FROM conferences c
       LEFT JOIN users u ON c.created_by = u.user_id
+      WHERE c.created_by = $1
       GROUP BY c.id, u.login, u.name, u.email
-      ORDER BY c.start_date DESC
-    `;
-    
+      ORDER BY c.start_date DESC`;
     const result = await pool.query(query);
     
     console.log(`📊 Получено конференций: ${result.rows.length}`);
