@@ -12,12 +12,28 @@ const AssignSectionHeads = () => {
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
 
-  // Загрузка конференций
+  // Загрузка конференций (только для администратора)
   const fetchConferences = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch('https://diplom-j6uo.onrender.com/api/conferences');
-      if (!response.ok) throw new Error('Ошибка загрузки конференций');
+      
+      // ✅ ПОЛУЧАЕМ ID АДМИНИСТРАТОРА
+      const userId = localStorage.getItem('userId');
+      
+      if (!userId) {
+        console.warn('userId не найден в localStorage');
+        setConferences([]);
+        return;
+      }
+      
+      // ✅ ДОБАВЛЯЕМ userId В ЗАПРОС
+      const response = await fetch(`https://diplom-j6uo.onrender.com/api/conferences?userId=${userId}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Ошибка загрузки конференций');
+      }
+      
       const data = await response.json();
       console.log('Полученные конференции:', data);
       
@@ -168,7 +184,6 @@ const AssignSectionHeads = () => {
     }
   };
 
-  // Ручное обновление секций
   const handleRefreshSections = async () => {
     if (selectedConference) {
       setSuccessMessage('');
