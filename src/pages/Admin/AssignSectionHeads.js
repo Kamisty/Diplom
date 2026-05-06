@@ -12,39 +12,77 @@ const AssignSectionHeads = () => {
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
 
-  // Загрузка конференций (только для администратора)
+  // Функция для получения userId из разных источников
+  const getUserId = () => {
+    // Способ 1:直接从 localStorage
+    let userId = localStorage.getItem('userId');
+    if (userId) return userId;
+    
+    // Способ 2: из объекта user
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        userId = user.id || user.user_id;
+        if (userId) return userId;
+      } catch (e) {}
+    }
+    
+    // Способ 3: из sessionStorage
+    userId = sessionStorage.getItem('userId');
+    if (userId) return userId;
+    
+    return null;
+  };
+
+  // Загрузка конференций
   const fetchConferences = useCallback(async () => {
     try {
       setLoading(true);
       
-      // ✅ ПОЛУЧАЕМ ID АДМИНИСТРАТОРА
-      const userId = localStorage.getItem('userId');
+      const userId = getUserId();
+      
+      console.log('=== ОТЛАДКА ===');
+      console.log('userId из хранилища:', userId);
+      console.log('localStorage userId:', localStorage.getItem('userId'));
+      console.log('localStorage user:', localStorage.getItem('user'));
       
       if (!userId) {
-        console.warn('userId не найден в localStorage');
+        console.error('❌ userId не найден!');
+        setError('Пользователь не авторизован. Войдите заново.');
         setConferences([]);
+        setLoading(false);
         return;
       }
       
-      // ✅ ДОБАВЛЯЕМ userId В ЗАПРОС
-      const response = await fetch(`https://diplom-j6uo.onrender.com/api/conferences?userId=${userId}`);
+      const url = `https://diplom-j6uo.onrender.com/api/conferences?userId=${userId}`;
+      console.log('📡 Запрос:', url);
+      
+      const response = await fetch(url);
       
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Ошибка загрузки конференций');
+        throw new Error(errorData.error || `Ошибка ${response.status}`);
       }
       
       const data = await response.json();
-      console.log('Полученные конференции:', data);
+      console.log('📊 Ответ сервера:', data);
       
       if (data.success && Array.isArray(data.conferences)) {
+        console.log(`✅ Загружено ${data.conferences.length} конференций`);
         setConferences(data.conferences);
+        
+        if (data.conferences.length === 0) {
+          setError('У вас пока нет созданных конференций. Создайте конференцию сначала.');
+        }
       } else {
         setConferences([]);
+        setError('Нет конференций или ошибка формата данных');
       }
     } catch (err) {
-      setError(err.message);
-      console.error('Ошибка:', err);
+      console.error('❌ Ошибка:', err);
+      setError(`Ошибка загрузки: ${err.message}`);
+      setConferences([]);
     } finally {
       setLoading(false);
     }
@@ -76,17 +114,15 @@ const AssignSectionHeads = () => {
     }
   }, []);
 
-  // Загрузка секций и назначений для выбранной конференции
+  // Загрузка секций и назначений
   const loadSectionsAndAssignments = useCallback(async (conferenceId) => {
     try {
-      // Загружаем секции конференции
       const sectionsResponse = await fetch(`https://diplom-j6uo.onrender.com/api/conferences/${conferenceId}/sections`);
       const sectionsData = await sectionsResponse.json();
       
       console.log('Загруженные секции:', sectionsData);
       
       if (sectionsData.success && Array.isArray(sectionsData.sections)) {
-        // Загружаем назначения
         const assignmentsResponse = await fetch(`https://diplom-j6uo.onrender.com/api/section-assignments?conferenceId=${conferenceId}`);
         let assignments = [];
         
@@ -97,7 +133,6 @@ const AssignSectionHeads = () => {
           }
         }
         
-        // Объединяем секции с назначениями
         const sectionsWithHeads = sectionsData.sections.map(section => ({
           id: section.id,
           name: section.name,
@@ -121,7 +156,6 @@ const AssignSectionHeads = () => {
     fetchSectionHeads();
   }, [fetchConferences, fetchSectionHeads]);
 
-  // Когда выбрана конференция, загружаем её секции
   useEffect(() => {
     if (selectedConference) {
       loadSectionsAndAssignments(parseInt(selectedConference));
@@ -172,8 +206,6 @@ const AssignSectionHeads = () => {
       
       setSuccessMessage(`Руководитель для секции "${section.name}" назначен!`);
       setTimeout(() => setSuccessMessage(''), 3000);
-      
-      // Обновляем данные после сохранения
       await loadSectionsAndAssignments(parseInt(selectedConference));
       
     } catch (err) {
@@ -197,10 +229,8 @@ const AssignSectionHeads = () => {
   const getHeadName = (headId) => {
     if (!headId) return 'Не назначен';
     if (!Array.isArray(sectionHeads) || sectionHeads.length === 0) return 'Загрузка...';
-    
     const head = sectionHeads.find(u => u.id === headId);
     if (!head) return 'Не назначен';
-    
     return head.name || head.login || 'Имя не указано';
   };
 
