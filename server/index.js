@@ -1223,44 +1223,58 @@ app.post('/api/conferences', async (req, res) => {
 
 
 // ============================================
-// ПОЛУЧЕНИЕ ВСЕХ КОНФЕРЕНЦИЙ - http://localhost:5000/api/conferences
+// ПОЛУЧЕНИЕ КОНФЕРЕНЦИЙ (только свои для администратора)
 // ============================================
 app.get('/api/conferences', async (req, res) => {
-  try {
-     const query = `
-      SELECT 
-        c.*, 
-        u.login as creator_login, 
-        u.name as creator_name,
-        u.email as creator_email,
-        COALESCE(
-          (SELECT json_agg(json_build_object('id', s.id_sections, 'name', s.name_section))
-           FROM sections s
-           WHERE s.conference_id = c.id),
-          '[]'::json
-        ) as sections
-      FROM conferences c
-      LEFT JOIN users u ON c.created_by = u.user_id
-      WHERE c.created_by = $1
-      GROUP BY c.id, u.login, u.name, u.email
-      ORDER BY c.start_date DESC`;
-    const result = await pool.query(query);
-    
-    console.log(`📊 Получено конференций: ${result.rows.length}`);
-
-    res.json({
-      success: true,
-      conferences: result.rows
-    });
-
-  } catch (error) {
-    console.error('❌ Ошибка при получении конференций:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Ошибка при получении списка конференций',
-      details: error.message
-    });
-  }
+    try {
+        // Получаем userId из query-параметра
+        const { userId } = req.query;
+        
+        console.log('🔍 userId из запроса:', userId);
+        
+        if (!userId) {
+            return res.status(400).json({
+                success: false,
+                error: 'Не передан идентификатор пользователя (userId)'
+            });
+        }
+        
+        const query = `
+            SELECT 
+                c.*, 
+                u.login as creator_login, 
+                u.name as creator_name,
+                u.email as creator_email,
+                COALESCE(
+                    (SELECT json_agg(json_build_object('id', s.id_sections, 'name', s.name_section))
+                     FROM sections s
+                     WHERE s.conference_id = c.id),
+                    '[]'::json
+                ) as sections
+            FROM conferences c
+            LEFT JOIN users u ON c.created_by = u.user_id
+            WHERE c.created_by = $1
+            GROUP BY c.id, u.login, u.name, u.email
+            ORDER BY c.start_date DESC
+        `;
+        
+        const result = await pool.query(query, [userId]);
+        
+        console.log(`📊 Получено конференций для пользователя ${userId}: ${result.rows.length}`);
+        
+        res.json({
+            success: true,
+            conferences: result.rows
+        });
+        
+    } catch (error) {
+        console.error('❌ Ошибка при получении конференций:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Ошибка при получении списка конференций',
+            details: error.message
+        });
+    }
 });
 
 // ============================================
