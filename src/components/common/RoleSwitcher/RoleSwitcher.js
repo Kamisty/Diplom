@@ -3,6 +3,9 @@ import { AuthContext } from '../../../context/AuthContext/Auth';
 import { getRoleName, getRoleIcon, getAllRoles } from '../../../config/roles';
 import './RoleSwitcher.css';
 
+// ✅ Базовый URL сервера
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://diplom-j6uo.onrender.com';
+
 const RoleSwitcher = ({ closeDropdown }) => {
   const { user, login } = useContext(AuthContext);
   const [isSwitching, setIsSwitching] = useState(false);
@@ -12,17 +15,14 @@ const RoleSwitcher = ({ closeDropdown }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [addRoleMessage, setAddRoleMessage] = useState({ type: '', text: '' });
 
-  // ✅ Все доступные роли
   const allAvailableRoles = useMemo(() => getAllRoles(), []);
 
-  // ✅ Текущие роли пользователя
   const userCurrentRoles = useMemo(() => {
     const roles = user?.roles || user?.availableRoles || [];
     console.log('📋 [RoleSwitcher] Текущие роли:', roles);
     return roles;
   }, [user?.roles, user?.availableRoles]);
   
-  // ✅ Доступные для добавления роли
   const availableNewRoles = useMemo(() => {
     const available = allAvailableRoles.filter(role => {
       const hasRole = 
@@ -50,8 +50,6 @@ const RoleSwitcher = ({ closeDropdown }) => {
   if (!user) {
     return <div className="role-switcher-empty">Загрузка...</div>;
   }
-
-
 
   const switchRole = (newRole) => {
     if (newRole === user.activeRole) {
@@ -88,9 +86,9 @@ const RoleSwitcher = ({ closeDropdown }) => {
   };
 
   const redirectBasedOnRole = (role) => {
-  console.log('Перенаправление для роли:', role);
-  window.location.href = '/dashboard';
-};
+    console.log('Перенаправление для роли:', role);
+    window.location.href = '/dashboard';
+  };
 
   const handleAddRole = async () => {
     if (!selectedNewRole) {
@@ -110,7 +108,13 @@ const RoleSwitcher = ({ closeDropdown }) => {
         throw new Error('Роль не найдена');
       }
       
-      const response = await fetch('http://localhost:5000/api/user/add-role', {
+      console.log('📡 Отправка запроса на добавление роли:', {
+        userId,
+        role: selectedRoleObj.dbName
+      });
+      
+      // ✅ ИСПРАВЛЕНО: используем API_BASE_URL вместо localhost
+      const response = await fetch(`https://diplom-j6uo.onrender.com/api/user/add-role`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -122,6 +126,7 @@ const RoleSwitcher = ({ closeDropdown }) => {
       });
 
       const data = await response.json();
+      console.log('📡 Ответ сервера:', data);
 
       if (response.ok && data.success) {
         const updatedRoles = data.userRoles || data.roles || userCurrentRoles;
@@ -130,7 +135,7 @@ const RoleSwitcher = ({ closeDropdown }) => {
           ...user,
           roles: updatedRoles,
           availableRoles: updatedRoles,
-          activeRole: user.activeRole || updatedRoles[0]
+          activeRole: user.activeRole || (updatedRoles.length > 0 ? updatedRoles[0] : null)
         };
         
         localStorage.setItem('user', JSON.stringify(updatedUser));
@@ -147,7 +152,11 @@ const RoleSwitcher = ({ closeDropdown }) => {
         setSelectedNewRole('');
         setShowAddRole(false);
         
-        if (closeDropdown) closeDropdown();
+        // ✅ Обновляем страницу через 1 секунду для применения изменений
+        setTimeout(() => {
+          if (closeDropdown) closeDropdown();
+          window.location.reload();
+        }, 1000);
       } else {
         setAddRoleMessage({ 
           type: 'error', 
@@ -156,10 +165,10 @@ const RoleSwitcher = ({ closeDropdown }) => {
         setTimeout(() => setAddRoleMessage({ type: '', text: '' }), 3000);
       }
     } catch (error) {
-      console.error('Ошибка при добавлении роли:', error);
+      console.error('❌ Ошибка при добавлении роли:', error);
       setAddRoleMessage({ 
         type: 'error', 
-        text: 'Ошибка подключения к серверу' 
+        text: error.message || 'Ошибка подключения к серверу' 
       });
       setTimeout(() => setAddRoleMessage({ type: '', text: '' }), 3000);
     } finally {
@@ -167,13 +176,12 @@ const RoleSwitcher = ({ closeDropdown }) => {
     }
   };
 
- return (
+  return (
     <div className="role-switcher-inline">
       <div className="role-switcher-header">
         <span className="role-switcher-title">Мои роли</span>
       </div>
       
-      {/* Список текущих ролей */}
       {hasCurrentRoles ? (
         userCurrentRoles.map((role) => (
           <button
@@ -200,7 +208,6 @@ const RoleSwitcher = ({ closeDropdown }) => {
         </div>
       )}
 
-      {/* ✅ КНОПКА ДОБАВИТЬ РОЛЬ */}
       {hasAvailableToAdd && (
         <>
           <div className="role-divider"></div>
@@ -260,7 +267,6 @@ const RoleSwitcher = ({ closeDropdown }) => {
         </>
       )}
       
-      {/* Если нет доступных ролей */}
       {!hasAvailableToAdd && hasCurrentRoles && (
         <div className="no-more-roles">
           <small>Все доступные роли уже назначены</small>
