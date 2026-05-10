@@ -4,7 +4,7 @@ import { getRoleName, getRoleIcon, getAllRoles } from '../../../config/roles';
 import './RoleSwitcher.css';
 
 // ✅ Базовый URL сервера
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://diplom-j6uo.onrender.com';
+
 
 const RoleSwitcher = ({ closeDropdown }) => {
   const { user, login } = useContext(AuthContext);

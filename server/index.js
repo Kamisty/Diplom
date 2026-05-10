@@ -1221,6 +1221,65 @@ app.post('/api/conferences', async (req, res) => {
   }
 });
 
+// ============================================
+// ПОЛУЧЕНИЕ ВСЕХ КОНФЕРЕНЦИЙ (для авторов, активный дедлайн)
+// ============================================
+app.get('/api/available-conferences', async (req, res) => {
+    try {
+        // Получаем текущую дату и время в формате ISO
+        const currentDate = new Date().toISOString();
+        
+        console.log('📅 Текущая дата для сравнения:', currentDate);
+        
+        const query = `
+            SELECT 
+                c.*, 
+                u.login as creator_login, 
+                u.name as creator_name,
+                u.email as creator_email,
+                COALESCE(
+                    (SELECT json_agg(json_build_object('id', s.id_sections, 'name', s.name_section))
+                     FROM sections s
+                     WHERE s.conference_id = c.id),
+                    '[]'::json
+                ) as sections
+            FROM conferences c
+            LEFT JOIN users u ON c.created_by = u.user_id
+            WHERE c.submission_deadline > $1::timestamptz
+            GROUP BY c.id, u.login, u.name, u.email
+            ORDER BY c.submission_deadline ASC
+        `;
+        
+        const result = await pool.query(query, [currentDate]);
+        
+        console.log(`📊 Получено доступных конференций (дедлайн не истёк): ${result.rows.length}`);
+        
+        // Дополнительная проверка на JS (резервная)
+        const now = new Date();
+        const validConferences = result.rows.filter(conf => {
+            const deadline = new Date(conf.submission_deadline);
+            return deadline > now;
+        });
+        
+        res.json({
+            success: true,
+            conferences: validConferences,
+            debug: {
+                total: result.rows.length,
+                filtered: validConferences.length,
+                currentTime: now.toISOString()
+            }
+        });
+        
+    } catch (error) {
+        console.error('❌ Ошибка при получении доступных конференций:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Ошибка при получении списка конференций',
+            details: error.message
+        });
+    }
+});
 
 // ============================================
 // ПОЛУЧЕНИЕ КОНФЕРЕНЦИЙ (только свои для администратора)

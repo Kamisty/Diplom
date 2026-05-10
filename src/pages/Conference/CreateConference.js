@@ -208,7 +208,7 @@ const CreateConference = () => {
               onClick={addSectionField}
               className="btn-add-section"
             >
-              + Добавить секцию
+              Добавить секцию
             </button>
             <small className="section-hint">
               Добавьте названия секций конференции (минимум 1)
