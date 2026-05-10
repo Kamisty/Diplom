@@ -1,5 +1,5 @@
-// src/pages/Reports/ReportDetail.jsx
-import React, { useState, useEffect } from 'react';
+// src/pages/Reports/ReportDetail.js
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import './Reports.css';
 
@@ -23,21 +23,27 @@ const ReportDetail = () => {
   const [isAuthorOfReport, setIsAuthorOfReport] = useState(false);
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-
   const isReviewer = user?.activeRole === 'Рецензент';
-  const isAuthor = user?.activeRole === 'Автор';
 
-  useEffect(() => {
-    loadReport();
+  // Загрузка рецензии для автора (просмотр)
+  const loadReviewForAuthor = useCallback(async () => {
+    try {
+      const response = await fetch(`https://diplom-j6uo.onrender.com/api/reviews/by-report/${id}`);
+      const data = await response.json();
+      
+      if (response.ok && data.success && data.review) {
+        setExistingReview(data.review);
+      } else {
+        setExistingReview(null);
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки рецензии для автора:', error);
+      setExistingReview(null);
+    }
   }, [id]);
 
-  useEffect(() => {
-    if (id && isReviewer) {
-      loadExistingReview();
-    }
-  }, [isReviewer, id]);
-
-  const loadReport = async () => {
+  // Загрузка доклада
+  const loadReport = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch(`https://diplom-j6uo.onrender.com/api/reports/${id}`);
@@ -66,9 +72,10 @@ const ReportDetail = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, user?.id, user?.user_id, user?.name, loadReviewForAuthor]);
 
-  const loadExistingReview = async () => {
+  // Загрузка рецензии для рецензента
+  const loadExistingReview = useCallback(async () => {
     try {
       const userId = user?.user_id || user?.id;
       const response = await fetch(`https://diplom-j6uo.onrender.com/api/reviews/report/${id}/reviewer/${userId}`);
@@ -92,23 +99,17 @@ const ReportDetail = () => {
       console.error('Ошибка загрузки рецензии:', error);
       setExistingReview(null);
     }
-  };
+  }, [id, user?.user_id, user?.id]);
 
-  const loadReviewForAuthor = async () => {
-    try {
-      const response = await fetch(`https://diplom-j6uo.onrender.com/api/reviews/by-report/${id}`);
-      const data = await response.json();
-      
-      if (response.ok && data.success && data.review) {
-        setExistingReview(data.review);
-      } else {
-        setExistingReview(null);
-      }
-    } catch (error) {
-      console.error('Ошибка загрузки рецензии для автора:', error);
-      setExistingReview(null);
+  useEffect(() => {
+    loadReport();
+  }, [loadReport]);
+
+  useEffect(() => {
+    if (id && isReviewer) {
+      loadExistingReview();
     }
-  };
+  }, [id, isReviewer, loadExistingReview]);
 
   const handleReviewChange = (e) => {
     const { name, value } = e.target;
@@ -236,6 +237,73 @@ const ReportDetail = () => {
     );
   };
 
+  // Функция рендеринга контента
+  const renderContentBlocks = () => {
+    if (!report?.content || !Array.isArray(report.content) || report.content.length === 0) {
+      return <div className="empty-state">Содержание статьи пусто</div>;
+    }
+
+    return report.content.map((block, index) => {
+      switch (block.type) {
+        case 'text':
+          return (
+            <div key={block.id || index} className="content-block text-block">
+              <div dangerouslySetInnerHTML={{ __html: block.content }} />
+            </div>
+          );
+        
+        case 'table':
+          return (
+            <div key={block.id || index} className="content-block table-block">
+              <div className="table-caption">
+                Таблица {block.number || index + 1} — {block.caption}
+              </div>
+              <div className="table-wrapper">
+                <table className="styled-table">
+                  <thead>
+                    <tr>
+                      {block.headers?.map((header, i) => (
+                        <th key={i}>{header}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {block.data?.map((row, i) => (
+                      <tr key={i}>
+                        {row.map((cell, j) => (
+                          <td key={j}>{cell}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        
+        case 'image':
+          return (
+            <div key={block.id || index} className="content-block image-block" style={{ textAlign: block.align || 'center' }}>
+              <img src={block.src} alt={block.caption} style={{ maxWidth: '100%', width: block.width || '100%' }} />
+              <div className="image-caption">
+                Рисунок {block.number || index + 1} — {block.caption}
+              </div>
+            </div>
+          );
+        
+        case 'formula':
+          return (
+            <div key={block.id || index} className="content-block formula-block" style={{ textAlign: block.align || 'center' }}>
+              <strong>Формула {block.number || index + 1}:</strong> {block.formulaString || block.content}
+            </div>
+          );
+        
+        default:
+          return null;
+      }
+    });
+  };
+
   if (loading) {
     return (
       <div className="reports-page">
@@ -269,7 +337,6 @@ const ReportDetail = () => {
         </div>
 
         <div className="report-detail-container">
-          {/* Информация о докладе */}
           <div className="report-info-section">
             <h2>Информация о докладе</h2>
             
@@ -302,7 +369,6 @@ const ReportDetail = () => {
               )}
             </div>
 
-            {/* Аннотация */}
             {report.abstract && (
               <div className="info-item full-width">
                 <strong>Аннотация:</strong>
@@ -310,69 +376,11 @@ const ReportDetail = () => {
               </div>
             )}
 
-            {/* ✅ СОДЕРЖАНИЕ ДОКЛАДА (как в предпросмотре) */}
-            {report.content && Array.isArray(report.content) && report.content.length > 0 && (
-              <div className="report-content-section">
-                <h3>Содержание</h3>
-                {report.content.map((block, index) => {
-                  switch (block.type) {
-                    case 'text':
-                      return (
-                        <div key={block.id || index} className="content-block text-block">
-                          <div dangerouslySetInnerHTML={{ __html: block.content }} />
-                        </div>
-                      );
-                    case 'table':
-                      return (
-                        <div key={block.id || index} className="content-block table-block">
-                          <div className="table-caption">
-                            Таблица {block.number || index + 1} — {block.caption}
-                          </div>
-                          <div className="table-wrapper">
-                            <table className="styled-table">
-                              <thead>
-                                <tr>
-                                  {block.headers?.map((header, i) => (
-                                    <th key={i}>{header}</th>
-                                  ))}
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {block.data?.map((row, i) => (
-                                  <tr key={i}>
-                                    {row.map((cell, j) => (
-                                      <td key={j}>{cell}</td>
-                                    ))}
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      );
-                    case 'image':
-                      return (
-                        <div key={block.id || index} className="content-block image-block" style={{ textAlign: block.align || 'center' }}>
-                          <img src={block.src} alt={block.caption} style={{ maxWidth: '100%', width: block.width || '100%' }} />
-                          <div className="image-caption">
-                            Рисунок {block.number || index + 1} — {block.caption}
-                          </div>
-                        </div>
-                      );
-                    case 'formula':
-                      return (
-                        <div key={block.id || index} className="content-block formula-block" style={{ textAlign: block.align || 'center' }}>
-                          <strong>Формула {block.number || index + 1}:</strong> {block.formulaString || block.content}
-                        </div>
-                      );
-                    default:
-                      return null;
-                  }
-                })}
-              </div>
-            )}
+            <div className="report-content-section">
+              <h3>Содержание</h3>
+              {renderContentBlocks()}
+            </div>
 
-            {/* Литература */}
             {report.literature && (
               <div className="info-item full-width">
                 <strong>Литература:</strong>
@@ -380,7 +388,6 @@ const ReportDetail = () => {
               </div>
             )}
 
-            {/* Дополнительная информация */}
             {report.additional_info && (
               <div className="info-item full-width">
                 <strong>Дополнительная информация:</strong>
@@ -389,7 +396,7 @@ const ReportDetail = () => {
             )}
           </div>
 
-          {/* БЛОК ДЛЯ РЕЦЕНЗЕНТА */}
+          {/* Блок для рецензента */}
           {isReviewer && report.status !== 'draft' && (
             <div className="review-section">
               <h2>{existingReview ? '✏️ Редактирование рецензии' : '📝 Написать рецензию'}</h2>
@@ -397,13 +404,28 @@ const ReportDetail = () => {
               {existingReview && (
                 <div className="existing-review-display">
                   <h3>Текущая рецензия:</h3>
-                  <div className="review-rating"><strong>Научная ценность:</strong> {existingReview.scientific_value || 'Нет оценки'}/10</div>
-                  <div className="review-rating"><strong>Практическая ценность:</strong> {existingReview.practical_value || 'Нет оценки'}/10</div>
-                  <div className="review-rating"><strong>Актуальность:</strong> {existingReview.relevance || 'Нет оценки'}/10</div>
-                  <div className="review-rating"><strong>Новизна:</strong> {existingReview.novelty || 'Нет оценки'}/10</div>
-                  <div className="review-rating"><strong>Качество оформления:</strong> {existingReview.quality || 'Нет оценки'}/10</div>
-                  <div className="review-recommendation"><strong>Рекомендация:</strong> {getRecommendationLabel(existingReview.recommendation)}</div>
-                  <div className="review-comment"><strong>Комментарий:</strong><p>{existingReview.comments_for_author || 'Нет комментариев'}</p></div>
+                  <div className="review-rating">
+                    <strong>Научная ценность:</strong> {existingReview.scientific_value || 'Нет оценки'}/10
+                  </div>
+                  <div className="review-rating">
+                    <strong>Практическая ценность:</strong> {existingReview.practical_value || 'Нет оценки'}/10
+                  </div>
+                  <div className="review-rating">
+                    <strong>Актуальность:</strong> {existingReview.relevance || 'Нет оценки'}/10
+                  </div>
+                  <div className="review-rating">
+                    <strong>Новизна:</strong> {existingReview.novelty || 'Нет оценки'}/10
+                  </div>
+                  <div className="review-rating">
+                    <strong>Качество оформления:</strong> {existingReview.quality || 'Нет оценки'}/10
+                  </div>
+                  <div className="review-recommendation">
+                    <strong>Рекомендация:</strong> {getRecommendationLabel(existingReview.recommendation)}
+                  </div>
+                  <div className="review-comment">
+                    <strong>Комментарий:</strong>
+                    <p>{existingReview.comments_for_author || 'Нет комментариев'}</p>
+                  </div>
                   <hr />
                   <p><em>Вы можете отредактировать рецензию ниже:</em></p>
                 </div>
@@ -441,19 +463,36 @@ const ReportDetail = () => {
             </div>
           )}
 
-          {/* БЛОК ДЛЯ АВТОРА */}
+          {/* Блок для автора */}
           {!isReviewer && isAuthorOfReport && existingReview && (
             <div className="review-section read-only">
               <h2>📋 Рецензия на доклад</h2>
               <div className="review-display">
-                <div className="review-rating"><strong>Научная ценность:</strong> {existingReview.scientific_value || 'Нет оценки'}/10</div>
-                <div className="review-rating"><strong>Практическая ценность:</strong> {existingReview.practical_value || 'Нет оценки'}/10</div>
-                <div className="review-rating"><strong>Актуальность:</strong> {existingReview.relevance || 'Нет оценки'}/10</div>
-                <div className="review-rating"><strong>Новизна:</strong> {existingReview.novelty || 'Нет оценки'}/10</div>
-                <div className="review-rating"><strong>Качество оформления:</strong> {existingReview.quality || 'Нет оценки'}/10</div>
-                <div className="review-recommendation"><strong>Рекомендация:</strong> {getRecommendationLabel(existingReview.recommendation)}</div>
-                <div className="review-comment"><strong>Комментарий рецензента:</strong><p>{existingReview.comments_for_author || 'Нет комментариев'}</p></div>
-                <div className="review-date"><small>Дата рецензии: {formatDate(existingReview.created_at)}</small></div>
+                <div className="review-rating">
+                  <strong>Научная ценность:</strong> {existingReview.scientific_value || 'Нет оценки'}/10
+                </div>
+                <div className="review-rating">
+                  <strong>Практическая ценность:</strong> {existingReview.practical_value || 'Нет оценки'}/10
+                </div>
+                <div className="review-rating">
+                  <strong>Актуальность:</strong> {existingReview.relevance || 'Нет оценки'}/10
+                </div>
+                <div className="review-rating">
+                  <strong>Новизна:</strong> {existingReview.novelty || 'Нет оценки'}/10
+                </div>
+                <div className="review-rating">
+                  <strong>Качество оформления:</strong> {existingReview.quality || 'Нет оценки'}/10
+                </div>
+                <div className="review-recommendation">
+                  <strong>Рекомендация:</strong> {getRecommendationLabel(existingReview.recommendation)}
+                </div>
+                <div className="review-comment">
+                  <strong>Комментарий рецензента:</strong>
+                  <p>{existingReview.comments_for_author || 'Нет комментариев'}</p>
+                </div>
+                <div className="review-date">
+                  <small>Дата рецензии: {formatDate(existingReview.created_at)}</small>
+                </div>
               </div>
             </div>
           )}
