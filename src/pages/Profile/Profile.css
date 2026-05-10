@@ -96,17 +96,19 @@
 .btn-change-email-inline {
   margin-top: 10px;
   padding: 6px 12px;
-  background-color: #667eea;
+  background-color: rgb(100, 125, 240);
   color: white;
   border: none;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 14px;
+  width: 150px;
+  height: 30px;
   cursor: pointer;
   transition: all 0.3s;
 }
 
 .btn-change-email-inline:hover {
-  background-color: #5a67d8;
+  background-color: rgb(85, 110, 230);
   transform: translateY(-1px);
 }
 

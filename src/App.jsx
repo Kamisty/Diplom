@@ -40,6 +40,19 @@ function App() {
               <Route path="/input" element={<Input />} />
               <Route path="/access-denied" element={<AccessDenied />} />
               
+            {/*АДМИНИСТРАТОР — редирект на /dashboard  */}
+              <Route path="/admin/dashboard" element={<Dashboard />} />
+              
+              {/* ✅ РУКОВОДИТЕЛЬ СЕКЦИИ — редирект на /dashboard */}
+              <Route path="/section-head/dashboard" element={<Dashboard />} />
+              
+              {/* ✅ РЕЦЕНЗЕНТ — редирект на /dashboard */}
+              <Route path="/reviewer/dashboard" element={<Dashboard />} />
+              
+              {/* ✅ АВТОР — редирект на /dashboard */}
+              <Route path="/author/dashboard" element={<Dashboard />} />
+
+
               {/* Защищенные маршруты */}
               <Route path="/profile" element={<Profile />} />
               <Route path="/dashboard" element={<Dashboard />} />
