@@ -43,28 +43,12 @@ function App() {
               {/* Защищенные маршруты */}
               <Route path="/profile" element={<Profile />} />
               
-              {/* ✅ МАРШРУТЫ ДЛЯ РАЗНЫХ ДАШБОРДОВ */}
+              {/* ✅ МАРШРУТЫ ДАШБОРДОВ БЕЗ ПРОВЕРКИ */}
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/admin/dashboard" element={
-                <RoleBasedRoute requiredPermission="admin_access">
-                  <Dashboard />
-                </RoleBasedRoute>
-              } />
-              <Route path="/section-head/dashboard" element={
-                <RoleBasedRoute requiredPermission="section_head_access">
-                  <SectionHeadDashboard />
-                </RoleBasedRoute>
-              } />
-              <Route path="/reviewer/dashboard" element={
-                <RoleBasedRoute requiredPermission="reviewer_access">
-                  <Dashboard />
-                </RoleBasedRoute>
-              } />
-              <Route path="/author/dashboard" element={
-                <RoleBasedRoute requiredPermission="author_access">
-                  <Dashboard />
-                </RoleBasedRoute>
-              } />
+              <Route path="/admin/dashboard" element={<Dashboard />} />
+              <Route path="/section-head/dashboard" element={<SectionHeadDashboard />} />
+              <Route path="/reviewer/dashboard" element={<Dashboard />} />
+              <Route path="/author/dashboard" element={<Dashboard />} />
               
               {/* Маршруты с проверкой ролей */}
               <Route path="/submit-report" element={
