@@ -46,8 +46,8 @@ function App() {
               {/* ✅ РУКОВОДИТЕЛЬ СЕКЦИИ — редирект на /dashboard */}
               <Route path="/section-head/dashboard" element={<Dashboard />} />
               
-              {/* ✅ РЕЦЕНЗЕНТ — редирект на /dashboard */}
-              <Route path="/reviewer/dashboard" element={<Dashboard />} />
+              {/* ✅ РЕЦЕНЗЕНТ — редирект на /dashboard
+              <Route path="/reviewer/dashboard" element={<Dashboard />} /> */}
               
               {/* ✅ АВТОР — редирект на /dashboard */}
               <Route path="/author/dashboard" element={<Dashboard />} />
