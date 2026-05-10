@@ -139,7 +139,7 @@ const SubmitReport = () => {
   const fetchConferences = async () => {
     setLoadingConferences(true);
     try {
-      const response = await fetch('https://diplom-j6uo.onrender.com/api/conferences');
+      const response = await fetch('https://diplom-j6uo.onrender.com/api/available-conferences');
       const data = await response.json();
       
       if (response.ok) {
