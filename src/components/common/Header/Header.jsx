@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../../context/AuthContext/Auth';
 import { getRoleName, getRoleIcon, ROLES } from '../../../config/roles';
 import RoleSwitcher from '../RoleSwitcher/RoleSwitcher';
+import Notifications from '../../Notifications/Notifications';
 import './Header.css';
 
 const Header = () => {
@@ -16,27 +17,22 @@ const Header = () => {
   const userRoles = useMemo(() => user?.roles || [], [user?.roles]);
   const availableRoles = useMemo(() => user?.availableRoles || userRoles, [user?.availableRoles, userRoles]);
   
-  // ✅ УДАЛЕНО: isAdmin, isAuthor, isReviewer, isSectionHead — не использовались
-// В Header.jsx, внутри компонента:
-useEffect(() => {
-  // Обработчик кастомного события от ManageUsers
-  const handleUserRolesUpdated = (event) => {
-    const updatedUser = event.detail;
-    if (updatedUser && login) {
-      // Обновляем контекст авторизации
-      login(updatedUser);
-      console.log('🔄 Header: роли обновлены через custom event');
-    }
-  };
-  
-  window.addEventListener('userRolesUpdated', handleUserRolesUpdated);
-  
-  return () => {
-    window.removeEventListener('userRolesUpdated', handleUserRolesUpdated);
-  };
-}, [login]);
+  useEffect(() => {
+    const handleUserRolesUpdated = (event) => {
+      const updatedUser = event.detail;
+      if (updatedUser && login) {
+        login(updatedUser);
+        console.log('🔄 Header: роли обновлены через custom event');
+      }
+    };
+    
+    window.addEventListener('userRolesUpdated', handleUserRolesUpdated);
+    
+    return () => {
+      window.removeEventListener('userRolesUpdated', handleUserRolesUpdated);
+    };
+  }, [login]);
 
-  // ✅ Отслеживаем изменения в localStorage
   useEffect(() => {
     const handleStorageChange = (e) => {
       if (e.key === 'user' && login) {
@@ -73,7 +69,6 @@ useEffect(() => {
     };
   }, [user, login]);
 
-  // Закрытие дропдауна при клике вне его
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -138,7 +133,7 @@ useEffect(() => {
             
             {user?.activeRole === ROLES.SECTION_HEAD && (
               <>
-                <Link to="section-head/dashboard" className="nav-link">Управление секцией</Link>
+                <Link to="/section-head/dashboard" className="nav-link">Управление секцией</Link>
                 <Link to="/section/reports" className="nav-link">Доклады секции</Link>
               </>
             )}
@@ -162,6 +157,9 @@ useEffect(() => {
             </div>
           ) : (
             <div className="user-menu" ref={dropdownRef}>
+              {/* ✅ УВЕДОМЛЕНИЯ */}
+              <Notifications />
+
               <div className="user-info" onClick={() => setIsDropdownOpen(!isDropdownOpen)}>
                 <div className="avatar">{getInitials}</div>
                 <span className="user-name">{user.name || user.login}</span>
