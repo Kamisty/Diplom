@@ -496,7 +496,23 @@ const TableManager = ({
     setShowDraftMessage(false);
     onClose();
   };
-
+// Добавляем глобальные стили для анимации изменения размера
+useEffect(() => {
+  const style = document.createElement('style');
+  style.textContent = `
+    .table-manager-cell input:hover,
+    .table-manager-cell textarea:hover {
+      border-color: #f39c12 !important;
+    }
+    .table-manager-cell input:focus,
+    .table-manager-cell textarea:focus {
+      border-color: #f39c12 !important;
+      background-color: #fff9f0 !important;
+    }
+  `;
+  document.head.appendChild(style);
+  return () => document.head.removeChild(style);
+}, []);
   if (!isOpen && !editingBlock) return null;
 
   const styles = {
@@ -617,36 +633,52 @@ const TableManager = ({
       marginBottom: '15px',
       tableLayout: 'fixed'
     },
-    td: (isSelected, isEmpty, isRotated) => ({
-      padding: isRotated ? '2px' : '6px',
-      border: '1px solid #000',
-      fontFamily: 'Times New Roman, serif',
-      fontSize: '14px',
-      backgroundColor: isSelected ? '#e6f2ff' : isEmpty ? '#fff3f3' : 'transparent',
-      cursor: 'pointer',
-      height: isRotated ? '60px' : '40px',
-      width: isRotated ? '40px' : 'auto',
-      ...(isRotated && {
-        writingMode: 'vertical-rl',
-        textOrientation: 'mixed',
-        whiteSpace: 'nowrap'
-      })
-    }),
-    cellInput: {
-      width: '100%',
-      height: '100%',
-      padding: '4px',
-      border: '1px solid transparent',
-      textAlign: 'center',
-      fontFamily: 'Times New Roman, serif',
-      fontSize: '14px',
-      backgroundColor: 'transparent',
-      outline: 'none',
-      boxSizing: 'border-box',
-      ':focus': {
-        border: '1px solid #007bff'
-      }
-    },
+  
+  td: (isSelected, isEmpty, isRotated) => ({
+    padding: isRotated ? '8px 4px' : '6px',
+    border: '1px solid #000',
+    fontFamily: 'Times New Roman, serif',
+    fontSize: '14px',
+    backgroundColor: isSelected ? '#e6f2ff' : isEmpty ? '#fff3f3' : 'transparent',
+    cursor: 'pointer',
+    textAlign: 'center',
+    verticalAlign: 'middle',
+    wordBreak: 'break-word',
+    // Динамические размеры
+    minWidth: isRotated ? '60px' : '80px',
+    maxWidth: isRotated ? '150px' : '400px',
+    width: isRotated ? 'auto' : 'auto',
+    height: 'auto',
+    ...(isRotated && {
+      writingMode: 'vertical-lr',
+      textOrientation: 'upright',
+      whiteSpace: 'nowrap',
+      minHeight: '80px',
+      maxHeight: '200px'
+    })
+  }),
+  
+  cellInput: {
+    width: '100%',
+    height: '100%',
+    minHeight: '32px',
+    padding: '6px 4px',
+    border: '1px solid transparent',
+    textAlign: 'center',
+    fontFamily: 'Times New Roman, serif',
+    fontSize: '14px',
+    backgroundColor: 'transparent',
+    outline: 'none',
+    boxSizing: 'border-box',
+    resize: 'vertical',
+    overflow: 'auto',
+    ':focus': {
+      border: '1px solid #007bff',
+      backgroundColor: '#fff',
+      borderRadius: '4px'
+    }
+  },
+
     buttonGroup: {
       display: 'flex',
       gap: '10px',
@@ -899,6 +931,7 @@ const TableManager = ({
       </div>
     </div>
   );
+  
 };
 
 export default TableManager;
