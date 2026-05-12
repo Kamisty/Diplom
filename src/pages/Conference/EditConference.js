@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { AuthContext } from '../../context/AuthContext/Auth';
 import { useParams, useNavigate } from 'react-router-dom';
+import StyleEditor from '../../components/StyleEditor/StyleEditor'; // Добавляем импорт StyleEditor
 import './Conference.css';
 
 const EditConference = () => {
@@ -12,6 +13,7 @@ const EditConference = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [showStyleEditor, setShowStyleEditor] = useState(false); // Состояние для показа редактора стилей
   
   const [formData, setFormData] = useState({
     title: '',
@@ -198,6 +200,12 @@ const EditConference = () => {
     }
   };
 
+  const handleStylesSaved = () => {
+    setShowStyleEditor(false);
+    setSuccess('Стили конференции сохранены!');
+    setTimeout(() => setSuccess(null), 3000);
+  };
+
   if (loading) {
     return <div className="loading">Загрузка конференции...</div>;
   }
@@ -210,13 +218,30 @@ const EditConference = () => {
             ← Назад
           </button>
           <h1>Редактирование конференции</h1>
-          <button 
-            className="btn-save" 
-            onClick={handleSubmit}
-            disabled={saving}
-          >
-            {saving ? 'Сохранение...' : 'Сохранить изменения'}
-          </button>
+          <div className="header-buttons">
+            <button 
+              className="btn-styles"
+              onClick={() => setShowStyleEditor(true)}
+              style={{
+                marginRight: '10px',
+                backgroundColor: '#9b59b6',
+                color: 'white',
+                padding: '10px 20px',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer'
+              }}
+            >
+              🎨 Настроить стили
+            </button>
+            <button 
+              className="btn-save" 
+              onClick={handleSubmit}
+              disabled={saving}
+            >
+              {saving ? 'Сохранение...' : 'Сохранить изменения'}
+            </button>
+          </div>
         </div>
 
         {error && <div className="error-message">{error}</div>}
@@ -295,8 +320,6 @@ const EditConference = () => {
                   placeholder="Город, место проведения"
                 />
               </div>
-
-          
             </div>
 
             <div className="form-row">
@@ -308,7 +331,6 @@ const EditConference = () => {
                   <option value="mixed">Смешанный</option>
                 </select>
               </div>
-
             </div>
           </div>
 
@@ -355,6 +377,16 @@ const EditConference = () => {
           </div>
         </form>
       </div>
+      
+      {/* Модальное окно StyleEditor */}
+      {showStyleEditor && (
+        <StyleEditor
+          conferenceId={id}
+          onSave={handleStylesSaved}
+          onClose={() => setShowStyleEditor(false)}
+          embedded={false}
+        />
+      )}
     </div>
   );
 };
