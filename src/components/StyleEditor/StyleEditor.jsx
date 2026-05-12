@@ -31,6 +31,7 @@ const StyleEditor = ({ conferenceId, onSave, onClose, embedded = true }) => {
     });
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [activeTab, setActiveTab] = useState('general'); // Добавляем состояние для активной вкладки
     
     console.log('StyleEditor рендерится, conferenceId:', conferenceId);
     
@@ -43,7 +44,6 @@ const StyleEditor = ({ conferenceId, onSave, onClose, embedded = true }) => {
     const loadStyles = async () => {
         setLoading(true);
         try {
-            // Пытаемся загрузить стили с сервера
             const response = await fetch(`https://diplom-j6uo.onrender.com/api/conferences/${conferenceId}/styles`);
             const data = await response.json();
             if (data.success && data.styles) {
@@ -98,6 +98,362 @@ const StyleEditor = ({ conferenceId, onSave, onClose, embedded = true }) => {
         );
     }
     
+    // Рендер содержимого вкладок
+    const renderTabContent = () => {
+        switch (activeTab) {
+            case 'general':
+                return (
+                    <div style={{ display: 'grid', gap: '20px' }}>
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+                                Цвет фона страницы
+                            </label>
+                            <input
+                                type="color"
+                                value={styles.page_background}
+                                onChange={(e) => handleStyleChange('page_background', e.target.value)}
+                                style={{ width: '80px', height: '40px', cursor: 'pointer', borderRadius: '5px', border: '1px solid #ddd' }}
+                            />
+                        </div>
+                        
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+                                Отступ контейнера (px)
+                            </label>
+                            <input
+                                type="number"
+                                value={styles.container_padding}
+                                onChange={(e) => handleStyleChange('container_padding', parseInt(e.target.value))}
+                                min="0"
+                                max="100"
+                                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
+                            />
+                        </div>
+                        
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+                                Основной шрифт
+                            </label>
+                            <select
+                                value={styles.font_family}
+                                onChange={(e) => handleStyleChange('font_family', e.target.value)}
+                                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
+                            >
+                                <option value="Arial, sans-serif">Arial</option>
+                                <option value="Times New Roman, serif">Times New Roman</option>
+                                <option value="Futura PT, sans-serif">Futura PT</option>
+                                <option value="Georgia, serif">Georgia</option>
+                                <option value="Verdana, sans-serif">Verdana</option>
+                            </select>
+                        </div>
+                    </div>
+                );
+                
+            case 'title':
+                return (
+                    <div style={{ display: 'grid', gap: '20px' }}>
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+                                Размер шрифта заголовка (px)
+                            </label>
+                            <input
+                                type="number"
+                                value={styles.title_font_size}
+                                onChange={(e) => handleStyleChange('title_font_size', parseInt(e.target.value))}
+                                min="12"
+                                max="72"
+                                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
+                            />
+                        </div>
+                        
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+                                Насыщенность шрифта
+                            </label>
+                            <select
+                                value={styles.title_font_weight}
+                                onChange={(e) => handleStyleChange('title_font_weight', e.target.value)}
+                                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
+                            >
+                                <option value="400">Обычный (400)</option>
+                                <option value="500">Средний (500)</option>
+                                <option value="600">Полужирный (600)</option>
+                                <option value="700">Жирный (700)</option>
+                                <option value="bold">Bold</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+                                Цвет заголовка
+                            </label>
+                            <input
+                                type="color"
+                                value={styles.title_color}
+                                onChange={(e) => handleStyleChange('title_color', e.target.value)}
+                                style={{ width: '80px', height: '40px', cursor: 'pointer', borderRadius: '5px', border: '1px solid #ddd' }}
+                            />
+                        </div>
+                        
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+                                Выравнивание заголовка
+                            </label>
+                            <select
+                                value={styles.title_text_align}
+                                onChange={(e) => handleStyleChange('title_text_align', e.target.value)}
+                                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
+                            >
+                                <option value="left">По левому краю</option>
+                                <option value="center">По центру</option>
+                                <option value="right">По правому краю</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+                                Отступ снизу (px)
+                            </label>
+                            <input
+                                type="number"
+                                value={styles.title_margin_bottom}
+                                onChange={(e) => handleStyleChange('title_margin_bottom', parseInt(e.target.value))}
+                                min="0"
+                                max="100"
+                                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
+                            />
+                        </div>
+                    </div>
+                );
+                
+            case 'authors':
+                return (
+                    <div style={{ display: 'grid', gap: '20px' }}>
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+                                Размер шрифта авторов (px)
+                            </label>
+                            <input
+                                type="number"
+                                value={styles.authors_font_size}
+                                onChange={(e) => handleStyleChange('authors_font_size', parseInt(e.target.value))}
+                                min="10"
+                                max="48"
+                                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
+                            />
+                        </div>
+                        
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+                                Цвет авторов
+                            </label>
+                            <input
+                                type="color"
+                                value={styles.authors_color}
+                                onChange={(e) => handleStyleChange('authors_color', e.target.value)}
+                                style={{ width: '80px', height: '40px', cursor: 'pointer', borderRadius: '5px', border: '1px solid #ddd' }}
+                            />
+                        </div>
+                        
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+                                Выравнивание авторов
+                            </label>
+                            <select
+                                value={styles.authors_text_align}
+                                onChange={(e) => handleStyleChange('authors_text_align', e.target.value)}
+                                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
+                            >
+                                <option value="left">По левому краю</option>
+                                <option value="center">По центру</option>
+                                <option value="right">По правому краю</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+                                Отступ снизу (px)
+                            </label>
+                            <input
+                                type="number"
+                                value={styles.authors_margin_bottom}
+                                onChange={(e) => handleStyleChange('authors_margin_bottom', parseInt(e.target.value))}
+                                min="0"
+                                max="100"
+                                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
+                            />
+                        </div>
+                    </div>
+                );
+                
+            case 'abstract':
+                return (
+                    <div style={{ display: 'grid', gap: '20px' }}>
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+                                Размер шрифта аннотации (px)
+                            </label>
+                            <input
+                                type="number"
+                                value={styles.abstract_font_size}
+                                onChange={(e) => handleStyleChange('abstract_font_size', parseInt(e.target.value))}
+                                min="10"
+                                max="24"
+                                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
+                            />
+                        </div>
+                        
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+                                Межстрочный интервал
+                            </label>
+                            <input
+                                type="number"
+                                step="0.1"
+                                value={styles.abstract_line_height}
+                                onChange={(e) => handleStyleChange('abstract_line_height', parseFloat(e.target.value))}
+                                min="1"
+                                max="2.5"
+                                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
+                            />
+                        </div>
+                        
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+                                Цвет текста
+                            </label>
+                            <input
+                                type="color"
+                                value={styles.abstract_color}
+                                onChange={(e) => handleStyleChange('abstract_color', e.target.value)}
+                                style={{ width: '80px', height: '40px', cursor: 'pointer', borderRadius: '5px', border: '1px solid #ddd' }}
+                            />
+                        </div>
+                        
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+                                Отступ снизу (px)
+                            </label>
+                            <input
+                                type="number"
+                                value={styles.abstract_margin_bottom}
+                                onChange={(e) => handleStyleChange('abstract_margin_bottom', parseInt(e.target.value))}
+                                min="0"
+                                max="100"
+                                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
+                            />
+                        </div>
+                    </div>
+                );
+                
+            case 'text':
+                return (
+                    <div style={{ display: 'grid', gap: '20px' }}>
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+                                Размер основного текста (px)
+                            </label>
+                            <input
+                                type="number"
+                                value={styles.text_font_size}
+                                onChange={(e) => handleStyleChange('text_font_size', parseInt(e.target.value))}
+                                min="10"
+                                max="24"
+                                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
+                            />
+                        </div>
+                        
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+                                Межстрочный интервал
+                            </label>
+                            <input
+                                type="number"
+                                step="0.1"
+                                value={styles.text_line_height}
+                                onChange={(e) => handleStyleChange('text_line_height', parseFloat(e.target.value))}
+                                min="1"
+                                max="2.5"
+                                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
+                            />
+                        </div>
+                        
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+                                Цвет текста
+                            </label>
+                            <input
+                                type="color"
+                                value={styles.text_color}
+                                onChange={(e) => handleStyleChange('text_color', e.target.value)}
+                                style={{ width: '80px', height: '40px', cursor: 'pointer', borderRadius: '5px', border: '1px solid #ddd' }}
+                            />
+                        </div>
+                        
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+                                Отступ снизу (px)
+                            </label>
+                            <input
+                                type="number"
+                                value={styles.text_margin_bottom}
+                                onChange={(e) => handleStyleChange('text_margin_bottom', parseInt(e.target.value))}
+                                min="0"
+                                max="50"
+                                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
+                            />
+                        </div>
+                    </div>
+                );
+                
+            case 'tables':
+                return (
+                    <div style={{ display: 'grid', gap: '20px' }}>
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+                                Цвет границ таблицы
+                            </label>
+                            <input
+                                type="color"
+                                value={styles.table_border_color}
+                                onChange={(e) => handleStyleChange('table_border_color', e.target.value)}
+                                style={{ width: '80px', height: '40px', cursor: 'pointer', borderRadius: '5px', border: '1px solid #ddd' }}
+                            />
+                        </div>
+                        
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+                                Цвет фона заголовка
+                            </label>
+                            <input
+                                type="color"
+                                value={styles.table_header_bg}
+                                onChange={(e) => handleStyleChange('table_header_bg', e.target.value)}
+                                style={{ width: '80px', height: '40px', cursor: 'pointer', borderRadius: '5px', border: '1px solid #ddd' }}
+                            />
+                        </div>
+                        
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+                                Отступ в ячейках (px)
+                            </label>
+                            <input
+                                type="number"
+                                value={styles.table_cell_padding}
+                                onChange={(e) => handleStyleChange('table_cell_padding', parseInt(e.target.value))}
+                                min="2"
+                                max="20"
+                                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
+                            />
+                        </div>
+                    </div>
+                );
+                
+            default:
+                return null;
+        }
+    };
+    
     return (
         <div style={{
             backgroundColor: 'white',
@@ -118,118 +474,93 @@ const StyleEditor = ({ conferenceId, onSave, onClose, embedded = true }) => {
                 display: 'flex',
                 gap: '10px',
                 marginBottom: '25px',
-                borderBottom: '1px solid #e0e0e0',
+                borderBottom: '2px solid #e0e0e0',
                 paddingBottom: '10px',
                 flexWrap: 'wrap'
             }}>
-                {['general', 'title', 'authors', 'abstract', 'text', 'tables'].map(tab => (
-                    <button
-                        key={tab}
-                        onClick={() => {/* переключение вкладок */}}
-                        style={{
-                            padding: '8px 16px',
-                            background: '#f8f9fa',
-                            border: '1px solid #dee2e6',
-                            borderRadius: '20px',
-                            cursor: 'pointer'
-                        }}
-                    >
-                        {tab === 'general' && 'Общие'}
-                        {tab === 'title' && 'Заголовок'}
-                        {tab === 'authors' && 'Авторы'}
-                        {tab === 'abstract' && 'Аннотация'}
-                        {tab === 'text' && 'Текст'}
-                        {tab === 'tables' && 'Таблицы'}
-                    </button>
-                ))}
+                <button
+                    onClick={() => setActiveTab('general')}
+                    style={{
+                        padding: '10px 20px',
+                        background: activeTab === 'general' ? '#f39c12' : '#f8f9fa',
+                        color: activeTab === 'general' ? 'white' : '#333',
+                        border: '1px solid #dee2e6',
+                        borderRadius: '25px',
+                        cursor: 'pointer',
+                        fontWeight: activeTab === 'general' ? '500' : 'normal'
+                    }}
+                >
+                    🎨 Общие
+                </button>
+                <button
+                    onClick={() => setActiveTab('title')}
+                    style={{
+                        padding: '10px 20px',
+                        background: activeTab === 'title' ? '#f39c12' : '#f8f9fa',
+                        color: activeTab === 'title' ? 'white' : '#333',
+                        border: '1px solid #dee2e6',
+                        borderRadius: '25px',
+                        cursor: 'pointer'
+                    }}
+                >
+                    📝 Заголовок
+                </button>
+                <button
+                    onClick={() => setActiveTab('authors')}
+                    style={{
+                        padding: '10px 20px',
+                        background: activeTab === 'authors' ? '#f39c12' : '#f8f9fa',
+                        color: activeTab === 'authors' ? 'white' : '#333',
+                        border: '1px solid #dee2e6',
+                        borderRadius: '25px',
+                        cursor: 'pointer'
+                    }}
+                >
+                    👥 Авторы
+                </button>
+                <button
+                    onClick={() => setActiveTab('abstract')}
+                    style={{
+                        padding: '10px 20px',
+                        background: activeTab === 'abstract' ? '#f39c12' : '#f8f9fa',
+                        color: activeTab === 'abstract' ? 'white' : '#333',
+                        border: '1px solid #dee2e6',
+                        borderRadius: '25px',
+                        cursor: 'pointer'
+                    }}
+                >
+                    📄 Аннотация
+                </button>
+                <button
+                    onClick={() => setActiveTab('text')}
+                    style={{
+                        padding: '10px 20px',
+                        background: activeTab === 'text' ? '#f39c12' : '#f8f9fa',
+                        color: activeTab === 'text' ? 'white' : '#333',
+                        border: '1px solid #dee2e6',
+                        borderRadius: '25px',
+                        cursor: 'pointer'
+                    }}
+                >
+                    📖 Текст
+                </button>
+                <button
+                    onClick={() => setActiveTab('tables')}
+                    style={{
+                        padding: '10px 20px',
+                        background: activeTab === 'tables' ? '#f39c12' : '#f8f9fa',
+                        color: activeTab === 'tables' ? 'white' : '#333',
+                        border: '1px solid #dee2e6',
+                        borderRadius: '25px',
+                        cursor: 'pointer'
+                    }}
+                >
+                    📊 Таблицы
+                </button>
             </div>
             
-            {/* Содержание вкладок - общие стили */}
-            <div style={{ display: 'grid', gap: '20px' }}>
-                <div>
-                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
-                        Цвет фона страницы
-                    </label>
-                    <input
-                        type="color"
-                        value={styles.page_background}
-                        onChange={(e) => handleStyleChange('page_background', e.target.value)}
-                        style={{ width: '80px', height: '40px', cursor: 'pointer', borderRadius: '5px', border: '1px solid #ddd' }}
-                    />
-                </div>
-                
-                <div>
-                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
-                        Отступ контейнера (px)
-                    </label>
-                    <input
-                        type="number"
-                        value={styles.container_padding}
-                        onChange={(e) => handleStyleChange('container_padding', parseInt(e.target.value))}
-                        min="0"
-                        max="100"
-                        style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
-                    />
-                </div>
-                
-                <div>
-                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
-                        Основной шрифт
-                    </label>
-                    <select
-                        value={styles.font_family}
-                        onChange={(e) => handleStyleChange('font_family', e.target.value)}
-                        style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
-                    >
-                        <option value="Arial, sans-serif">Arial</option>
-                        <option value="Times New Roman, serif">Times New Roman</option>
-                        <option value="Futura PT, sans-serif">Futura PT</option>
-                        <option value="Georgia, serif">Georgia</option>
-                        <option value="Verdana, sans-serif">Verdana</option>
-                    </select>
-                </div>
-                
-                <div>
-                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
-                        Размер шрифта заголовка (px)
-                    </label>
-                    <input
-                        type="number"
-                        value={styles.title_font_size}
-                        onChange={(e) => handleStyleChange('title_font_size', parseInt(e.target.value))}
-                        min="12"
-                        max="72"
-                        style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
-                    />
-                </div>
-                
-                <div>
-                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
-                        Цвет заголовка
-                    </label>
-                    <input
-                        type="color"
-                        value={styles.title_color}
-                        onChange={(e) => handleStyleChange('title_color', e.target.value)}
-                        style={{ width: '80px', height: '40px', cursor: 'pointer', borderRadius: '5px', border: '1px solid #ddd' }}
-                    />
-                </div>
-                
-                <div>
-                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
-                        Выравнивание заголовка
-                    </label>
-                    <select
-                        value={styles.title_text_align}
-                        onChange={(e) => handleStyleChange('title_text_align', e.target.value)}
-                        style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
-                    >
-                        <option value="left">По левому краю</option>
-                        <option value="center">По центру</option>
-                        <option value="right">По правому краю</option>
-                    </select>
-                </div>
-            </div>
+            {/* Содержимое активной вкладки */}
+            {renderTabContent()}
             
             {/* Кнопки действий */}
             <div style={{
