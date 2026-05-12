@@ -70,7 +70,7 @@ const SectionHeadDashboard = () => {
     try {
       const assignmentsData = {};
       for (const report of reportsList) {
-        const response = await fetch(`https://diplom-j6uo.onrender.com/reviews/report/${report.id}/reviewers`);
+        const response = await fetch(`https://diplom-j6uo.onrender.com/api/reviews/report/${report.id}/reviewers`);
         if (response.ok) {
           const data = await response.json();
           assignmentsData[report.id] = data.reviewers || [];
