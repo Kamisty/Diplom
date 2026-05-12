@@ -123,6 +123,124 @@ app.post("/test-post", (req, res) => {
 
 
 // ============================================
+// УВЕДОМЛЕНИЯ
+// ============================================
+
+
+// Функция создания уведомления
+async function createNotification(userId, type, title, message, link = null) {
+    try {
+        const result = await pool.query(
+            `INSERT INTO notifications (user_id, type, title, message, link, created_at)
+             VALUES ($1, $2, $3, $4, $5, NOW())
+             RETURNING *`,
+            [userId, type, title, message, link]
+        );
+        console.log(`📧 Уведомление создано для пользователя ${userId}: ${title}`);
+        return result.rows[0];
+    } catch (error) {
+        console.error('❌ Ошибка создания уведомления:', error);
+        return null;
+    }
+}
+// Получение всех уведомлений пользователя
+app.get('/api/notifications', async (req, res) => {
+    try {
+        const { userId } = req.query;
+        
+        if (!userId) {
+            return res.status(400).json({ success: false, error: 'Не передан userId' });
+        }
+        
+        const result = await pool.query(
+            `SELECT * FROM notifications 
+             WHERE user_id = $1 
+             ORDER BY created_at DESC 
+             LIMIT 50`,
+            [userId]
+        );
+        
+        res.json({
+            success: true,
+            notifications: result.rows
+        });
+        
+    } catch (error) {
+        console.error('❌ Ошибка получения уведомлений:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Получение количества непрочитанных уведомлений
+app.get('/api/notifications/unread-count', async (req, res) => {
+    try {
+        const { userId } = req.query;
+        
+        if (!userId) {
+            return res.status(400).json({ success: false, error: 'Не передан userId' });
+        }
+        
+        const result = await pool.query(
+            `SELECT COUNT(*) FROM notifications 
+             WHERE user_id = $1 AND is_read = false`,
+            [userId]
+        );
+        
+        res.json({
+            success: true,
+            unreadCount: parseInt(result.rows[0].count)
+        });
+        
+    } catch (error) {
+        console.error('❌ Ошибка получения количества уведомлений:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Отметить уведомление как прочитанное
+app.put('/api/notifications/:id/read', async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        await pool.query(
+            `UPDATE notifications SET is_read = true WHERE id = $1`,
+            [id]
+        );
+        
+        res.json({ success: true });
+        
+    } catch (error) {
+        console.error('❌ Ошибка отметки уведомления:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Отметить все уведомления как прочитанные
+app.put('/api/notifications/read-all', async (req, res) => {
+    try {
+        const { userId } = req.body;
+        
+        if (!userId) {
+            return res.status(400).json({ success: false, error: 'Не передан userId' });
+        }
+        
+        await pool.query(
+            `UPDATE notifications SET is_read = true WHERE user_id = $1`,
+            [userId]
+        );
+        
+        res.json({ success: true });
+        
+    } catch (error) {
+        console.error('❌ Ошибка отметки всех уведомлений:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+
+
+
+// ============================================
 // РЕГИСТРАЦИЯ - http://localhost:5000/api/register
 // ============================================
 app.post("/api/register", async (req, res) => {
@@ -704,6 +822,14 @@ app.post('/api/user/add-role', async (req, res) => {
       [userId, roleDbId]
     );
 
+    // ✅ Добавить уведомление
+    await createNotification(
+        userId,
+        'role_added',
+        'Вам назначена новая роль',
+        `Вам назначена роль "${roleName}". Теперь вам доступны новые функции.`,
+        '/dashboard'
+    );
     // Специальная обработка для рецензента
     if (roleName === 'Рецензент') {
       console.log(`📝 Пользователь ${userId} становится рецензентом...`);
@@ -2293,7 +2419,8 @@ app.get('/api/reports/section/:sectionId', (req, res) => {
 
 
 
-// НАЗНАЧЕНИЕ РЕЦЕНЗЕНТА//
+// ============================================
+// НАЗНАЧЕНИЕ РЕЦЕНЗЕНТА
 // ============================================
 
 // 1. Получить всех рецензентов (из таблицы resensent)
@@ -2313,7 +2440,6 @@ app.get('/api/users/reviewers', async (req, res) => {
   try {
     const result = await pool.query(query);
     console.log(`📋 Найдено рецензентов: ${result.rows.length}`);
-    console.log('Первый рецензент:', result.rows[0]);
     res.json({ success: true, reviewers: result.rows });
   } catch (error) {
     console.error('Ошибка при получении рецензентов:', error);
@@ -2322,39 +2448,54 @@ app.get('/api/users/reviewers', async (req, res) => {
 });
 
 
-// 2. Назначить рецензента на доклад (заполняет reports_resensent)
+
+
+// 2. Назначить рецензента на доклад
 app.post('/api/reviews/assign', async (req, res) => {
-  const { report_id, reviewer_id, assigned_by } = req.body;
+  const { report_id, reviewer_id } = req.body;
   
   console.log('=== НАЗНАЧЕНИЕ РЕЦЕНЗЕНТА ===');
   console.log('report_id:', report_id);
   console.log('reviewer_id:', reviewer_id);
-  console.log('assigned_by:', assigned_by);
   
   try {
-    // Проверяем, существует ли доклад
-    const checkReportQuery = `SELECT * FROM reports WHERE report_id = $1`;
-    const reportResult = await pool.query(checkReportQuery, [report_id]);
+    // 1. Получаем информацию о докладе
+    const reportResult = await pool.query(
+      `SELECT r.*, u.name as author_name 
+       FROM reports r 
+       JOIN users u ON r.user_id = u.user_id 
+       WHERE r.report_id = $1`,
+      [report_id]
+    );
     
     if (reportResult.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Доклад не найден' });
     }
     
-    // reviewer_id - это id_resensent из таблицы resensent
-    // Проверяем, существует ли рецензент
-    const checkReviewerQuery = `SELECT * FROM resensent WHERE id_resensent = $1`;
-    const reviewerResult = await pool.query(checkReviewerQuery, [reviewer_id]);
+    const report = reportResult.rows[0];
+    const reportTitle = report.title;
+    const authorId = report.user_id;
+    
+    // 2. Получаем информацию о рецензенте
+    const reviewerResult = await pool.query(
+      `SELECT id_resensent, name_resensent, user_id, email FROM resensent WHERE id_resensent = $1`,
+      [reviewer_id]
+    );
     
     if (reviewerResult.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Рецензент не найден' });
     }
     
-    // Проверяем, не назначен ли уже этот рецензент на доклад
-    const checkAssignmentQuery = `
-      SELECT * FROM reports_resensent 
-      WHERE report_id = $1 AND id_resensent = $2
-    `;
-    const existingAssignment = await pool.query(checkAssignmentQuery, [report_id, reviewer_id]);
+    const reviewer = reviewerResult.rows[0];
+    const reviewerUserId = reviewer.user_id;
+    const reviewerName = reviewer.name_resensent;
+    
+    // 3. Проверяем, не назначен ли уже этот рецензент
+    const existingAssignment = await pool.query(
+      `SELECT * FROM reports_resensent 
+       WHERE report_id = $1 AND id_resensent = $2`,
+      [report_id, reviewer_id]
+    );
     
     if (existingAssignment.rows.length > 0) {
       return res.status(400).json({ 
@@ -2363,30 +2504,46 @@ app.post('/api/reviews/assign', async (req, res) => {
       });
     }
     
-    // Создаем назначение в таблице reports_resensent
-    const insertQuery = `
-      INSERT INTO reports_resensent (report_id, id_resensent)
-      VALUES ($1, $2)
-      RETURNING *
-    `;
+    // 4. Создаем назначение
+    const insertResult = await pool.query(
+      `INSERT INTO reports_resensent (report_id, id_resensent)
+       VALUES ($1, $2)
+       RETURNING *`,
+      [report_id, reviewer_id]
+    );
     
-    const result = await pool.query(insertQuery, [report_id, reviewer_id]);
+    // 5. Обновляем статус доклада
+    await pool.query(
+      `UPDATE reports SET status = 'under_review' WHERE report_id = $1`,
+      [report_id]
+    );
     
-    // Обновляем статус доклада на "under_review"
-    const updateReportQuery = `
-      UPDATE reports 
-      SET status = 'under_review' 
-      WHERE report_id = $1
-    `;
+    console.log('✅ Рецензент назначен успешно');
     
-    await pool.query(updateReportQuery, [report_id]);
+    // 6. Уведомление рецензенту (если есть user_id)
+    if (reviewerUserId) {
+      await createNotification(
+        reviewerUserId,
+        'review_assigned',
+        '📋 Вам назначен доклад на рецензирование',
+        `Вам назначен доклад "${reportTitle}" для рецензирования. Пожалуйста, ознакомьтесь с материалами.`,
+        `/review-reports`
+      );
+    }
     
-    console.log('✅ Рецензент назначен успешно:', result.rows[0]);
+    // 7. Уведомление автору
+    await createNotification(
+      authorId,
+      'report_under_review',
+      '🔍 Ваш доклад на рецензировании',
+      `Ваш доклад "${reportTitle}" передан на рецензирование. Ожидайте результатов.`,
+      `/my-reports`
+    );
     
     res.json({ 
       success: true, 
       message: 'Рецензент успешно назначен',
-      assignment: result.rows[0]
+      assignment: insertResult.rows[0]
     });
   } catch (error) {
     console.error('Ошибка при назначении рецензента:', error);
@@ -2405,6 +2562,7 @@ app.get('/api/reviews/report/:reportId/reviewers', async (req, res) => {
       rr.id_resensent,
       r.name_resensent as name,
       r.email,
+      r.user_id,
       r.status as reviewer_status
     FROM reports_resensent rr
     JOIN resensent r ON rr.id_resensent = r.id_resensent
@@ -2421,7 +2579,7 @@ app.get('/api/reviews/report/:reportId/reviewers', async (req, res) => {
   }
 });
 
-// 4. Получить доклады для рецензента (через reports_resensent)
+// 4. Получить доклады для рецензента
 app.get('/api/reports/for-review/:userId', async (req, res) => {
   const { userId } = req.params;
   
@@ -2430,20 +2588,18 @@ app.get('/api/reports/for-review/:userId', async (req, res) => {
   
   try {
     // Находим id_resensent по user_id
-    const findResensentQuery = `
-      SELECT id_resensent 
-      FROM resensent 
-      WHERE user_id = $1
-    `;
-    const resensentResult = await pool.query(findResensentQuery, [userId]);
+    const resensentResult = await pool.query(
+      `SELECT id_resensent FROM resensent WHERE user_id = $1`,
+      [userId]
+    );
     
     if (resensentResult.rows.length === 0) {
-      console.log(`❌ Рецензент с user_id=${userId} не найден в таблице resensent`);
+      console.log(`❌ Рецензент с user_id=${userId} не найден`);
       return res.json({ success: true, reports: [] });
     }
     
     const id_resensent = resensentResult.rows[0].id_resensent;
-    console.log(`✅ Найден id_resensent: ${id_resensent} для user_id: ${userId}`);
+    console.log(`✅ Найден id_resensent: ${id_resensent}`);
     
     // Получаем доклады для этого рецензента
     const query = `
@@ -2471,15 +2627,7 @@ app.get('/api/reports/for-review/:userId', async (req, res) => {
     `;
     
     const result = await pool.query(query, [id_resensent]);
-    console.log(`📋 Найдено ${result.rows.length} докладов для рецензента ${userId} (id_resensent: ${id_resensent})`);
-    
-    if (result.rows.length > 0) {
-      console.log('Первый доклад:', {
-        id: result.rows[0].id,
-        title: result.rows[0].title,
-        status: result.rows[0].status
-      });
-    }
+    console.log(`📋 Найдено ${result.rows.length} докладов для рецензента`);
     
     res.json({ success: true, reports: result.rows });
   } catch (error) {
@@ -2488,35 +2636,59 @@ app.get('/api/reports/for-review/:userId', async (req, res) => {
   }
 });
 
-// 5. Удалить рецензента с доклада (опционально)
+// 5. Удалить рецензента с доклада
 app.delete('/api/reviews/assign', async (req, res) => {
   const { report_id, reviewer_id } = req.body;
   
   try {
-    const deleteQuery = `
-      DELETE FROM reports_resensent 
-      WHERE report_id = $1 AND id_resensent = $2
-      RETURNING *
-    `;
+    // Получаем информацию перед удалением
+    const assignmentInfo = await pool.query(
+      `SELECT r.title, r.user_id as author_id, res.user_id as reviewer_user_id, res.name_resensent
+       FROM reports_resensent rr
+       JOIN reports r ON rr.report_id = r.report_id
+       JOIN resensent res ON rr.id_resensent = res.id_resensent
+       WHERE rr.report_id = $1 AND rr.id_resensent = $2`,
+      [report_id, reviewer_id]
+    );
     
-    const result = await pool.query(deleteQuery, [report_id, reviewer_id]);
+    const deleteResult = await pool.query(
+      `DELETE FROM reports_resensent 
+       WHERE report_id = $1 AND id_resensent = $2
+       RETURNING *`,
+      [report_id, reviewer_id]
+    );
     
-    if (result.rows.length === 0) {
+    if (deleteResult.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Назначение не найдено' });
     }
     
     // Проверяем, остались ли еще рецензенты
-    const checkQuery = `SELECT COUNT(*) FROM reports_resensent WHERE report_id = $1`;
-    const countResult = await pool.query(checkQuery, [report_id]);
+    const countResult = await pool.query(
+      `SELECT COUNT(*) FROM reports_resensent WHERE report_id = $1`,
+      [report_id]
+    );
     
-    // Если не осталось рецензентов, возвращаем статус в 'submitted'
     if (parseInt(countResult.rows[0].count) === 0) {
-      await pool.query(`UPDATE reports SET status = 'submitted' WHERE report_id = $1`, [report_id]);
+      await pool.query(
+        `UPDATE reports SET status = 'submitted' WHERE report_id = $1`,
+        [report_id]
+      );
+    }
+    
+    // Уведомление рецензенту об отмене назначения
+    if (assignmentInfo.rows.length > 0 && assignmentInfo.rows[0].reviewer_user_id) {
+      await createNotification(
+        assignmentInfo.rows[0].reviewer_user_id,
+        'review_unassigned',
+        '❌ Назначение на рецензирование отменено',
+        `Ваше назначение на доклад "${assignmentInfo.rows[0].title}" было отменено.`,
+        `/review-reports`
+      );
     }
     
     res.json({ success: true, message: 'Рецензент удален' });
   } catch (error) {
-    console.error('Ошибка:', error);
+    console.error('Ошибка при удалении рецензента:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -2527,32 +2699,34 @@ app.post('/api/resensent/create', async (req, res) => {
   
   try {
     // Проверяем, существует ли уже
-    const checkQuery = `SELECT * FROM resensent WHERE user_id = $1`;
-    const existing = await pool.query(checkQuery, [user_id]);
+    const existing = await pool.query(
+      `SELECT * FROM resensent WHERE user_id = $1`,
+      [user_id]
+    );
     
     if (existing.rows.length > 0) {
-      return res.json({ success: true, message: 'Рецензент уже существует', resensent: existing.rows[0] });
+      return res.json({ 
+        success: true, 
+        message: 'Рецензент уже существует', 
+        resensent: existing.rows[0] 
+      });
     }
     
     // Создаем запись
-    const insertQuery = `
-      INSERT INTO resensent (name_resensent, email, user_id, status, created_at)
-      VALUES ($1, $2, $3, 'active', NOW())
-      RETURNING *
-    `;
-    
-    const result = await pool.query(insertQuery, [name || email, email, user_id]);
+    const result = await pool.query(
+      `INSERT INTO resensent (name_resensent, email, user_id, status, created_at) 
+       VALUES ($1, $2, $3, 'active', NOW())
+       RETURNING *`,
+      [name || email, email, user_id]
+    );
     
     console.log('✅ Создан рецензент:', result.rows[0]);
     res.json({ success: true, resensent: result.rows[0] });
   } catch (error) {
-    console.error('Ошибка:', error);
+    console.error('Ошибка при создании рецензента:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
-
-
-
 
 
 // ПРОСМОТР ДОКЛАДА ДЛЯ РЕЦЕНЗИРОВАНИЯ//
@@ -2753,6 +2927,73 @@ app.post('/api/reviews', async (req, res) => {
       ]);
     }
     
+
+// ========== ✅ УВЕДОМЛЕНИЯ ==========
+    
+    // Уведомление автору о новой финальной рецензии
+    if (is_final === true && !wasFinal) {
+      const recommendationText = {
+        'accepted': 'рекомендовал доклад к публикации',
+        'rejected': 'не рекомендовал доклад к публикации',
+        'revision_required': 'рекомендовал доработку доклада'
+      }[recommendation] || 'оставил рецензию';
+      
+      await createNotification(
+        authorId,
+        'review_received',
+        '📝 Получена новая рецензия',
+        `Рецензент ${reviewerName} ${recommendationText} на ваш доклад "${reportTitle}". Ознакомьтесь с подробностями.`,
+        `/my-reports`
+      );
+    }
+    
+    // Уведомление рецензенту об успешном сохранении черновика
+    if (is_final === false) {
+      await createNotification(
+        reviewerUserId,
+        'review_saved',
+        '💾 Черновик рецензии сохранён',
+        `Черновик рецензии на доклад "${reportTitle}" сохранён. Вы можете вернуться к нему позже.`,
+        `/review-reports`
+      );
+    }
+    
+    // Уведомление рецензенту об успешной отправке финальной рецензии
+    if (is_final === true && !wasFinal) {
+      await createNotification(
+        reviewerUserId,
+        'review_submitted',
+        '✅ Рецензия отправлена',
+        `Ваша рецензия на доклад "${reportTitle}" успешно отправлена. Спасибо за работу!`,
+        `/review-reports`
+      );
+    }
+    
+    // Уведомление руководителю секции о готовности рецензии
+    if (is_final === true && !wasFinal) {
+      // Находим руководителя секции
+      const sectionHeadQuery = `
+        SELECT hs.user_id 
+        FROM header_section hs
+        JOIN sections s ON s.id_sections = hs.id_section
+        JOIN reports r ON r.id_sections = s.id_sections
+        WHERE r.report_id = $1
+      `;
+      const sectionHeadResult = await pool.query(sectionHeadQuery, [report_id]);
+      
+      if (sectionHeadResult.rows.length > 0) {
+        const sectionHeadId = sectionHeadResult.rows[0].user_id;
+        await createNotification(
+          sectionHeadId,
+          'review_completed',
+          '📊 Рецензия на доклад готова',
+          `Рецензент ${reviewerName} завершил рецензирование доклада "${reportTitle}".`,
+          `/section/reports`
+        );
+      }
+    }
+
+
     res.json({ 
       success: true, 
       review: result.rows[0]
@@ -3575,6 +3816,15 @@ app.put('/api/reports/:reportId/status', async (req, res) => {
       finalDecisionAt = new Date();
     }
 
+    // Получаем информацию о докладе для уведомления (до обновления)
+    const reportInfo = await pool.query(
+      `SELECT user_id, title FROM reports WHERE report_id = $1`,
+      [reportId]
+    );
+    
+    const authorId = reportInfo.rows[0]?.user_id;
+    const reportTitle = reportInfo.rows[0]?.title || 'Доклад';
+
     const query = `
       UPDATE reports 
       SET status = $1,
@@ -3591,6 +3841,53 @@ app.put('/api/reports/:reportId/status', async (req, res) => {
     }
 
     console.log(`✅ Статус доклада ${reportId} изменён на "${status}"`);
+
+    // ========== ОТПРАВКА УВЕДОМЛЕНИЙ АВТОРУ ==========
+    
+    // Уведомление о принятии доклада
+    if (status === 'accepted') {
+      await createNotification(
+        authorId,
+        'report_accepted',
+        '✅ Доклад принят!',
+        `Ваш доклад "${reportTitle}" был принят к участию в конференции. Поздравляем!`,
+        `/my-reports`
+      );
+    }
+    
+    // Уведомление об отклонении доклада
+    if (status === 'rejected') {
+      const notesText = final_decision_notes ? ` Причина: ${final_decision_notes}` : '';
+      await createNotification(
+        authorId,
+        'report_rejected',
+        '❌ Доклад отклонён',
+        `Ваш доклад "${reportTitle}" был отклонён.${notesText} Ознакомьтесь с рецензиями.`,
+        `/my-reports`
+      );
+    }
+    
+    // Уведомление о необходимости доработки
+    if (status === 'revision_required') {
+      await createNotification(
+        authorId,
+        'report_revision',
+        '📝 Требуется доработка доклада',
+        `Ваш доклад "${reportTitle}" требует доработки по замечаниям рецензентов. Пожалуйста, внесите правки и отправьте обновлённую версию.`,
+        `/my-reports`
+      );
+    }
+    
+    // Уведомление о начале рецензирования
+    if (status === 'under_review') {
+      await createNotification(
+        authorId,
+        'report_under_review',
+        '🔍 Доклад на рецензировании',
+        `Ваш доклад "${reportTitle}" передан на рецензирование. Ожидайте результатов.`,
+        `/my-reports`
+      );
+    }
 
     res.json({
       success: true,
@@ -3643,6 +3940,9 @@ app.delete('/api/reports/:reportId', async (req, res) => {
     });
   }
 });
+
+
+
 
 
 
