@@ -65,31 +65,22 @@ const SectionHeadDashboard = () => {
     }
   }, []);
 
+  // Загрузить назначения рецензентов для докладов
   const fetchAssignmentsForReports = async (reportsList) => {
-  try {
-    const assignmentsData = {};
-    for (const report of reportsList) {
-      console.log(`🔄 Загрузка рецензентов для доклада ${report.id}...`);
-      
-      const response = await fetch(`https://diplom-j6uo.onrender.com/api/reviews/report/${report.id}/reviewers`);
-      const data = await response.json();
-      
-      console.log(`📋 Ответ для доклада ${report.id}:`, data);
-      
-      if (response.ok && data.success) {
-        assignmentsData[report.id] = data.reviewers || [];
-        console.log(`✅ Назначено рецензентов: ${data.reviewers?.length}`);
-      } else {
-        console.error(`❌ Ошибка для доклада ${report.id}:`, data.error);
-        assignmentsData[report.id] = [];
+    try {
+      const assignmentsData = {};
+      for (const report of reportsList) {
+        const response = await fetch(`https://diplom-j6uo.onrender.com/reviews/report/${report.id}/reviewers`);
+        if (response.ok) {
+          const data = await response.json();
+          assignmentsData[report.id] = data.reviewers || [];
+        }
       }
+      setAssignments(assignmentsData);
+    } catch (error) {
+      console.error('Ошибка загрузки назначений:', error);
     }
-    console.log('📦 Итоговые назначения:', assignmentsData);
-    setAssignments(assignmentsData);
-  } catch (error) {
-    console.error('❌ Ошибка загрузки назначений:', error);
-  }
-};
+  };
 
   // Загрузить список рецензентов
   const fetchReviewers = useCallback(async () => {
