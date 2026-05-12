@@ -2,10 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Conference.css';
-
+import StyleEditor from '../../components/StyleEditor/StyleEditor';
 const CreateConference = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
+  const [step, setStep] = useState(1); // 1: основная информация, 2: стили
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -16,6 +17,7 @@ const CreateConference = () => {
     format: 'offline',
     sections: ['']
   });
+  const [conferenceId, setConferenceId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
@@ -26,12 +28,11 @@ const CreateConference = () => {
       try {
         const parsedUser = JSON.parse(userData);
         setUser(parsedUser);
-        console.log('Пользователь:', parsedUser); // Для отладки
+        console.log('Пользователь:', parsedUser);
       } catch (error) {
         console.error('Ошибка при получении данных пользователя:', error);
       }
     } else {
-      // Если пользователь не авторизован, перенаправляем на страницу входа
       navigate('/login');
     }
   }, [navigate]);
@@ -70,7 +71,7 @@ const CreateConference = () => {
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmitConference = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setMessage({ type: '', text: '' });
@@ -91,7 +92,6 @@ const CreateConference = () => {
         return;
       }
 
-      // Подготавливаем данные для отправки на сервер
       const conferenceData = {
         title: formData.title,
         description: formData.description,
@@ -100,7 +100,7 @@ const CreateConference = () => {
         submission_deadline: formData.submissionDeadline,
         location: formData.location,
         format: formData.format,
-        sections: nonEmptySections, // Отправляем как массив, сервер сам преобразует в JSON
+        sections: nonEmptySections,
         created_by: user.user_id || user.id
       };
 
@@ -119,10 +119,12 @@ const CreateConference = () => {
       if (response.ok && data.success) {
         setMessage({
           type: 'success',
-          text: 'Конференция успешно создана!'
+          text: 'Конференция успешно создана! Переход к настройке стилей...'
         });
         
-        setTimeout(() => navigate('/admin/manage-conferences'), 2000);
+        // Сохраняем ID созданной конференции и переходим к шагу 2
+        setConferenceId(data.conference.id);
+        setStep(2);
       } else {
         throw new Error(data.error || 'Ошибка при создании конференции');
       }
@@ -138,162 +140,206 @@ const CreateConference = () => {
     }
   };
 
+  const handleStylesComplete = () => {
+    navigate('/admin/manage-conferences');
+  };
+
+  const handleBackToForm = () => {
+    setStep(1);
+  };
+
+  // Шаг 1: Основная информация
+  if (step === 1) {
+    return (
+      <div className="conference-page">
+        <div className="container">
+          <h1>Создание новой конференции - Шаг 1 из 2</h1>
+          <div className="step-indicator">
+            <div className="step active">1. Основная информация</div>
+            <div className="step">2. Настройка стилей</div>
+          </div>
+          
+          {message.text && (
+            <div className={`message ${message.type}`}>
+              {message.text}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmitConference} className="conference-form">
+            <div className="form-group">
+              <label htmlFor="title">Название конференции *</label>
+              <input
+                type="text"
+                id="title"
+                name="title"
+                value={formData.title}
+                onChange={handleChange}
+                required
+                placeholder="Введите название конференции"
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="description">Описание *</label>
+              <textarea
+                id="description"
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                rows="5"
+                required
+                placeholder="Опишите конференцию"
+              />
+            </div>
+
+            <div className="form-group sections-group">
+              <label>Секции конференции *</label>
+              {formData.sections.map((section, index) => (
+                <div key={index} className="section-input-wrapper">
+                  <div className="section-input-container">
+                    <input
+                      type="text"
+                      value={section}
+                      onChange={(e) => handleSectionChange(index, e.target.value)}
+                      placeholder={`Название секции ${index + 1}`}
+                      className="section-input"
+                      required={index === 0}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeSectionField(index)}
+                      className="btn-remove-section"
+                      disabled={formData.sections.length === 1}
+                      aria-label="Удалить секцию"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+              ))}
+              
+              <button
+                type="button"
+                onClick={addSectionField}
+                className="btn-add-section"
+              >
+                + Добавить секцию
+              </button>
+              <small className="section-hint">
+                Добавьте названия секций конференции (минимум 1)
+              </small>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="startDate">Дата начала *</label>
+                <input
+                  type="date"
+                  id="startDate"
+                  name="startDate"
+                  value={formData.startDate}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="endDate">Дата окончания *</label>
+                <input
+                  type="date"
+                  id="endDate"
+                  name="endDate"
+                  value={formData.endDate}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="submissionDeadline">Дедлайн подачи заявок *</label>
+              <input
+                type="date"
+                id="submissionDeadline"
+                name="submissionDeadline"
+                value={formData.submissionDeadline}
+                onChange={handleChange}
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="location">Место проведения *</label>
+              <input
+                type="text"
+                id="location"
+                name="location"
+                value={formData.location}
+                onChange={handleChange}
+                required
+                placeholder="Город, адрес или ссылка на онлайн-платформу"
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="format">Формат проведения *</label>
+              <select
+                id="format"
+                name="format"
+                value={formData.format}
+                onChange={handleChange}
+                required
+              >
+                <option value="offline">Офлайн</option>
+                <option value="online">Онлайн</option>
+                <option value="hybrid">Гибридный</option>
+              </select>
+            </div>
+
+            <div className="form-actions">
+              <button type="submit" disabled={isLoading} className="btn-primary">
+                {isLoading ? 'Создание...' : 'Далее → Настройка стилей'}
+              </button>
+              <button 
+                type="button" 
+                onClick={() => navigate('/admin/manage-conferences')} 
+                className="btn-secondary"
+              >
+                Отмена
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // Шаг 2: Настройка стилей
   return (
     <div className="conference-page">
       <div className="container">
-        <h1>Создание новой конференции</h1>
+        <h1>Создание новой конференции - Шаг 2 из 2</h1>
+        <div className="step-indicator">
+          <div className="step completed">1. Основная информация</div>
+          <div className="step active">2. Настройка стилей</div>
+        </div>
         
-        {message.text && (
-          <div className={`message ${message.type}`}>
-            {message.text}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="conference-form">
-          {/* Форма остается без изменений */}
-          <div className="form-group">
-            <label htmlFor="title">Название конференции *</label>
-            <input
-              type="text"
-              id="title"
-              name="title"
-              value={formData.title}
-              onChange={handleChange}
-              required
-              placeholder="Введите название конференции"
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="description">Описание *</label>
-            <textarea
-              id="description"
-              name="description"
-              value={formData.description}
-              onChange={handleChange}
-              rows="5"
-              required
-              placeholder="Опишите конференцию"
-            />
-          </div>
-
-          <div className="form-group sections-group">
-            <label>Секции конференции *</label>
-            {formData.sections.map((section, index) => (
-              <div key={index} className="section-input-wrapper">
-                <div className="section-input-container">
-                  <input
-                    type="text"
-                    value={section}
-                    onChange={(e) => handleSectionChange(index, e.target.value)}
-                    placeholder={`Название секции ${index + 1}`}
-                    className="section-input"
-                    required={index === 0}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeSectionField(index)}
-                    className="btn-remove-section"
-                    disabled={formData.sections.length === 1}
-                    aria-label="Удалить секцию"
-                  >
-                    ×
-                  </button>
-                </div>
-              </div>
-            ))}
-            
-            <button
-              type="button"
-              onClick={addSectionField}
-              className="btn-add-section"
-            >
-              Добавить секцию
-            </button>
-            <small className="section-hint">
-              Добавьте названия секций конференции (минимум 1)
-            </small>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="startDate">Дата начала *</label>
-              <input
-                type="date"
-                id="startDate"
-                name="startDate"
-                value={formData.startDate}
-                onChange={handleChange}
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="endDate">Дата окончания *</label>
-              <input
-                type="date"
-                id="endDate"
-                name="endDate"
-                value={formData.endDate}
-                onChange={handleChange}
-                required
-              />
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="submissionDeadline">Дедлайн подачи заявок *</label>
-            <input
-              type="date"
-              id="submissionDeadline"
-              name="submissionDeadline"
-              value={formData.submissionDeadline}
-              onChange={handleChange}
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="location">Место проведения *</label>
-            <input
-              type="text"
-              id="location"
-              name="location"
-              value={formData.location}
-              onChange={handleChange}
-              required
-              placeholder="Город, адрес или ссылка на онлайн-платформу"
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="format">Формат проведения *</label>
-            <select
-              id="format"
-              name="format"
-              value={formData.format}
-              onChange={handleChange}
-              required
-            >
-              <option value="offline">Офлайн</option>
-              <option value="online">Онлайн</option>
-              <option value="hybrid">Гибридный</option>
-            </select>
-          </div>
-
-          <div className="form-actions">
-            <button type="submit" disabled={isLoading} className="btn-primary">
-              {isLoading ? 'Создание...' : 'Создать конференцию'}
-            </button>
-            <button 
-              type="button" 
-              onClick={() => navigate('/admin/manage-conferences')} 
-              className="btn-secondary"
-            >
-              Отмена
-            </button>
-          </div>
-        </form>
+        <div className="success-message" style={{
+          backgroundColor: '#d4edda',
+          color: '#155724',
+          padding: '15px',
+          borderRadius: '10px',
+          marginBottom: '20px'
+        }}>
+          ✅ Конференция "{formData.title}" успешно создана! Теперь настройте её стиль.
+        </div>
+        
+        <StyleEditor
+          conferenceId={conferenceId}
+          onSave={handleStylesComplete}
+          onClose={handleBackToForm}
+          embedded={true} // Новый пропс для встроенного режима
+        />
       </div>
     </div>
   );
