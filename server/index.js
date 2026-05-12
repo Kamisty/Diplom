@@ -2833,9 +2833,9 @@ app.post('/api/reviews', async (req, res) => {
   console.log('reviewer_id:', reviewer_id);
   
   try {
-    // 1. Находим id_resensent по user_id
+    // 1. Находим id_resensent и ДАННЫЕ РЕЦЕНЗЕНТА
     const reviewerResult = await pool.query(
-      `SELECT id_resensent FROM resensent WHERE user_id = $1`,
+      `SELECT id_resensent, user_id, name_resensent FROM resensent WHERE user_id = $1`,
       [reviewer_id]
     );
     
@@ -2847,8 +2847,26 @@ app.post('/api/reviews', async (req, res) => {
     }
     
     const id_resensent = reviewerResult.rows[0].id_resensent;
+    const reviewerUserId = reviewerResult.rows[0].user_id;      // ✅ ДОБАВЛЕНО
+    const reviewerName = reviewerResult.rows[0].name_resensent;  // ✅ ДОБАВЛЕНО
     
-    // 2. Получаем id_version из report_versions
+    // 2. Получаем информацию о докладе
+    const reportInfo = await pool.query(
+      `SELECT user_id as author_id, title FROM reports WHERE report_id = $1`,
+      [report_id]
+    );
+    
+    if (reportInfo.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Доклад не найден' 
+      });
+    }
+    
+    const authorId = reportInfo.rows[0].author_id;      // ✅ ДОБАВЛЕНО
+    const reportTitle = reportInfo.rows[0].title;       // ✅ ДОБАВЛЕНО
+    
+    // 3. Получаем id_version из report_versions
     let versionResult = await pool.query(
       `SELECT id_versions FROM report_versions WHERE report_id = $1 ORDER BY version_number DESC LIMIT 1`,
       [report_id]
@@ -2866,13 +2884,14 @@ app.post('/api/reviews', async (req, res) => {
       id_versions = versionResult.rows[0].id_versions;
     }
     
-    // 3. Проверяем существование рецензии
+    // 4. Проверяем существование рецензии и была ли она финальной
     const checkResult = await pool.query(
-      `SELECT id_reviews FROM reviews 
+      `SELECT id_reviews, is_final FROM reviews 
        WHERE id_versions = $1 AND id_resensent = $2`,
       [id_versions, id_resensent]
     );
     
+    const wasFinal = checkResult.rows[0]?.is_final === true;  // ✅ ДОБАВЛЕНО
     let result;
     
     if (checkResult.rows.length > 0) {
@@ -2926,8 +2945,6 @@ app.post('/api/reviews', async (req, res) => {
         id_resensent
       ]);
     }
-    
-
 // ========== ✅ УВЕДОМЛЕНИЯ ==========
     
     // Уведомление автору о новой финальной рецензии
