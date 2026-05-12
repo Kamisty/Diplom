@@ -50,6 +50,8 @@
   font-weight: 500;
   transition: color 0.3s;
   position: relative;
+  margin: 0 20px;  
+  text-align: center;
 }
 
 .nav-link:hover {
@@ -256,5 +258,6 @@
 
   .header-container {
     padding: 0 1rem;
+
   }
 }

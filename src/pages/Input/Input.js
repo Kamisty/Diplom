@@ -266,8 +266,17 @@ const Input = () => {
     }
   };
 
-  const completeLogin = (userData, roles, selectedRoleName = null) => {
-    const activeRole = selectedRoleName || roles[0];
+ const completeLogin = (userData, roles, selectedRoleName = null) => {
+    const activeRole = selectedRoleName || roles[0];  // ← ЭТУ СТРОКУ НЕ УДАЛЯЙТЕ!
+    
+    // ✅ ОТЛАДКА
+    console.log('🔍🔍🔍 userData из сервера:', userData);
+    console.log('🔍 userData.user_id:', userData.user_id);
+    console.log('🔍 userData.id:', userData.id);
+    
+    const savedUserId = userData.user_id || userData.id;
+    localStorage.setItem('userId', savedUserId);
+    console.log('✅ userId сохранён:', savedUserId);
     
     const userWithRoles = {
       ...userData,
@@ -288,7 +297,7 @@ const Input = () => {
     setTimeout(() => {
       redirectBasedOnRole(activeRole);
     }, 1500);
-  };
+};
 
   const redirectBasedOnRole = (role) => {
     const roleRoutes = {

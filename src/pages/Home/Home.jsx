@@ -6,7 +6,7 @@ const Home = () => {
     <div className="home-page">
       <div className="container">
         <h1>Добро пожаловать в сервис для организации конференций</h1>
-        <div class="stroka">
+        <div className="stroka">
         <p>Управляйте конференциями, докладами и участниками в одном месте</p>
         </div>
         <div className="features">

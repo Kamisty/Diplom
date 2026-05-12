@@ -140,7 +140,7 @@ const Header = () => {
             
             {user?.activeRole === ROLES.ADMIN && (
               <>
-                <Link to="/admin/create-conference" className="nav-link">Создать конф.</Link>
+                <Link to="/admin/create-conference" className="nav-link">Создать конференцию</Link>
                 <Link to="/admin/conferences" className="nav-link">Управление</Link>
                 <Link to="/admin/users" className="nav-link">Пользователи</Link>
                 <Link to="/admin/assign-section-heads" className="nav-link">Руководители</Link>
@@ -157,13 +157,15 @@ const Header = () => {
             </div>
           ) : (
             <div className="user-menu" ref={dropdownRef}>
-              {/* ✅ УВЕДОМЛЕНИЯ */}
-              <Notifications />
+             
 
               <div className="user-info" onClick={() => setIsDropdownOpen(!isDropdownOpen)}>
+                    {/* УВЕДОМЛЕНИЯ */}
+              <Notifications />
                 <div className="avatar">{getInitials}</div>
                 <span className="user-name">{user.name || user.login}</span>
                 <span className={`dropdown-arrow ${isDropdownOpen ? 'open' : ''}`}>▼</span>
+             
               </div>
 
               {isDropdownOpen && (

@@ -2969,22 +2969,12 @@ app.post('/api/reviews', async (req, res) => {
       await createNotification(
         reviewerUserId,
         'review_saved',
-        '💾 Черновик рецензии сохранён',
-        `Черновик рецензии на доклад "${reportTitle}" сохранён. Вы можете вернуться к нему позже.`,
+        '💾 Рецензия отправлена',
+        `Рецензия на доклад "${reportTitle}" отправлена. Вы можете вернуться к нему позже.`,
         `/review-reports`
       );
     }
     
-    // Уведомление рецензенту об успешной отправке финальной рецензии
-    if (is_final === true && !wasFinal) {
-      await createNotification(
-        reviewerUserId,
-        'review_submitted',
-        '✅ Рецензия отправлена',
-        `Ваша рецензия на доклад "${reportTitle}" успешно отправлена. Спасибо за работу!`,
-        `/review-reports`
-      );
-    }
     
     // Уведомление руководителю секции о готовности рецензии
     if (is_final === true && !wasFinal) {
