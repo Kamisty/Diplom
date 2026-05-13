@@ -102,14 +102,14 @@ const Dashboard = () => {
       actions.push({
         title: 'Доклады секции',
         description: 'Просмотрите доклады вашей секции',
-        link: '/section-reports',
+        link:'/section/reports',
         icon: '📊',
         color: '#1e90ff'
       });
       actions.push({
         title: 'Управление секцией',
         description: 'Управляйте секцией и назначениями',
-        link: '/section/manage',
+        link: '/section-head/resensent',
         icon: '⚙️',
         color: '#fbbf24'
       });

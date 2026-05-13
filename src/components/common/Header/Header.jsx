@@ -133,7 +133,7 @@ const Header = () => {
             
             {user?.activeRole === ROLES.SECTION_HEAD && (
               <>
-                <Link to="/section-head/dashboard" className="nav-link">Управление секцией</Link>
+                <Link to="/section-head/resensent" className="nav-link">Управление секцией</Link>
                 <Link to="/section/reports" className="nav-link">Доклады секции</Link>
               </>
             )}
@@ -212,7 +212,7 @@ const Header = () => {
 
                   {user?.activeRole === ROLES.SECTION_HEAD && (
                     <>
-                      <Link to="/section/manage" className="dropdown-item" onClick={() => setIsDropdownOpen(false)}>
+                      <Link to="/section-head/resensent" className="dropdown-item" onClick={() => setIsDropdownOpen(false)}>
                         <span className="dropdown-icon">🎯</span>Управление секцией
                       </Link>
                       <Link to="/section/reports" className="dropdown-item" onClick={() => setIsDropdownOpen(false)}>

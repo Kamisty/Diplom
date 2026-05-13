@@ -76,3 +76,420 @@ select.input-field {
   color: #292929;
 }
 
+/* ============================================
+   МОБИЛЬНАЯ АДАПТАЦИЯ (до 768px)
+   ============================================ */
+
+@media (max-width: 768px) {
+    /* Общие контейнеры */
+    .container {
+        padding: 15px;
+        width: 100%;
+        overflow-x: hidden;
+    }
+
+    /* Шапка сайта */
+    .header {
+        flex-direction: column;
+        height: auto;
+        padding: 10px;
+        gap: 10px;
+    }
+
+    .header-nav {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 15px;
+    }
+
+    .nav-link {
+        font-size: 14px;
+        padding: 8px 12px;
+    }
+
+    .header-right {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 15px;
+    }
+
+    .user-info {
+        padding: 5px 10px;
+    }
+
+    .user-name {
+        font-size: 14px;
+    }
+
+    /* Дашборд */
+    .dashboard-page {
+        padding: 10px;
+    }
+
+    .welcome-section h1 {
+        font-size: 24px;
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+
+    .stat-card {
+        padding: 15px;
+    }
+
+    .actions-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+
+    .action-card {
+        padding: 15px;
+    }
+
+    /* Управление конференциями */
+    .page-header {
+        flex-direction: column;
+        gap: 15px;
+        align-items: stretch;
+    }
+
+    .page-header h1 {
+        font-size: 24px;
+        text-align: center;
+    }
+
+    .filters-bar {
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .filter-buttons {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px;
+    }
+
+    .filter-buttons button {
+        padding: 8px 16px;
+        font-size: 14px;
+    }
+
+    .search-input {
+        width: 100%;
+    }
+
+    /* Таблицы */
+    .conferences-table,
+    .users-table,
+    .reports-table {
+        overflow-x: auto;
+        display: block;
+    }
+
+    .conferences-table table,
+    .users-table table,
+    .reports-table table {
+        min-width: 600px;
+    }
+
+    .conferences-table th,
+    .conferences-table td,
+    .users-table th,
+    .users-table td,
+    .reports-table th,
+    .reports-table td {
+        padding: 10px 8px;
+        font-size: 13px;
+    }
+
+    .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .btn-icon {
+        width: 32px;
+        height: 32px;
+        font-size: 16px;
+    }
+
+    /* Профиль */
+    .profile-info-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+
+    .profile-modal {
+        width: 95%;
+        margin: 10px;
+        padding: 20px;
+    }
+
+    .profile-header {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    /* Управление пользователями */
+    .admin-filters {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .search-box,
+    .filter-select {
+        min-width: 100%;
+        width: 100%;
+    }
+
+    /* Секции */
+    .dashboard-content {
+        flex-direction: column;
+    }
+
+    .sections-sidebar {
+        width: 100%;
+        margin-bottom: 20px;
+    }
+
+    .reports-content {
+        width: 100%;
+    }
+
+    .sections-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+
+    .section-card {
+        padding: 15px;
+    }
+
+    /* Формы */
+    .form-section {
+        padding: 20px;
+    }
+
+    .form-group {
+        margin-bottom: 15px;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        padding: 10px;
+        font-size: 16px; /* Увеличиваем для мобильных, чтобы не было зума */
+    }
+
+    /* Кнопки */
+    .btn-primary,
+    .btn-secondary,
+    .btn-save,
+    .btn-cancel {
+        width: 100%;
+        padding: 12px;
+        font-size: 16px;
+    }
+
+    /* Модальные окна */
+    .modal-overlay {
+        padding: 10px;
+    }
+
+    .modal-content {
+        width: 95%;
+        margin: 10px;
+        padding: 20px;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .modal-header h2,
+    .modal-content h3 {
+        font-size: 20px;
+    }
+
+    .modal-footer {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .modal-footer button {
+        width: 100%;
+    }
+
+    /* Редактор стилей */
+    .style-editor-tabs {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .style-editor-tabs button {
+        padding: 8px 12px;
+        font-size: 13px;
+    }
+
+    /* Сообщения об ошибках и успехе */
+    .error-message,
+    .success-message {
+        padding: 12px;
+        font-size: 14px;
+    }
+
+    /* Загрузка */
+    .loading {
+        font-size: 16px;
+        padding: 30px;
+    }
+
+    /* Редактирование секций */
+    .sections-list {
+        gap: 15px;
+    }
+
+    .section-item {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    .section-actions {
+        justify-content: flex-start;
+    }
+
+    /* Назначение руководителей */
+    .assign-control {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .assign-control select {
+        width: 100%;
+    }
+
+    /* Доклады */
+    .report-card {
+        padding: 15px;
+    }
+
+    .report-header {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .report-meta {
+        flex-wrap: wrap;
+    }
+}
+
+/* ============================================
+   ДЛЯ МАЛЕНЬКИХ ТЕЛЕФОНОВ (до 480px)
+   ============================================ */
+
+@media (max-width: 480px) {
+    .container {
+        padding: 10px;
+    }
+
+    h1 {
+        font-size: 22px;
+    }
+
+    h2 {
+        font-size: 18px;
+    }
+
+    h3 {
+        font-size: 16px;
+    }
+
+    .nav-link {
+        font-size: 12px;
+        padding: 6px 10px;
+    }
+
+    .status-badge {
+        font-size: 11px;
+        padding: 3px 8px;
+    }
+
+    .btn-view-report,
+    .btn-assign-reviewer {
+        font-size: 12px;
+        padding: 6px 10px;
+    }
+}
+
+/* ============================================
+   ДЛЯ ПЛАНШЕТОВ (768px - 1024px)
+   ============================================ */
+
+@media (min-width: 769px) and (max-width: 1024px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .actions-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .sections-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .dashboard-content {
+        flex-direction: column;
+    }
+
+    .sections-sidebar {
+        width: 100%;
+        margin-bottom: 20px;
+    }
+
+    .reports-content {
+        width: 100%;
+    }
+}
+
+/* ============================================
+   ОБЩИЕ УЛУЧШЕНИЯ ДЛЯ МОБИЛЬНЫХ
+   ============================================ */
+
+/* Убираем эффекты наведения на мобильных */
+@media (max-width: 768px) {
+    .action-card:hover,
+    .stat-card:hover,
+    .section-card:hover {
+        transform: none;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    /* Увеличиваем область нажатия для кнопок */
+    button,
+    .nav-link,
+    .action-card,
+    .btn-icon {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Скрываем подписи к иконкам, если нужно */
+    .action-card h3 {
+        font-size: 16px;
+    }
+
+    .action-card p {
+        font-size: 12px;
+    }
+
+    /* Таблицы с горизонтальной прокруткой */
+    .table-wrapper {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+}

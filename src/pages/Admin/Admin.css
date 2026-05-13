@@ -694,13 +694,3 @@
 }
 
 
-@media (max-width: 768px) {
-  .profile-info-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .profile-modal {
-    width: 95%;
-    margin: 1rem;
-  }
-}

@@ -21,6 +21,7 @@ import AccessDenied from './pages/AccessDenied/AccessDenied';
 import SectionHeadDashboard from './pages/Section_heder/Section_header';
 import EditConference from './pages/Conference/EditConference';
 import ConferenceDetails from './pages/Conference/ConferenceDetails';
+import SectionReports from './pages/Section_heder/Section_reports';
 import './App.css';
 import './context/font.css';
 
@@ -46,7 +47,7 @@ function App() {
               {/* ✅ МАРШРУТЫ ДАШБОРДОВ БЕЗ ПРОВЕРКИ */}
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/admin/dashboard" element={<Dashboard />} />
-              <Route path="/section-head/dashboard" element={<SectionHeadDashboard />} />
+              <Route path="/section-head/dashboard" element={<Dashboard />} />
               <Route path="/reviewer/dashboard" element={<Dashboard />} />
               <Route path="/author/dashboard" element={<Dashboard />} />
               
@@ -92,10 +93,12 @@ function App() {
                   <EditConference />
                 </RoleBasedRoute>
               } />
-
+             
               <Route path="/review-reports" element={<ReviewReports />} />
               <Route path="/report/:id" element={<ReportDetail />} />
               <Route path="/conference/:id" element={<ConferenceDetails />} />
+              <Route path="/section-head/resensent" element={<SectionHeadDashboard />} />
+              <Route path="/section/reports" element={<SectionReports/>} />
             </Routes>
           </main>
           

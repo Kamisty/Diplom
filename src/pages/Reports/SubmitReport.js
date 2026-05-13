@@ -1384,7 +1384,7 @@ const handleSubmit = async (e) => {
     }}
     disabled={loading}
   >
-    + Добавить соавтора
+   Добавить соавтора
   </button>
   
   {errors.authors && <span style={{ color: '#e74c3c', fontSize: '12px', marginTop: '5px', display: 'block' }}>

@@ -1,0 +1,483 @@
+/* Section_reports.css */
+
+.section-reports-page {
+    min-height: 100vh;
+    background: #f5f7fb;
+    padding: 30px 20px;
+}
+
+.section-reports-page .container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.page-header h1 {
+    font-size: 28px;
+    color: #2d3748;
+    margin-bottom: 8px;
+}
+
+.page-header p {
+    color: #718096;
+    margin-bottom: 30px;
+}
+
+/* Выбор секции */
+.section-selector {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.section-selector label {
+    font-weight: 600;
+    color: #4a5568;
+}
+
+.section-select {
+    padding: 10px 15px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 14px;
+    min-width: 250px;
+    background: white;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.section-select:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.conference-info {
+    background: linear-gradient(#ffaa55 0%, #d57200);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 10px;
+    margin-bottom: 25px;
+    font-weight: 500;
+}
+
+/* Сетка карточек */
+.reports-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 24px;
+}
+
+.report-card {
+    background: white;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.report-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+}
+
+.report-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 16px;
+    border-bottom: 1px solid #edf2f7;
+    padding-bottom: 12px;
+}
+
+.report-card-header h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #2d3748;
+    margin: 0;
+    flex: 1;
+}
+
+.status-badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.status-pending {
+    background: #fef5e7;
+    color: #f39c12;
+}
+
+.status-review {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.status-approved {
+    background: #e8f5e9;
+    color: #388e3c;
+}
+
+.status-rejected {
+    background: #ffebee;
+    color: #d32f2f;
+}
+
+.status-revision {
+    background: #fff3e0;
+    color: #f57c00;
+}
+
+.report-card-info {
+    margin-bottom: 20px;
+}
+
+.info-row {
+    display: flex;
+    margin-bottom: 10px;
+    font-size: 14px;
+}
+
+.info-label {
+    width: 100px;
+    flex-shrink: 0;
+    color: #718096;
+    font-weight: 500;
+}
+
+.info-value {
+    color: #2d3748;
+    flex: 1;
+}
+
+.reviewers-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.reviewer-name {
+    background: #edf2f7;
+    padding: 2px 10px;
+    border-radius: 15px;
+    font-size: 12px;
+    color: #4a5568;
+}
+
+.no-reviewer {
+    color: #a0aec0;
+    font-style: italic;
+}
+
+.report-card-actions {
+    display: flex;
+    gap: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #edf2f7;
+}
+
+.btn-view, .btn-assign {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-view {
+    background: #edf2f7;
+    color: #4a5568;
+}
+
+.btn-view:hover {
+    background: #e2e8f0;
+}
+
+.btn-assign {
+    background: #667eea;
+    color: white;
+}
+
+.btn-assign:hover {
+    background: #5a67d8;
+}
+
+.btn-assign:disabled {
+    background: #cbd5e0;
+    cursor: not-allowed;
+}
+
+/* Модальное окно */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 20px;
+    width: 500px;
+    max-width: 90%;
+    overflow: hidden;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid #edf2f7;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #2d3748;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #a0aec0;
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.modal-footer {
+    padding: 20px;
+    border-top: 1px solid #edf2f7;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.form-group {
+    margin-top: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #4a5568;
+}
+
+.reviewer-select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.btn-confirm {
+    background: #ee892a;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.btn-cancel {
+    background: #edf2f7;
+    color: #4a5568;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+/* Пустые состояния */
+.no-reports {
+    text-align: center;
+    padding: 60px;
+    background: white;
+    border-radius: 16px;
+    color: #a0aec0;
+}
+
+.section-reports-loading,
+.section-reports-empty {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 400px;
+    font-size: 18px;
+    color: #718096;
+}
+
+
+
+
+/* Дополнительные стили для кнопок и модальных окон */
+
+.report-card-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.btn-view, .btn-assign, .btn-decision {
+    flex: 1;
+    min-width: 100px;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-view {
+    background: #edf2f7;
+    color: #4a5568;
+}
+
+.btn-view:hover {
+    background: #e2e8f0;
+}
+
+.btn-assign {
+    background: #f5922e;
+    color: white;
+}
+
+.btn-assign:hover {
+    background: #ff8d35;
+}
+
+.btn-decision {
+    background: #f39c12;
+    color: white;
+}
+
+.btn-decision:hover {
+    background: #e67e22;
+}
+
+.btn-decision.disabled {
+    background: #cbd5e0;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* Кнопки выбора решения */
+.decision-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.decision-option {
+    padding: 12px 16px;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    background: white;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+}
+
+.decision-option:hover {
+    border-color: #cbd5e0;
+    background: #f7fafc;
+}
+
+.decision-option.selected {
+    border-color: #667eea;
+    background: #ebf4ff;
+}
+
+.decision-option.accepted.selected {
+    border-color: #48bb78;
+    background: #f0fff4;
+    color: #276749;
+}
+
+.decision-option.rejected.selected {
+    border-color: #f56565;
+    background: #fff5f5;
+    color: #c53030;
+}
+
+.decision-option.revision.selected {
+    border-color: #ed8936;
+    background: #fffaf0;
+    color: #c05621;
+}
+
+.comment-textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 14px;
+    resize: vertical;
+    font-family: inherit;
+}
+
+.comment-textarea:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.status-modal {
+    max-width: 500px;
+}
+
+@media (max-width: 768px) {
+    .report-card-actions {
+        flex-direction: column;
+    }
+    
+    .btn-view, .btn-assign, .btn-decision {
+        width: 100%;
+    }
+}
+
+
+
+@media (max-width: 768px) {
+    .reports-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .info-row {
+        flex-direction: column;
+    }
+    
+    .info-label {
+        width: auto;
+        margin-bottom: 4px;
+    }
+    
+    .report-card-actions {
+        flex-direction: column;
+    }
+}

@@ -29,7 +29,7 @@
 
 /* Левая колонка - секции */
 .sections-sidebar {
-  background: #f8f9fa;
+  background: #ffaa55;
   border-radius: 12px;
   padding: 20px;
   height: fit-content;
@@ -181,6 +181,7 @@
   cursor: pointer;
   font-size: 12px;
   transition: background 0.3s;
+  width: 150px;
 }
 
 .btn-view-report:hover {
@@ -237,18 +238,19 @@
 
 /* Кнопка назначения рецензента */
 .btn-assign-reviewer {
-  background-color: #4caf50;
-  color: white;
+  background-color: #ff7332;
+color: white;
   border: none;
   padding: 6px 12px;
-  margin-left: 8px;
   border-radius: 4px;
   cursor: pointer;
   font-size: 12px;
+  transition: background 0.3s;
+  width: 150px;
 }
 
 .btn-assign-reviewer:hover {
-  background-color: #45a049;
+   background-color: rgb(260, 130, 65);
 }
 
 /* Список рецензентов */
