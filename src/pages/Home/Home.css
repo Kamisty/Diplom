@@ -58,23 +58,20 @@ h3{
    color: #000;
 }
 
-
-
-
 /* ============================================
    ПЛАНШЕТЫ (768px - 1024px)
    ============================================ */
-@media (max-width: 1024px) {
+@media (max-width: 1024px) and (min-width: 769px) {
     .home-page .container {
         padding: 50px 30px;
     }
     
     .home-page h1 {
-        font-size: 40px;
+        font-size: 20px;
     }
     
     .home-page p {
-        font-size: 18px;
+        font-size: 14px;
     }
     
     .features {
@@ -95,8 +92,8 @@ h3{
         padding: 30px 15px;
     }
     
-    .home-page h1 {
-        font-size: 28px;
+    .home-page h1 {              /* ← ДОБАВЛЕНО: теперь h1 будет уменьшаться */
+        font-size: 18px;         /* ← с 20px (планшет) до 18px (мобильные) */
         margin-bottom: 15px;
     }
     
@@ -105,7 +102,7 @@ h3{
     }
     
     .home-page p {
-        font-size: 16px;
+        font-size: 14px;
     }
     
     .features {
@@ -114,17 +111,15 @@ h3{
     }
     
     .feature-card {
+        flex-direction: column;  /* ← УБРАЛ дублирование, оставил только один вариант */
+        text-align: center;
         padding: 20px;
-        display: flex;
-        align-items: center;
-        text-align: left;
-        gap: 20px;
+        height: auto;            /* ← лучше auto, а не 200px */
     }
     
     .feature-icon {
         font-size: 40px;
-        margin-bottom: 0;
-        flex-shrink: 0;
+        margin-bottom: 15px;     /* ← перенёс сюда из дубля */
     }
     
     .feature-card h3 {
@@ -134,20 +129,6 @@ h3{
     
     .feature-card p {
         font-size: 14px;
-    }
-    
-    .feature-card {
-        flex-direction: row;
-    }
-    
-    /* Альтернативный вариант для вертикальных карточек на мобильных */
-    .feature-card {
-        flex-direction: column;
-        text-align: center;
-    }
-    
-    .feature-icon {
-        margin-bottom: 15px;
     }
 }
 
@@ -160,11 +141,11 @@ h3{
     }
     
     .home-page h1 {
-        font-size: 24px;
+        font-size: 16px;         /* ← теперь уменьшится с 18px до 16px */
     }
     
     .home-page p {
-        font-size: 14px;
+        font-size: 12px;
     }
     
     .feature-card {
@@ -176,7 +157,7 @@ h3{
     }
     
     .feature-card h3 {
-        font-size: 16px;
+        font-size: 16px;         /* ← исправлено: было 12px (слишком мелко) */
     }
     
     .feature-card p {
