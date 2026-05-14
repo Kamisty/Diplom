@@ -394,9 +394,6 @@ select.input-field {
         padding: 10px;
     }
 
-    h1 {
-        font-size: 22px;
-    }
 
     h2 {
         font-size: 18px;
@@ -459,7 +456,7 @@ select.input-field {
    ============================================ */
 
 /* Убираем эффекты наведения на мобильных */
-@media (max-width: 768px) {
+@media (max-width: 1150px) {
     .action-card:hover,
     .stat-card:hover,
     .section-card:hover {
@@ -492,4 +489,167 @@ select.input-field {
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
     }
+    .feature-card {
+        flex-direction: column;  /* ← УБРАЛ дублирование, оставил только один вариант */
+        text-align: center;
+        padding: 20px;
+        height: auto;            /* ← лучше auto, а не 200px */
+    }
+    
+    .feature-icon {
+        font-size: 40px;
+        margin-bottom: 15px;     /* ← перенёс сюда из дубля */
+    }
+    
+    .feature-card h3 {
+        font-size: 18px;
+        margin-bottom: 5px;
+    }
+    
+    .feature-card p {
+        font-size: 14px;
+    }
+}
+
+
+
+/* ============================================
+   ПЛАНШЕТЫ (768px - 1024px)
+   ============================================ */
+@media (max-width: 1024px) and (min-width: 769px) {
+    .home-page .container {
+        padding: 50px 30px;
+    }
+    
+    .home-page h1 {
+        font-size: 45px;
+    }
+    
+    .home-page p {
+        font-size: 22px;
+        text-align: center;
+    }
+    
+    .features {
+        gap: 25px;
+    }
+}
+
+/* ============================================
+   МОБИЛЬНЫЕ (до 768px)
+   ============================================ */
+@media (max-width: 768px) {
+    .home-page {
+        min-height: auto;
+        padding: 20px 0;
+    }
+    
+    .home-page .container {
+        padding: 30px 15px;
+    }
+    
+    .home-page h1 {              /* ← ДОБАВЛЕНО: теперь h1 будет уменьшаться */
+        font-size: 25px;         /* ← с 20px (планшет) до 18px (мобильные) */
+        margin-bottom: 15px;
+    }
+    
+    .stroka {
+        margin-bottom: 35px;
+    }
+    
+    .home-page p {
+        font-size: 25px;
+        text-align: center;
+    }
+    
+    .features {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+    
+    .feature-card {
+        flex-direction: column;  /* ← УБРАЛ дублирование, оставил только один вариант */
+        text-align: center;
+        padding: 20px;
+        height: auto;            /* ← лучше auto, а не 200px */
+    }
+    
+    .feature-icon {
+        font-size: 40px;
+        margin-bottom: 15px;     /* ← перенёс сюда из дубля */
+    }
+    
+    .feature-card h3 {
+        font-size: 18px;
+        margin-bottom: 5px;
+    }
+    
+    .feature-card p {
+        font-size: 14px;
+    }
+}
+
+/* ============================================
+   МАЛЕНЬКИЕ ТЕЛЕФОНЫ (до 480px)
+   ============================================ */
+@media (max-width: 480px) {
+    .home-page .container {
+        padding: 20px 12px;
+    }
+    
+    .home-page h1 {
+        font-size: 25px;         /* ← теперь уменьшится с 18px до 16px */
+    }
+    
+    .home-page p {
+        font-size: 25px;
+        text-align: center;
+    }
+    
+    .feature-card {
+        padding: 5px;
+    }
+    
+    .feature-icon {
+        font-size: 32px;
+    }
+    
+    .feature-card h3 {
+        font-size: 20px;         /* ← исправлено: было 12px (слишком мелко) */
+    }
+    
+    .feature-card p {
+        font-size: 13px;
+    }
+}
+
+/* ============================================
+   АНИМАЦИИ (опционально)
+   ============================================ */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.feature-card {
+    animation: fadeInUp 0.6s ease forwards;
+    opacity: 0;
+}
+
+.feature-card:nth-child(1) {
+    animation-delay: 0.1s;
+}
+
+.feature-card:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.feature-card:nth-child(3) {
+    animation-delay: 0.3s;
 }

@@ -10,7 +10,7 @@ h3{
 .stroka{
   display: block;
   margin-top: 60px;
-  text-align: left;
+  text-align: center;
   font-size: 25px;
   font-weight: 700;
   color: #474747; 
@@ -33,18 +33,18 @@ h3{
 }
 .feature-card{
   display: block;
-  border: 3px solid #e27a02;
+  border: 3px solid #ffffff;
   flex: 1; 
   width: 300px; 
   height: 180px;
   margin-top: 45px;
   padding: 20px;
-  background-color:#ffffff ;
-  color: #474747;
+  background-color:#ed7e00 ;
+  color: #ffffff;
   text-align: center;
   box-sizing: border-box; 
   border-radius: 25px;
-   box-shadow: 
+    box-shadow: 
     2px 2px 4px rgba(0,0,0,0.1),
     4px 4px 0 rgba(74, 111, 165, 0.1);
 
@@ -53,145 +53,8 @@ h3{
     4px 4px 0 rgba(74, 111, 165, 0.1);
 }
 .feature-card:hover{
-  background-color: #e27a02;
+  background-color: #f5c894;
    border: 3px solid #ffffff;
    color: #000;
 }
 
-/* ============================================
-   ПЛАНШЕТЫ (768px - 1024px)
-   ============================================ */
-@media (max-width: 1024px) and (min-width: 769px) {
-    .home-page .container {
-        padding: 50px 30px;
-    }
-    
-    .home-page h1 {
-        font-size: 20px;
-    }
-    
-    .home-page p {
-        font-size: 14px;
-    }
-    
-    .features {
-        gap: 25px;
-    }
-}
-
-/* ============================================
-   МОБИЛЬНЫЕ (до 768px)
-   ============================================ */
-@media (max-width: 768px) {
-    .home-page {
-        min-height: auto;
-        padding: 20px 0;
-    }
-    
-    .home-page .container {
-        padding: 30px 15px;
-    }
-    
-    .home-page h1 {              /* ← ДОБАВЛЕНО: теперь h1 будет уменьшаться */
-        font-size: 18px;         /* ← с 20px (планшет) до 18px (мобильные) */
-        margin-bottom: 15px;
-    }
-    
-    .stroka {
-        margin-bottom: 35px;
-    }
-    
-    .home-page p {
-        font-size: 14px;
-    }
-    
-    .features {
-        grid-template-columns: 1fr;
-        gap: 20px;
-    }
-    
-    .feature-card {
-        flex-direction: column;  /* ← УБРАЛ дублирование, оставил только один вариант */
-        text-align: center;
-        padding: 20px;
-        height: auto;            /* ← лучше auto, а не 200px */
-    }
-    
-    .feature-icon {
-        font-size: 40px;
-        margin-bottom: 15px;     /* ← перенёс сюда из дубля */
-    }
-    
-    .feature-card h3 {
-        font-size: 18px;
-        margin-bottom: 5px;
-    }
-    
-    .feature-card p {
-        font-size: 14px;
-    }
-}
-
-/* ============================================
-   МАЛЕНЬКИЕ ТЕЛЕФОНЫ (до 480px)
-   ============================================ */
-@media (max-width: 480px) {
-    .home-page .container {
-        padding: 20px 12px;
-    }
-    
-    .home-page h1 {
-        font-size: 16px;         /* ← теперь уменьшится с 18px до 16px */
-    }
-    
-    .home-page p {
-        font-size: 12px;
-    }
-    
-    .feature-card {
-        padding: 16px;
-    }
-    
-    .feature-icon {
-        font-size: 32px;
-    }
-    
-    .feature-card h3 {
-        font-size: 16px;         /* ← исправлено: было 12px (слишком мелко) */
-    }
-    
-    .feature-card p {
-        font-size: 13px;
-    }
-}
-
-/* ============================================
-   АНИМАЦИИ (опционально)
-   ============================================ */
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(30px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.feature-card {
-    animation: fadeInUp 0.6s ease forwards;
-    opacity: 0;
-}
-
-.feature-card:nth-child(1) {
-    animation-delay: 0.1s;
-}
-
-.feature-card:nth-child(2) {
-    animation-delay: 0.2s;
-}
-
-.feature-card:nth-child(3) {
-    animation-delay: 0.3s;
-}
