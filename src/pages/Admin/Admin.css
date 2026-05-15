@@ -700,7 +700,7 @@
 /* ReportAll.css */
 .reports-page {
     min-height: 100vh;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+
     padding: 40px 0;
 }
 
@@ -836,7 +836,7 @@
 
 .section-header {
     padding: 20px 25px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    
     cursor: pointer;
     display: flex;
     justify-content: space-between;
