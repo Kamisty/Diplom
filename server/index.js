@@ -4201,10 +4201,161 @@ stylesRouter.post('/api/conferences/:conferenceId/styles', async (req, res) => {
     }
 });
 
-// ✅ ПОДКЛЮЧАЕМ РОУТЕР (ДО маршрутов с :id!)
-app.use(stylesRouter);
 
 
+// ВСЕ ПРИНЯТЫЕ ДОКЛАДЫ
+router.get('/accepted', async (req, res) => {
+    try {
+        const query = `
+            SELECT 
+                r.report_id,
+                r.title,
+                r.abstract,
+                r.keywords,
+                r.status,
+                r.user_id,
+                r.final_decision_at,
+                r.final_decision_no,
+                r.created_at,
+                r.id_sections,
+                r.literature,
+                r.submitted_at,
+                r.additional_info,
+                r.content,
+                r.coauthors,
+                r.conference_id,
+                r.current_version,
+                s.name as section_name
+            FROM reports r
+            LEFT JOIN sections s ON r.id_sections = s.id_sections
+            WHERE r.status = 'accepted'
+            ORDER BY r.id_sections, r.submitted_at DESC
+        `;
+        
+        const result = await db.query(query);
+        const reports = result.rows || result;
+        
+        res.json(reports);
+    } catch (error) {
+        console.error('Ошибка получения докладов:', error);
+        res.status(500).json({ error: 'Ошибка сервера' });
+    }
+});
+
+// ВСЕ СЕКЦИИ
+router.get('/sections', async (req, res) => {
+    try {
+        const query = `
+            SELECT 
+                s.id_sections as id,
+                s.name,
+                s.description,
+                COALESCE(s.rating, 0) as rating,
+                COUNT(r.report_id) FILTER (WHERE r.status = 'accepted') as accepted_reports_count
+            FROM sections s
+            LEFT JOIN reports r ON r.id_sections = s.id_sections
+            WHERE s.id_sections IS NOT NULL
+            GROUP BY s.id_sections, s.name, s.description, s.rating
+            ORDER BY s.name
+        `;
+        
+        const result = await db.query(query);
+        const sections = result.rows || result;
+        
+        res.json(sections);
+    } catch (error) {
+        console.error('Ошибка получения секций:', error);
+        res.status(500).json({ error: 'Ошибка сервера' });
+    }
+});
+
+// ДОКЛАДЫ ПО СЕКЦИИ
+router.get('/section/:sectionId', async (req, res) => {
+    try {
+        const { sectionId } = req.params;
+        
+        const query = `
+            SELECT 
+                r.report_id,
+                r.title,
+                r.abstract,
+                r.keywords,
+                r.status,
+                r.user_id,
+                r.final_decision_at,
+                r.created_at,
+                r.literature,
+                r.submitted_at,
+                r.additional_info,
+                r.content,
+                r.coauthors,
+                r.current_version,
+                u.email,
+                u.first_name,
+                u.last_name
+            FROM reports r
+            LEFT JOIN users u ON r.user_id = u.id
+            WHERE r.id_sections = $1 AND r.status = 'accepted'
+            ORDER BY r.submitted_at DESC
+        `;
+        
+        const result = await db.query(query, [sectionId]);
+        const reports = result.rows || result;
+        
+        res.json(reports);
+    } catch (error) {
+        console.error('Ошибка получения докладов секции:', error);
+        res.status(500).json({ error: 'Ошибка сервера' });
+    }
+});
+
+// ДЕТАЛИ ДОКЛАДА ПО ID
+router.get('/:reportId', async (req, res) => {
+    try {
+        const { reportId } = req.params;
+        
+        const query = `
+            SELECT 
+                r.report_id,
+                r.title,
+                r.abstract,
+                r.keywords,
+                r.status,
+                r.user_id,
+                r.final_decision_at,
+                r.final_decision_no,
+                r.created_at,
+                r.id_sections,
+                r.literature,
+                r.submitted_at,
+                r.additional_info,
+                r.content,
+                r.coauthors,
+                r.conference_id,
+                r.current_version,
+                s.name as section_name,
+                u.email as user_email,
+                u.first_name as user_first_name,
+                u.last_name as user_last_name
+            FROM reports r
+            LEFT JOIN sections s ON r.id_sections = s.id_sections
+            LEFT JOIN users u ON r.user_id = u.id
+            WHERE r.report_id = $1
+        `;
+        
+        const result = await db.query(query, [reportId]);
+        const report = (result.rows || result)[0];
+        
+        if (!report) {
+            return res.status(404).json({ error: 'Доклад не найден' });
+        }
+        
+        res.json(report);
+    } catch (error) {
+        console.error('Ошибка получения доклада:', error);
+        res.status(500).json({ error: 'Ошибка сервера' });
+    }
+});
 
 // ============================================
 // ЗАПУСК СЕРВЕРА

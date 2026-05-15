@@ -22,6 +22,7 @@ import SectionHeadDashboard from './pages/Section_heder/Section_header';
 import EditConference from './pages/Conference/EditConference';
 import ConferenceDetails from './pages/Conference/ConferenceDetails';
 import SectionReports from './pages/Section_heder/Section_reports';
+import ReportAll from './pages/Admin/ReportAll';
 import './App.css';
 import './context/font.css';
 
@@ -98,7 +99,9 @@ function App() {
               <Route path="/report/:id" element={<ReportDetail />} />
               <Route path="/conference/:id" element={<ConferenceDetails />} />
               <Route path="/section-head/resensent" element={<SectionHeadDashboard />} />
-              <Route path="/section/reports" element={<SectionReports/>} />
+             <Route path="/admin/reports/accepted" element={<ReportAll />} />
+
+
             </Routes>
           </main>
           
