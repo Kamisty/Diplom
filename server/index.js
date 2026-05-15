@@ -3486,6 +3486,76 @@ app.post('/api/user/reset-password', async (req, res) => {
 });
 
 
+
+// ============================================
+// ПРАВИЛЬНЫЙ код для ВАШЕЙ структуры БД
+// ============================================
+
+// 1. Получить все принятые доклады
+app.get('/api/reports/accepted', async (req, res) => {
+    try {
+        const query = `
+            SELECT 
+                report_id,
+                title,
+                abstract,
+                keywords,
+                status,
+                user_id,
+                final_decision_at,
+                final_decision_notes,
+                created_at as submitted_at,
+                id_sections,
+                literature
+            FROM reports
+            WHERE status = 'accepted'
+            ORDER BY id_sections, created_at DESC
+        `;
+        
+        const result = await db.query(query);
+        
+        // Добавляем пустые массивы для авторов (так как нет таблицы coauthors)
+        const reportsWithAuthors = result.rows.map(report => ({
+            ...report,
+            coauthors: [], // Временно пустой массив
+            current_version: 1,
+            content: null,
+            additional_info: null
+        }));
+        
+        res.json(reportsWithAuthors);
+    } catch (error) {
+        console.error('Ошибка получения докладов:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 2. Получить все секции
+app.get('/api/sections', async (req, res) => {
+    try {
+        // Проверьте, есть ли таблица sections
+        const query = `
+            SELECT 
+                id_sections as id,
+                name,
+                description
+            FROM sections
+            WHERE id_sections IS NOT NULL
+            ORDER BY name
+        `;
+        
+        const result = await db.query(query);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Ошибка получения секций:', error);
+        // Если таблицы sections нет, верните пустой массив
+        res.json([]);
+    }
+});
+
+
+
+
 // ============================================
 // РАБОТА С ДОКЛАДАМИ (REPORTS)
 // ============================================
@@ -4203,71 +4273,6 @@ stylesRouter.post('/api/conferences/:conferenceId/styles', async (req, res) => {
 
 
 
-// ============================================
-// ПРАВИЛЬНЫЙ код для ВАШЕЙ структуры БД
-// ============================================
-
-// 1. Получить все принятые доклады
-app.get('/api/reports/accepted', async (req, res) => {
-    try {
-        const query = `
-            SELECT 
-                report_id,
-                title,
-                abstract,
-                keywords,
-                status,
-                user_id,
-                final_decision_at,
-                final_decision_notes,
-                created_at as submitted_at,
-                id_sections,
-                literature
-            FROM reports
-            WHERE status = 'accepted'
-            ORDER BY id_sections, created_at DESC
-        `;
-        
-        const result = await db.query(query);
-        
-        // Добавляем пустые массивы для авторов (так как нет таблицы coauthors)
-        const reportsWithAuthors = result.rows.map(report => ({
-            ...report,
-            coauthors: [], // Временно пустой массив
-            current_version: 1,
-            content: null,
-            additional_info: null
-        }));
-        
-        res.json(reportsWithAuthors);
-    } catch (error) {
-        console.error('Ошибка получения докладов:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// 2. Получить все секции
-app.get('/api/sections', async (req, res) => {
-    try {
-        // Проверьте, есть ли таблица sections
-        const query = `
-            SELECT 
-                id_sections as id,
-                name,
-                description
-            FROM sections
-            WHERE id_sections IS NOT NULL
-            ORDER BY name
-        `;
-        
-        const result = await db.query(query);
-        res.json(result.rows);
-    } catch (error) {
-        console.error('Ошибка получения секций:', error);
-        // Если таблицы sections нет, верните пустой массив
-        res.json([]);
-    }
-});
 
 // ============================================
 // ЗАПУСК СЕРВЕРА
