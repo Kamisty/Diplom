@@ -144,7 +144,7 @@ const Header = () => {
                 <Link to="/admin/conferences" className="nav-link">Управление</Link>
                 <Link to="/admin/users" className="nav-link">Пользователи</Link>
                 <Link to="/admin/assign-section-heads" className="nav-link">Руководители</Link>
-                <Link to="/admin/reports/accepted" className="nav-link">Принятые доклады</Link>
+                <Link to="/admin/rep/accepted" className="nav-link">Принятые доклады</Link>
               </>
             )}
           </nav>
