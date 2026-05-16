@@ -240,6 +240,152 @@ app.put('/api/notifications/read-all', async (req, res) => {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Вместо /api/rep/accepted/admin/:userId
+// Используйте уникальное название, например:
+
+app.get('/api/admin/conferences/accepted-reports/:userId', async (req, res) => {
+    try {
+        const { userId } = req.params;
+        
+        console.log('=== ПОЛУЧЕНИЕ ПРИНЯТЫХ ДОКЛАДОВ ДЛЯ АДМИНИСТРАТОРА ===');
+        console.log('userId:', userId);
+        
+        // Проверяем, есть ли конференции у пользователя
+        const checkConferences = await pool.query(
+            'SELECT COUNT(*) FROM conferences WHERE created_by = $1',
+            [userId]
+        );
+        console.log(`Конференций у пользователя: ${checkConferences.rows[0].count}`);
+        
+        const query = `
+            SELECT 
+                r.report_id,
+                r.title,
+                r.abstract,
+                r.keywords,
+                r.status,
+                r.created_at,
+                r.submitted_at,
+                r.coauthors,
+                u.name as author_name,
+                u.login as author_login,
+                s.id_sections as section_id,
+                s.name_section as section_name,
+                s.user_id as section_head_id,
+                s_owner.name as section_head_name,
+                c.id as conference_id,
+                c.title as conference_title,
+                c.start_date,
+                c.end_date,
+                c.submission_deadline
+            FROM conferences c
+            LEFT JOIN sections s ON c.id = s.conference_id
+            LEFT JOIN reports r ON s.id_sections = r.id_sections AND r.status = 'accepted'
+            LEFT JOIN users u ON r.user_id = u.user_id
+            LEFT JOIN users s_owner ON s.user_id = s_owner.user_id
+            WHERE c.created_by = $1
+            ORDER BY c.title, s.name_section, r.submitted_at DESC
+        `;
+        
+        const result = await pool.query(query, [userId]);
+        
+        console.log(`Найдено записей: ${result.rows.length}`);
+        
+        // Группируем по конференциям и секциям
+        const conferencesMap = new Map();
+        
+        result.rows.forEach(row => {
+            if (!conferencesMap.has(row.conference_id)) {
+                conferencesMap.set(row.conference_id, {
+                    id: row.conference_id,
+                    title: row.conference_title,
+                    start_date: row.start_date,
+                    end_date: row.end_date,
+                    submission_deadline: row.submission_deadline,
+                    sections: new Map()
+                });
+            }
+            
+            const conference = conferencesMap.get(row.conference_id);
+            
+            if (row.section_id) {
+                if (!conference.sections.has(row.section_id)) {
+                    conference.sections.set(row.section_id, {
+                        id: row.section_id,
+                        name: row.section_name,
+                        head_id: row.section_head_id,
+                        head_name: row.section_head_name,
+                        reports: []
+                    });
+                }
+                
+                if (row.report_id) {
+                    conference.sections.get(row.section_id).reports.push({
+                        report_id: row.report_id,
+                        title: row.title,
+                        abstract: row.abstract,
+                        keywords: row.keywords,
+                        status: row.status,
+                        created_at: row.created_at,
+                        submitted_at: row.submitted_at,
+                        coauthors: row.coauthors || [],
+                        author_name: row.author_name,
+                        author_login: row.author_login
+                    });
+                }
+            }
+        });
+        
+        const groupedResult = Array.from(conferencesMap.values()).map(conf => ({
+            ...conf,
+            sections: Array.from(conf.sections.values())
+        }));
+        
+        const totalReports = groupedResult.reduce((total, conf) => {
+            return total + conf.sections.reduce((sum, section) => sum + section.reports.length, 0);
+        }, 0);
+        
+        res.json({
+            success: true,
+            user_id: userId,
+            conferences: groupedResult,
+            total_reports: totalReports
+        });
+        
+    } catch (error) {
+        console.error('❌ Ошибка:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: error.message 
+        });
+    }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
 // ============================================
 // РЕГИСТРАЦИЯ - http://localhost:5000/api/register
 // ============================================
@@ -3487,71 +3633,19 @@ app.post('/api/user/reset-password', async (req, res) => {
 
 
 
-// ============================================
-// ПРАВИЛЬНЫЙ код для ВАШЕЙ структуры БД
-// ============================================
 
-// 1. Получить все принятые доклады
-app.get('/api/reports/accepted', async (req, res) => {
-    try {
-        const query = `
-            SELECT 
-                report_id,
-                title,
-                abstract,
-                keywords,
-                status,
-                user_id,
-                final_decision_at,
-                final_decision_notes,
-                created_at as submitted_at,
-                id_sections,
-                literature
-            FROM reports
-            WHERE status = 'accepted'
-            ORDER BY id_sections, created_at DESC
-        `;
-        
-        const result = await db.query(query);
-        
-        // Добавляем пустые массивы для авторов (так как нет таблицы coauthors)
-        const reportsWithAuthors = result.rows.map(report => ({
-            ...report,
-            coauthors: [], // Временно пустой массив
-            current_version: 1,
-            content: null,
-            additional_info: null
-        }));
-        
-        res.json(reportsWithAuthors);
-    } catch (error) {
-        console.error('Ошибка получения докладов:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
 
-// 2. Получить все секции
-app.get('/api/sections', async (req, res) => {
-    try {
-        // Проверьте, есть ли таблица sections
-        const query = `
-            SELECT 
-                id_sections as id,
-                name,
-                description
-            FROM sections
-            WHERE id_sections IS NOT NULL
-            ORDER BY name
-        `;
-        
-        const result = await db.query(query);
-        res.json(result.rows);
-    } catch (error) {
-        console.error('Ошибка получения секций:', error);
-        // Если таблицы sections нет, верните пустой массив
-        res.json([]);
-    }
-});
+
+
+
+
+
+
+
+
+
+
+
 
 
 
