@@ -99,7 +99,8 @@ function App() {
               <Route path="/report/:id" element={<ReportDetail />} />
               <Route path="/conference/:id" element={<ConferenceDetails />} />
               <Route path="/section-head/resensent" element={<SectionHeadDashboard />} />
-             <Route path="/admin/reports/accepted" element={<ReportAll />} />
+              <Route path="/section/reports" element={< SectionReports/>} />
+              <Route path="/admin/rep/accepted" element={<ReportAll />} />
 
 
             </Routes>
