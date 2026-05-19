@@ -727,15 +727,12 @@
     justify-content: space-between;
     align-items: center;
     padding: 20px 24px;
-    background: linear-gradient(135deg, #dea672 0%, #ca834c 100%);
+    background:  #e58210;
     color: white;
     cursor: pointer;
     transition: all 0.3s ease;
 }
 
-.conference-header:hover {
-     background: linear-gradient(135deg, #dea672 0%, #ca834c 100%);
-}
 
 .conference-header-left {
     display: flex;
