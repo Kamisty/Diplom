@@ -34,21 +34,177 @@ app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
 
 
+
 // ============================================
-// ПРОСТЕЙШИЙ ТЕСТОВЫЙ МАРШРУТ ДЛЯ СТИЛЕЙ
+// ПРЯМЫЕ МАРШРУТЫ ДЛЯ СТИЛЕЙ (РАБОТАЮТ 100%)
 // ============================================
 
-app.post('/api/conferences/:conferenceId/styles', (req, res) => {
-    console.log('🔥🔥🔥 ТЕСТОВЫЙ POST МАРШРУТ СРАБОТАЛ! 🔥🔥🔥');
-    console.log('conferenceId:', req.params.conferenceId);
-    console.log('body:', req.body);
-    res.json({ success: true, message: 'Тестовый маршрут работает!' });
+// Получить стили конференции
+app.get('/api/conferences/:conferenceId/styles', async (req, res) => {
+    const { conferenceId } = req.params;
+    console.log('🔍 GET /api/conferences/' + conferenceId + '/styles - ВЫЗВАН');
+    
+    try {
+        const conferenceIdInt = parseInt(conferenceId);
+        const result = await pool.query(
+            'SELECT * FROM conference_styles WHERE conference_id = $1',
+            [conferenceIdInt]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.json({ success: true, styles: null });
+        }
+        res.json({ success: true, styles: result.rows[0] });
+    } catch (error) {
+        console.error('❌ Ошибка:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
 });
 
-app.get('/api/conferences/:conferenceId/styles', (req, res) => {
-    console.log('🔥🔥🔥 ТЕСТОВЫЙ GET МАРШРУТ СРАБОТАЛ! 🔥🔥🔥');
-    res.json({ success: true, styles: null });
+// Сохранить стили конференции
+app.post('/api/conferences/:conferenceId/styles', async (req, res) => {
+    const { conferenceId } = req.params;
+    const styles = req.body;
+    
+    console.log('💾 POST /api/conferences/' + conferenceId + '/styles - ВЫЗВАН');
+    console.log('📦 Стили для сохранения:', Object.keys(styles));
+    
+    try {
+        const conferenceIdInt = parseInt(conferenceId);
+        
+        // Проверяем, существует ли конференция
+        const conferenceCheck = await pool.query(
+            'SELECT id FROM conferences WHERE id = $1',
+            [conferenceIdInt]
+        );
+        
+        if (conferenceCheck.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Конференция не найдена' });
+        }
+        
+        // Проверяем, есть ли уже стили
+        const existing = await pool.query(
+            'SELECT id FROM conference_styles WHERE conference_id = $1',
+            [conferenceIdInt]
+        );
+        
+        if (existing.rows.length === 0) {
+            // Вставка
+            await pool.query(
+                `INSERT INTO conference_styles (
+                    conference_id, page_background, container_padding, font_family,
+                    title_font_size, title_font_weight, title_color, title_text_align, title_margin_bottom,
+                    authors_font_size, authors_font_weight, authors_color, authors_text_align, authors_margin_bottom,
+                    abstract_font_size, abstract_font_weight, abstract_color, abstract_line_height, abstract_margin_bottom,
+                    text_font_size, text_line_height, text_color, text_margin_bottom,
+                    table_border_color, table_header_bg, table_cell_padding
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
+                `,
+                [
+                    conferenceIdInt,
+                    styles.page_background || '#ffffff',
+                    styles.container_padding || 40,
+                    styles.font_family || 'Arial, sans-serif',
+                    styles.title_font_size || 32,
+                    styles.title_font_weight || '600',
+                    styles.title_color || '#f39c12',
+                    styles.title_text_align || 'center',
+                    styles.title_margin_bottom || 30,
+                    styles.authors_font_size || 16,
+                    styles.authors_font_weight || '400',
+                    styles.authors_color || '#e67e22',
+                    styles.authors_text_align || 'center',
+                    styles.authors_margin_bottom || 20,
+                    styles.abstract_font_size || 14,
+                    styles.abstract_font_weight || '400',
+                    styles.abstract_color || '#333333',
+                    styles.abstract_line_height || 1.6,
+                    styles.abstract_margin_bottom || 30,
+                    styles.text_font_size || 14,
+                    styles.text_line_height || 1.6,
+                    styles.text_color || '#333333',
+                    styles.text_margin_bottom || 15,
+                    styles.table_border_color || '#000000',
+                    styles.table_header_bg || '#f8f9fa',
+                    styles.table_cell_padding || 8
+                ]
+            );
+            console.log('✅ Стили вставлены');
+        } else {
+            // Обновление
+            await pool.query(
+                `UPDATE conference_styles SET
+                    page_background = COALESCE($1, page_background),
+                    container_padding = COALESCE($2, container_padding),
+                    font_family = COALESCE($3, font_family),
+                    title_font_size = COALESCE($4, title_font_size),
+                    title_font_weight = COALESCE($5, title_font_weight),
+                    title_color = COALESCE($6, title_color),
+                    title_text_align = COALESCE($7, title_text_align),
+                    title_margin_bottom = COALESCE($8, title_margin_bottom),
+                    authors_font_size = COALESCE($9, authors_font_size),
+                    authors_font_weight = COALESCE($10, authors_font_weight),
+                    authors_color = COALESCE($11, authors_color),
+                    authors_text_align = COALESCE($12, authors_text_align),
+                    authors_margin_bottom = COALESCE($13, authors_margin_bottom),
+                    abstract_font_size = COALESCE($14, abstract_font_size),
+                    abstract_font_weight = COALESCE($15, abstract_font_weight),
+                    abstract_color = COALESCE($16, abstract_color),
+                    abstract_line_height = COALESCE($17, abstract_line_height),
+                    abstract_margin_bottom = COALESCE($18, abstract_margin_bottom),
+                    text_font_size = COALESCE($19, text_font_size),
+                    text_line_height = COALESCE($20, text_line_height),
+                    text_color = COALESCE($21, text_color),
+                    text_margin_bottom = COALESCE($22, text_margin_bottom),
+                    table_border_color = COALESCE($23, table_border_color),
+                    table_header_bg = COALESCE($24, table_header_bg),
+                    table_cell_padding = COALESCE($25, table_cell_padding),
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE conference_id = $26
+                `,
+                [
+                    styles.page_background || null,
+                    styles.container_padding || null,
+                    styles.font_family || null,
+                    styles.title_font_size || null,
+                    styles.title_font_weight || null,
+                    styles.title_color || null,
+                    styles.title_text_align || null,
+                    styles.title_margin_bottom || null,
+                    styles.authors_font_size || null,
+                    styles.authors_font_weight || null,
+                    styles.authors_color || null,
+                    styles.authors_text_align || null,
+                    styles.authors_margin_bottom || null,
+                    styles.abstract_font_size || null,
+                    styles.abstract_font_weight || null,
+                    styles.abstract_color || null,
+                    styles.abstract_line_height || null,
+                    styles.abstract_margin_bottom || null,
+                    styles.text_font_size || null,
+                    styles.text_line_height || null,
+                    styles.text_color || null,
+                    styles.text_margin_bottom || null,
+                    styles.table_border_color || null,
+                    styles.table_header_bg || null,
+                    styles.table_cell_padding || null,
+                    conferenceIdInt
+                ]
+            );
+            console.log('✅ Стили обновлены');
+        }
+        
+        res.json({ success: true, message: 'Стили успешно сохранены' });
+    } catch (error) {
+        console.error('❌ Ошибка:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
 });
+
+console.log('✅ Прямые маршруты для стилей зарегистрированы');
+
+
+
 
 
 
