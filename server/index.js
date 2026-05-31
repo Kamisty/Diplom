@@ -3,7 +3,7 @@ const app = express();
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
 
-const pool = require('./db');  // <-- ДОБАВЬТЕ ЭТУ СТРОКУ
+const pool = require('./db');  
 // Настройка CORS для React
 
 app.use(cors({
@@ -50,7 +50,7 @@ const emailTransporter = nodemailer.createTransport({
 async function sendResetCodeEmail(email, code) {
     try {
         const info = await emailTransporter.sendMail({
-            from: '"Платформа конференций" <ik.montseva@mail.ru>',  // отправитель должен совпадать с auth.user
+            from: '"Платформа конференций" <ik.montseva@mail.ru>', 
             to: email,
             subject: 'Восстановление пароля',
             html: `
@@ -4365,7 +4365,7 @@ stylesRouter.post('/api/conferences/:conferenceId/styles', async (req, res) => {
     }
 });
 
-
+app.use('/api', stylesRouter);
 
 
 // ============================================
