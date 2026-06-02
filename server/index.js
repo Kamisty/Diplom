@@ -34,15 +34,14 @@ app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
 
 
-
 // ============================================
-// ПРЯМЫЕ МАРШРУТЫ ДЛЯ СТИЛЕЙ (РАБОТАЮТ 100%)
+// МАРШРУТЫ ДЛЯ СТИЛЕЙ КОНФЕРЕНЦИЙ
 // ============================================
 
-// Получить стили конференции
+// Получить стили конференции (GET)
 app.get('/api/conferences/:conferenceId/styles', async (req, res) => {
     const { conferenceId } = req.params;
-    console.log('🔍 GET /api/conferences/' + conferenceId + '/styles - ВЫЗВАН');
+    console.log('🔍 GET стили для конференции:', conferenceId);
     
     try {
         const conferenceIdInt = parseInt(conferenceId);
@@ -56,18 +55,18 @@ app.get('/api/conferences/:conferenceId/styles', async (req, res) => {
         }
         res.json({ success: true, styles: result.rows[0] });
     } catch (error) {
-        console.error('❌ Ошибка:', error);
+        console.error('❌ Ошибка получения стилей:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// Сохранить стили конференции
+// Сохранить стили конференции (POST)
 app.post('/api/conferences/:conferenceId/styles', async (req, res) => {
     const { conferenceId } = req.params;
     const styles = req.body;
     
-    console.log('💾 POST /api/conferences/' + conferenceId + '/styles - ВЫЗВАН');
-    console.log('📦 Стили для сохранения:', Object.keys(styles));
+    console.log('💾 POST сохранение стилей для конференции:', conferenceId);
+    console.log('📦 Полученные поля:', Object.keys(styles));
     
     try {
         const conferenceIdInt = parseInt(conferenceId);
@@ -88,50 +87,72 @@ app.post('/api/conferences/:conferenceId/styles', async (req, res) => {
             [conferenceIdInt]
         );
         
+        // Значения для INSERT (25 полей, как в клиенте)
+        const insertValues = [
+            conferenceIdInt,
+            styles.page_background || '#ffffff',
+            styles.container_padding || 40,
+            styles.font_family || 'Arial, sans-serif',
+            styles.title_font_size || 32,
+            styles.title_font_weight || '600',
+            styles.title_color || '#f39c12',
+            styles.title_text_align || 'center',
+            styles.title_margin_bottom || 30,
+            styles.authors_font_size || 16,
+            styles.authors_font_weight || '400',
+            styles.authors_color || '#e67e22',
+            styles.authors_text_align || 'center',
+            styles.authors_margin_bottom || 20,
+            styles.abstract_font_size || 14,
+            styles.abstract_font_weight || '400',
+            styles.abstract_color || '#333333',
+            styles.abstract_line_height || 1.6,
+            styles.abstract_margin_bottom || 30,
+            styles.text_font_size || 14,
+            styles.text_line_height || 1.6,
+            styles.text_color || '#333333',
+            styles.text_margin_bottom || 15,
+            styles.table_border_color || '#000000',
+            styles.table_header_bg || '#f8f9fa',
+            styles.table_cell_padding || 8
+        ];
+        
         if (existing.rows.length === 0) {
-            // Вставка
+            // ВСТАВКА (25 полей)
             await pool.query(
                 `INSERT INTO conference_styles (
-                    conference_id, page_background, container_padding, font_family,
-                    title_font_size, title_font_weight, title_color, title_text_align, title_margin_bottom,
-                    authors_font_size, authors_font_weight, authors_color, authors_text_align, authors_margin_bottom,
-                    abstract_font_size, abstract_font_weight, abstract_color, abstract_line_height, abstract_margin_bottom,
-                    text_font_size, text_line_height, text_color, text_margin_bottom,
-                    table_border_color, table_header_bg, table_cell_padding
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
-                `,
-                [
-                    conferenceIdInt,
-                    styles.page_background || '#ffffff',
-                    styles.container_padding || 40,
-                    styles.font_family || 'Arial, sans-serif',
-                    styles.title_font_size || 32,
-                    styles.title_font_weight || '600',
-                    styles.title_color || '#f39c12',
-                    styles.title_text_align || 'center',
-                    styles.title_margin_bottom || 30,
-                    styles.authors_font_size || 16,
-                    styles.authors_font_weight || '400',
-                    styles.authors_color || '#e67e22',
-                    styles.authors_text_align || 'center',
-                    styles.authors_margin_bottom || 20,
-                    styles.abstract_font_size || 14,
-                    styles.abstract_font_weight || '400',
-                    styles.abstract_color || '#333333',
-                    styles.abstract_line_height || 1.6,
-                    styles.abstract_margin_bottom || 30,
-                    styles.text_font_size || 14,
-                    styles.text_line_height || 1.6,
-                    styles.text_color || '#333333',
-                    styles.text_margin_bottom || 15,
-                    styles.table_border_color || '#000000',
-                    styles.table_header_bg || '#f8f9fa',
-                    styles.table_cell_padding || 8
-                ]
+                    conference_id,
+                    page_background,
+                    container_padding,
+                    font_family,
+                    title_font_size,
+                    title_font_weight,
+                    title_color,
+                    title_text_align,
+                    title_margin_bottom,
+                    authors_font_size,
+                    authors_font_weight,
+                    authors_color,
+                    authors_text_align,
+                    authors_margin_bottom,
+                    abstract_font_size,
+                    abstract_font_weight,
+                    abstract_color,
+                    abstract_line_height,
+                    abstract_margin_bottom,
+                    text_font_size,
+                    text_line_height,
+                    text_color,
+                    text_margin_bottom,
+                    table_border_color,
+                    table_header_bg,
+                    table_cell_padding
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)`,
+                insertValues
             );
-            console.log('✅ Стили вставлены');
+            console.log('✅ Стили вставлены для конференции', conferenceIdInt);
         } else {
-            // Обновление
+            // ОБНОВЛЕНИЕ (24 поля + WHERE = 25 параметров)
             await pool.query(
                 `UPDATE conference_styles SET
                     page_background = COALESCE($1, page_background),
@@ -160,8 +181,7 @@ app.post('/api/conferences/:conferenceId/styles', async (req, res) => {
                     table_header_bg = COALESCE($24, table_header_bg),
                     table_cell_padding = COALESCE($25, table_cell_padding),
                     updated_at = CURRENT_TIMESTAMP
-                WHERE conference_id = $26
-                `,
+                WHERE conference_id = $26`,
                 [
                     styles.page_background || null,
                     styles.container_padding || null,
@@ -191,18 +211,19 @@ app.post('/api/conferences/:conferenceId/styles', async (req, res) => {
                     conferenceIdInt
                 ]
             );
-            console.log('✅ Стили обновлены');
+            console.log('✅ Стили обновлены для конференции', conferenceIdInt);
         }
         
         res.json({ success: true, message: 'Стили успешно сохранены' });
     } catch (error) {
-        console.error('❌ Ошибка:', error);
+        console.error('❌ Ошибка сохранения стилей:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
-console.log('✅ Прямые маршруты для стилей зарегистрированы');
-
+console.log('✅ Маршруты стилей зарегистрированы:');
+console.log('   GET  /api/conferences/:id/styles');
+console.log('   POST /api/conferences/:id/styles');
 
 
 
