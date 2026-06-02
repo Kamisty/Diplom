@@ -63,6 +63,7 @@ app.post('/api/conferences/:conferenceId/styles', async (req, res) => {
     
     console.log('💾 POST сохранение стилей для конференции:', conferenceId);
     console.log('📦 Полученные поля:', Object.keys(styles));
+    console.log('📦 Количество полей:', Object.keys(styles).length);
     
     try {
         const conferenceIdInt = parseInt(conferenceId);
@@ -83,7 +84,7 @@ app.post('/api/conferences/:conferenceId/styles', async (req, res) => {
             [conferenceIdInt]
         );
         
-        // ВСЕ 44 ПОЛЯ ТАБЛИЦЫ
+        // ВСЕ ПОЛЯ ТАБЛИЦЫ (без id, created_at, updated_at)
         const allColumns = [
             'conference_id',
             'page_background', 'container_padding', 'font_family',
@@ -101,31 +102,24 @@ app.post('/api/conferences/:conferenceId/styles', async (req, res) => {
         ];
         
         if (existing.rows.length === 0) {
-            // ВСТАВКА — строим динамический запрос
-            const values = [];
-            const placeholders = [];
+            // Динамический INSERT
+            const columnNames = allColumns.join(', ');
+            const placeholders = allColumns.map((_, i) => `$${i + 1}`).join(', ');
             
-            for (let i = 0; i < allColumns.length; i++) {
-                const column = allColumns[i];
-                if (column === 'conference_id') {
-                    values.push(conferenceIdInt);
-                    placeholders.push(`$${values.length}`);
-                } else {
-                    const value = styles[column] !== undefined ? styles[column] : null;
-                    values.push(value);
-                    placeholders.push(`$${values.length}`);
-                }
-            }
+            const insertValues = allColumns.map(column => {
+                if (column === 'conference_id') return conferenceIdInt;
+                return styles[column] !== undefined ? styles[column] : null;
+            });
             
-            const insertQuery = `
-                INSERT INTO conference_styles (${allColumns.join(', ')})
-                VALUES (${placeholders.join(', ')})
-            `;
+            const insertQuery = `INSERT INTO conference_styles (${columnNames}) VALUES (${placeholders})`;
             
-            await pool.query(insertQuery, values);
+            console.log('📝 INSERT запрос:', insertQuery);
+            console.log('📦 Количество значений:', insertValues.length);
+            
+            await pool.query(insertQuery, insertValues);
             console.log('✅ Стили вставлены для конференции', conferenceIdInt);
         } else {
-            // ОБНОВЛЕНИЕ — обновляем только те поля, которые пришли от клиента
+            // Обновление
             const updateFields = [];
             const updateValues = [];
             let paramIndex = 1;
@@ -139,7 +133,6 @@ app.post('/api/conferences/:conferenceId/styles', async (req, res) => {
             }
             
             updateValues.push(conferenceIdInt);
-            
             const updateQuery = `
                 UPDATE conference_styles 
                 SET ${updateFields.join(', ')}, updated_at = CURRENT_TIMESTAMP
@@ -158,12 +151,6 @@ app.post('/api/conferences/:conferenceId/styles', async (req, res) => {
 });
 
 console.log('✅ Маршруты стилей зарегистрированы');
-
-
-
-
-
-
 
 
 
