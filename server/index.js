@@ -4363,30 +4363,30 @@ app.delete('/api/reports/:reportId', async (req, res) => {
 //             return res.json({ success: true, styles: null });
 //         }
         
-        res.json({ success: true, styles: result.rows[0] });
-    } catch (error) {
-        console.error('❌ Ошибка получения стилей:', error);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
+//         res.json({ success: true, styles: result.rows[0] });
+//     } catch (error) {
+//         console.error('❌ Ошибка получения стилей:', error);
+//         res.status(500).json({ success: false, error: error.message });
+//     }
+// });
 
-// Сохранить стили конференции
-stylesRouter.post('/conferences/:conferenceId/styles', async (req, res) => {
-    const { conferenceId } = req.params;
-    const styles = req.body;
-    const db = req.app.get('db');
+// // Сохранить стили конференции
+// stylesRouter.post('/conferences/:conferenceId/styles', async (req, res) => {
+//     const { conferenceId } = req.params;
+//     const styles = req.body;
+//     const db = req.app.get('db');
     
-    console.log('=== POST СОХРАНЕНИЕ СТИЛЕЙ ===');
-    console.log('conferenceId:', conferenceId);
-    console.log('Полученные поля:', Object.keys(styles));
+//     console.log('=== POST СОХРАНЕНИЕ СТИЛЕЙ ===');
+//     console.log('conferenceId:', conferenceId);
+//     console.log('Полученные поля:', Object.keys(styles));
     
-    if (!db) {
-        console.error('❌ db не инициализирован!');
-        return res.status(500).json({ success: false, error: 'Ошибка подключения к БД' });
-    }
+//     if (!db) {
+//         console.error('❌ db не инициализирован!');
+//         return res.status(500).json({ success: false, error: 'Ошибка подключения к БД' });
+//     }
     
-    try {
-        const conferenceIdInt = parseInt(conferenceId);
+//     try {
+//         const conferenceIdInt = parseInt(conferenceId);
         
 //         // Проверяем существование конференции
 //         const conferenceCheck = await db.query(
