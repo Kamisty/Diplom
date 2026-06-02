@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Conference.css';
 import StyleEditor from '../../components/StyleEditor/StyleEditor';
+
 const CreateConference = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
@@ -154,10 +155,7 @@ const CreateConference = () => {
       <div className="conference-page">
         <div className="container">
           <h1>Создание новой конференции - Шаг 1 из 2</h1>
-          <div className="step-indicator">
-            <div className="step active">1. Основная информация</div>
-            <div className="step">2. Настройка стилей</div>
-          </div>
+         
           
           {message.text && (
             <div className={`message ${message.type}`}>
