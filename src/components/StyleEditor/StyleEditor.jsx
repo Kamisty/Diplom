@@ -28,6 +28,25 @@ const StyleEditor = ({ conferenceId, onSave, onClose, embedded = true }) => {
         table_border_color: '#000000',
         table_header_bg: '#f8f9fa',
         table_cell_padding: 8,
+        keywords_font_size: 14,
+        keywords_font_weight: '600',
+        keywords_color: '#e67e22',
+        keywords_margin_bottom: 30,
+        section_title_font_size: 24,
+        section_title_font_weight: '500',
+        section_title_color: '#e67e22',
+        section_title_margin_top: 30,
+        section_title_margin_bottom: 15,
+        image_max_width: '100%',
+        image_margin_top: 20,
+        image_margin_bottom: 20,
+        formula_font_size: 16,
+        formula_color: '#333333',
+        formula_text_align: 'center',
+        references_font_size: 12,
+        references_line_height: 1.4,
+        references_color: '#666666',
+        created_by: null
     });
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
