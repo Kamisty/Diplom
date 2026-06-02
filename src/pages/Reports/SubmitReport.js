@@ -6,7 +6,8 @@ import TableManager from '../../components/article/TableManager';
 import ImageManager from '../../components/article/ImageManager';
 import FormulaManager from '../../components/article/FormulaManager';
 import TextEditor from '../../components/article/TextEditor';
-
+import 'katex/dist/katex.min.css';
+import { BlockMath, InlineMath } from 'react-katex';
 import './Reports.css';
 
 
@@ -33,7 +34,39 @@ const SubmitReport = () => {
   const [errors, setErrors] = useState({});
   const [template, setTemplate] = useState(null);
   const [conferenceTemplate, setConferenceTemplate] = useState(null);
+  // Добавьте в начало компонента с другими useState
+const [conferenceStyles, setConferenceStyles] = useState(null);
+const [loadingStyles, setLoadingStyles] = useState(false);
+
+// Функция загрузки стилей конференции (добавьте рядом с другими fetch-функциями)
+const loadConferenceStyles = async (conferenceId) => {
+  if (!conferenceId) {
+    setConferenceStyles(null);
+    return;
+  }
   
+  setLoadingStyles(true);
+  try {
+    console.log(`🔍 Загрузка стилей для конференции ${conferenceId}...`);
+    const response = await fetch(`https://diplom-j6uo.onrender.com/api/conferences/${conferenceId}/styles`);
+    const data = await response.json();
+    
+    console.log('📦 Ответ от сервера (styles):', data);
+    
+    if (data.success && data.styles) {
+      setConferenceStyles(data.styles);
+      console.log('✅ Стили конференции загружены:', data.styles);
+    } else {
+      setConferenceStyles(null);
+      console.log('⚠️ Стили для конференции не найдены');
+    }
+  } catch (error) {
+    console.error('❌ Ошибка загрузки стилей:', error);
+    setConferenceStyles(null);
+  } finally {
+    setLoadingStyles(false);
+  }
+};
   const [article, setArticle] = useState({
     annotation: '',
     keywords: '',
@@ -127,7 +160,25 @@ const SubmitReport = () => {
       }
     }
   }, []);
-  
+  useEffect(() => {
+  if (formData.conferenceId) {
+    loadConferenceStyles(formData.conferenceId);
+  } else {
+    setConferenceStyles(null);
+  }
+}, [formData.conferenceId]);
+
+// Загрузка секций и шаблона при выборе конференции
+useEffect(() => {
+  if (formData.conferenceId) {
+    fetchSections(formData.conferenceId);
+    loadConferenceTemplate(formData.conferenceId);
+    setFormData(prev => ({ ...prev, sectionId: '' }));
+  } else {
+    setSections([]);
+    setConferenceTemplate(null);
+  }
+}, [formData.conferenceId]);
   // ==================== 4. ВСЕ ФУНКЦИИ ====================
   
   const showTemporaryMessage = (message) => {
@@ -1208,7 +1259,14 @@ const handleSubmit = async (e) => {
     }
   `;
   document.head.appendChild(styleSheet);
-  
+
+  const getConferenceStyle = (styleName, defaultValue) => {
+  if (conferenceStyles && conferenceStyles[styleName] !== undefined && conferenceStyles[styleName] !== null) {
+    return conferenceStyles[styleName];
+  }
+  return defaultValue;
+};
+
   return (
     <div style={styles.app}>
       {showSaveMessage && (
@@ -1687,155 +1745,370 @@ const handleSubmit = async (e) => {
           </div>
           
           {errors.content && <span style={styles.errorMessage}>{errors.content}</span>}
+  
         </form>
       ) : (
-  <div style={styles.previewContainer}>
-    <h2 style={styles.previewTitle}>Научная статья</h2>
-    
-    {/* ✅ Добавьте название конференции, если выбрана */}
-    {formData.conferenceId && conferenceTemplate && (
-      <div style={styles.previewSection}>
-        <div style={styles.previewLabel}>Конференция</div>
-        <div>{conferences.find(c => c.id === parseInt(formData.conferenceId))?.title || 'Не указана'}</div>
-      </div>
-    )}
-    
-    {/* ✅ Применяем стили из шаблона к авторам */}
-    <div style={styles.previewSection}>
-      <div style={styles.previewLabel}>Авторы</div>
-      <div style={conferenceTemplate?.styles?.authors}>
-        {formData.authors.filter(a => a.trim()).join(', ') || 'Не указаны'}
-      </div>
-    </div>
-    
-    {/* ✅ Применяем стили из шаблона к аннотации */}
-    <div style={styles.previewSection}>
-      <div style={styles.previewLabel}>Аннотация</div>
-      <div style={conferenceTemplate?.styles?.abstract}>
-        {article.annotation || 'Аннотация отсутствует'}
-      </div>
-    </div>
-    
-    {/* ✅ Применяем стили из шаблона к ключевым словам */}
-    {article.keywords && (
-      <div style={styles.previewSection}>
-        <div style={styles.previewLabel}>Ключевые слова</div>
-        <div style={conferenceTemplate?.styles?.keywords}>
-          {article.keywords}
+  <div style={{
+    backgroundColor: getConferenceStyle('page_background', '#ffffff'),
+    padding: `${getConferenceStyle('container_padding', 40)}px`,
+    fontFamily: getConferenceStyle('font_family', 'Futura PT, -apple-system, BlinkMacSystemFont, sans-serif'),
+    minHeight: '100vh'
+  }}>
+    <div style={{ 
+      maxWidth: '800px', 
+      margin: '0 auto',
+      backgroundColor: getConferenceStyle('page_background', '#ffffff')
+    }}>
+      {/* Название статьи */}
+      <h2 style={{
+        fontSize: getConferenceStyle('title_font_size', 32),
+        fontWeight: getConferenceStyle('title_font_weight', '600'),
+        color: getConferenceStyle('title_color', '#f39c12'),
+        textAlign: getConferenceStyle('title_text_align', 'center'),
+        marginBottom: getConferenceStyle('title_margin_bottom', 30)
+      }}>
+        {formData.title || 'Научная статья'}
+      </h2>
+      
+      {/* Конференция (опционально) */}
+      {formData.conferenceId && conferences.find(c => c.id === parseInt(formData.conferenceId)) && (
+        <div style={{
+          textAlign: 'center',
+          marginBottom: 20,
+          fontSize: 14,
+          color: '#666'
+        }}>
+          {conferences.find(c => c.id === parseInt(formData.conferenceId))?.title}
         </div>
+      )}
+      
+      {/* Авторы - стили автоматически из БД */}
+      <div style={{
+        fontSize: getConferenceStyle('authors_font_size', 16),
+        fontWeight: getConferenceStyle('authors_font_weight', '400'),
+        color: getConferenceStyle('authors_color', '#e67e22'),
+        textAlign: getConferenceStyle('authors_text_align', 'center'),
+        marginBottom: getConferenceStyle('authors_margin_bottom', 20)
+      }}>
+        {formData.authors.filter(a => a.trim()).join(', ') || 'Авторы не указаны'}
       </div>
-    )}
-    
-    {/* ✅ Применяем стили из шаблона к содержанию */}
-    <div style={styles.previewSection}>
-      <div style={styles.previewLabel}>Содержание</div>
-      <div style={conferenceTemplate?.styles?.content}>
+      
+      {/* Аннотация - стили автоматически из БД */}
+      <div style={{
+        fontSize: getConferenceStyle('abstract_font_size', 14),
+        fontWeight: getConferenceStyle('abstract_font_weight', '400'),
+        color: getConferenceStyle('abstract_color', '#333333'),
+        lineHeight: getConferenceStyle('abstract_line_height', 1.6),
+        marginBottom: getConferenceStyle('abstract_margin_bottom', 30)
+      }}>
+        <strong>Аннотация:</strong> {article.annotation || 'Аннотация отсутствует'}
+      </div>
+      
+      {/* Ключевые слова - стили автоматически из БД */}
+      {article.keywords && (
+        <div style={{
+          fontSize: getConferenceStyle('keywords_font_size', 14),
+          fontWeight: getConferenceStyle('keywords_font_weight', '600'),
+          color: getConferenceStyle('keywords_color', '#e67e22'),
+          marginBottom: getConferenceStyle('keywords_margin_bottom', 30)
+        }}>
+          <strong>Ключевые слова:</strong> {article.keywords}
+        </div>
+      )}
+      
+      {/* Содержание - стили автоматически из БД */}
+      <div>
+        <strong style={{
+          fontSize: getConferenceStyle('section_title_font_size', 24),
+          fontWeight: getConferenceStyle('section_title_font_weight', '500'),
+          color: getConferenceStyle('section_title_color', '#e67e22'),
+          marginBottom: getConferenceStyle('section_title_margin_bottom', 15),
+          display: 'block'
+        }}>
+          Содержание
+        </strong>
+        
         {contentBlocks.length > 0 ? (
           contentBlocks.map((block) => {
             switch (block.type) {
               case 'text':
                 return (
-                  <div key={block.id} style={{ margin: '20px 0', ...(conferenceTemplate?.styles?.textBlock || {}) }}>
+                  <div key={block.id} style={{
+                    fontSize: getConferenceStyle('text_font_size', 14),
+                    lineHeight: getConferenceStyle('text_line_height', 1.6),
+                    color: getConferenceStyle('text_color', '#333333'),
+                    marginBottom: getConferenceStyle('text_margin_bottom', 15)
+                  }}>
                     <div dangerouslySetInnerHTML={{ __html: block.content }} />
                   </div>
                 );
-              case 'table':
-                return (
-                  <div key={block.id}>
-                    <div style={conferenceTemplate?.styles?.tableCaption}>
-                      Таблица {block.number} — {block.caption}
-                    </div>
-                    <div style={{ overflowX: 'auto' }}>
-                      <table style={{ 
-                        borderCollapse: 'collapse', 
-                        width: '100%',
-                        ...(conferenceTemplate?.styles?.table || {})
-                      }}>
-                        <thead>
-                          <tr>
-                            {block.headers?.map((header, i) => (
-                              <th key={i} style={{ 
-                                border: '1px solid black', 
-                                padding: '8px',
-                                ...(conferenceTemplate?.styles?.tableHeader || {})
-                              }}>{header}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {block.data?.map((row, i) => (
-                            <tr key={i}>
-                              {row.map((cell, j) => (
-                                <td key={j} style={{ 
-                                  border: '1px solid black', 
-                                  padding: '8px',
-                                  ...(conferenceTemplate?.styles?.tableCell || {})
-                                }}>{cell}</td>
-                              ))}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                );
+              
+             case 'table':
+  // Получаем данные об объединенных и повернутых ячейках
+  const mergedCells = block.mergedCells || {};
+  const rotatedCells = block.rotatedCells || {};
+  const tableData = block.data || [];
+  const rows = tableData.length;
+  const cols = tableData[0]?.length || 0;
+  
+  // Функция для определения, должна ли ячейка отображаться (не скрыта ли она объединением)
+  const shouldRenderCell = (row, col) => {
+    for (const [key, info] of Object.entries(mergedCells)) {
+      const [startRow, startCol] = key.split('-').map(Number);
+      if (row >= startRow && row < startRow + info.rowspan &&
+          col >= startCol && col < startCol + info.colspan) {
+        return startRow === row && startCol === col;
+      }
+    }
+    return true;
+  };
+  
+  // Функция для получения значения ячейки с учетом объединения
+  const getCellValue = (row, col) => {
+    for (const [key, info] of Object.entries(mergedCells)) {
+      const [startRow, startCol] = key.split('-').map(Number);
+      if (row >= startRow && row < startRow + info.rowspan &&
+          col >= startCol && col < startCol + info.colspan) {
+        return info.value || tableData[startRow]?.[startCol] || '';
+      }
+    }
+    return tableData[row]?.[col] || '';
+  };
+  
+  // Функция для получения rowSpan/colSpan
+  const getSpan = (row, col) => {
+    for (const [key, info] of Object.entries(mergedCells)) {
+      const [startRow, startCol] = key.split('-').map(Number);
+      if (row === startRow && col === startCol) {
+        return { rowSpan: info.rowspan, colSpan: info.colspan };
+      }
+    }
+    return { rowSpan: 1, colSpan: 1 };
+  };
+  
+  // Проверяем, повернута ли ячейка
+  const isRotated = (row, col) => {
+    return rotatedCells[`${row}-${col}`] || false;
+  };
+  
+  // Проверяем, есть ли реальные заголовки
+  const hasHeaders = block.headers && 
+                     block.headers.length > 0 && 
+                     block.headers.some(header => header && header.trim() !== '');
+  
+  return (
+    <div key={block.id} style={{ margin: '20px 0' }}>
+      <div style={{
+        fontSize: 14,
+        fontWeight: '600',
+        marginBottom: 8,
+        color: getConferenceStyle('text_color', '#333333')
+      }}>
+        Таблица {block.number} — {block.caption}
+      </div>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{
+          borderCollapse: 'collapse',
+          width: '100%',
+          border: `1px solid ${getConferenceStyle('table_border_color', '#000000')}`
+        }}>
+          {/* Заголовки таблицы */}
+          {hasHeaders && (
+            <thead>
+              <tr>
+                {block.headers.map((header, i) => (
+                  <th key={i} style={{
+                    border: `1px solid ${getConferenceStyle('table_border_color', '#000000')}`,
+                    padding: `${getConferenceStyle('table_cell_padding', 8)}px`,
+                    backgroundColor: getConferenceStyle('table_header_bg', '#f8f9fa'),
+                    fontWeight: '600'
+                  }}>
+                    {header || ''}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+          )}
+          
+          {/* Тело таблицы с поддержкой объединенных ячеек */}
+          <tbody>
+            {Array.from({ length: rows }).map((_, rowIndex) => {
+              // Пропускаем строки, которые полностью скрыты объединениями
+              let hasVisibleCells = false;
+              for (let colIndex = 0; colIndex < cols; colIndex++) {
+                if (shouldRenderCell(rowIndex, colIndex)) {
+                  hasVisibleCells = true;
+                  break;
+                }
+              }
+              if (!hasVisibleCells) return null;
+              
+              return (
+                <tr key={rowIndex}>
+                  {Array.from({ length: cols }).map((_, colIndex) => {
+                    if (!shouldRenderCell(rowIndex, colIndex)) {
+                      return null;
+                    }
+                    
+                    const { rowSpan, colSpan } = getSpan(rowIndex, colIndex);
+                    const cellValue = getCellValue(rowIndex, colIndex);
+                    const rotated = isRotated(rowIndex, colIndex);
+                    
+                    return (
+                      <td 
+                        key={`${rowIndex}-${colIndex}`}
+                        rowSpan={rowSpan}
+                        colSpan={colSpan}
+                        style={{
+                          border: `1px solid ${getConferenceStyle('table_border_color', '#000000')}`,
+                          padding: rotated ? '4px' : `${getConferenceStyle('table_cell_padding', 8)}px`,
+                          textAlign: 'center',
+                          verticalAlign: 'middle',
+                          ...(rotated && {
+                            writingMode: 'vertical-rl',  // Вертикальное направление текста
+                            textOrientation: 'mixed',     // Буквы не переворачиваются
+                            whiteSpace: 'nowrap',
+                            minWidth: '30px',
+                            height: 'auto'
+                          })
+                        }}
+                      >
+                        {rotated ? (
+                          <div style={{ 
+                            display: 'inline-block',
+                            transform: 'rotate(0deg)'  // Явно отменяем поворот букв
+                          }}>
+                            {cellValue}
+                          </div>
+                        ) : (
+                          cellValue
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
               case 'image':
                 return (
-                  <div key={block.id} style={{ textAlign: block.align, margin: '30px 0' }}>
-                    <img src={block.src} alt={block.caption} style={{ maxWidth: '100%', width: block.width }} />
-                    <div style={{ 
-                      marginTop: '8px', 
-                      fontSize: '12px', 
-                      color: '#666',
-                      ...(conferenceTemplate?.styles?.figureCaption || {})
+                  <div key={block.id} style={{
+                    textAlign: block.align || 'center',
+                    marginTop: getConferenceStyle('image_margin_top', 20),
+                    marginBottom: getConferenceStyle('image_margin_bottom', 20)
+                  }}>
+                    <img 
+                      src={block.src} 
+                      alt={block.caption} 
+                      style={{ 
+                        maxWidth: getConferenceStyle('image_max_width', '100%'),
+                        width: block.width,
+                        height: 'auto'
+                      }} 
+                    />
+                    <div style={{
+                      marginTop: '8px',
+                      fontSize: '12px',
+                      color: '#666'
                     }}>
                       Рисунок {block.number} — {block.caption}
                     </div>
                   </div>
                 );
-              case 'formula':
-                return (
-                  <div key={block.id} style={{ 
-                    textAlign: block.align || 'center', 
-                    margin: '30px 0', 
-                    fontSize: block.size || 16,
-                    ...(conferenceTemplate?.styles?.formula || {})
-                  }}>
-                    <strong>Формула {block.number}:</strong> {block.formulaString || block.content}
-                  </div>
-                );
+              
+      case 'formula':
+  // Получаем LaTeX строку из блока
+  const formulaText = block.formulaString || block.content || '';
+  
+  // Очищаем от лишних символов
+  const cleanFormula = formulaText
+    .replace(/\\\\/g, '\\')
+    .replace(/\\\[|\\\]|\\\(|\\\)/g, '');
+  
+  return (
+    <div key={block.id} style={{
+      fontSize: getConferenceStyle('formula_font_size', 16),
+      color: getConferenceStyle('formula_color', '#333333'),
+      textAlign: block.align || getConferenceStyle('formula_text_align', 'center'),
+      margin: '20px 0',
+      padding: '15px',
+      backgroundColor: 'white',
+      borderRadius: '8px',
+      overflowX: 'auto'
+    }}>
+      <BlockMath math={cleanFormula} />
+      <div style={{ 
+        marginTop: '12px',
+        textAlign: 'center',
+        fontSize: '12px',
+        color: '#666',
+        fontStyle: 'italic'
+      }}>
+        Формула {block.number}
+      </div>
+    </div>
+  );
+              
               default:
                 return null;
             }
           })
         ) : (
-          <div style={styles.emptyState}>Содержание статьи пусто</div>
+          <div style={{
+            textAlign: 'center',
+            padding: '60px',
+            color: '#999',
+            fontSize: '16px'
+          }}>
+            Содержание статьи пусто
+          </div>
         )}
       </div>
-    </div>
-    
-    {/* ✅ Применяем стили из шаблона к литературе */}
-    {literature && (
-      <div style={styles.previewSection}>
-        <div style={styles.previewLabel}>Список литературы</div>
-        <div style={{ 
-          whiteSpace: 'pre-wrap', 
-          fontSize: '14px', 
-          lineHeight: '1.5',
-          ...(conferenceTemplate?.styles?.references || {})
+      
+      {/* Список литературы - стили автоматически из БД */}
+      {literature && (
+        <div style={{
+          marginTop: 40,
+          fontSize: getConferenceStyle('references_font_size', 12),
+          lineHeight: getConferenceStyle('references_line_height', 1.4),
+          color: getConferenceStyle('references_color', '#666666')
         }}>
-          {literature}
+          <strong style={{
+            fontSize: getConferenceStyle('section_title_font_size', 24),
+            fontWeight: getConferenceStyle('section_title_font_weight', '500'),
+            color: getConferenceStyle('section_title_color', '#e67e22'),
+            marginBottom: getConferenceStyle('section_title_margin_bottom', 15),
+            display: 'block'
+          }}>
+            Список литературы
+          </strong>
+          <div style={{ whiteSpace: 'pre-wrap' }}>
+            {literature}
+          </div>
         </div>
+      )}
+      
+      <div style={{ marginTop: '30px', textAlign: 'center' }}>
+        <button 
+          onClick={() => setShowPreview(false)} 
+          style={{
+            ...styles.previewButton,
+            backgroundColor: '#f39c12',
+            color: '#fff',
+            border: 'none'
+          }}
+        >
+          ← Вернуться к редактированию
+        </button>
       </div>
-    )}
-    
-    <div style={{ marginTop: '30px', textAlign: 'center' }}>
-      <button onClick={() => setShowPreview(false)} style={styles.previewButton}>
-        ← Вернуться к редактированию
-      </button>
     </div>
   </div>
 )}
+
       {/* Модальные окна */}
       <TableManager
         isOpen={isTableManagerOpen}
@@ -1875,4 +2148,3 @@ const handleSubmit = async (e) => {
  
 
 export default SubmitReport;
-

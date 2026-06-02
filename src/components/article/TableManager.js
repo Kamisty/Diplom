@@ -1,5 +1,6 @@
-// src/components/TableManager.js
+// src/components/article/TableManager.jsx
 import React, { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 
 const TableManager = ({ 
   isOpen, 
@@ -17,7 +18,6 @@ const TableManager = ({
   const [startCell, setStartCell] = useState(null);
   const [mergedCells, setMergedCells] = useState({});
   const [rotatedCells, setRotatedCells] = useState({});
-  const [showDraftMessage, setShowDraftMessage] = useState(false);
 
   // Инициализация при редактировании
   useEffect(() => {
@@ -111,7 +111,6 @@ const TableManager = ({
     return selectedCells.some(cell => cell.row === row && cell.col === col);
   };
 
-  // Очистка выделения
   const clearSelection = () => {
     setSelectedCells([]);
   };
@@ -177,7 +176,6 @@ const TableManager = ({
     setSelectedCells([]);
   };
 
-  // Функции для удаления строк и столбцов
   const deleteRows = () => {
     if (selectedCells.length === 0) {
       alert('Сначала выделите ячейку или область');
@@ -219,7 +217,7 @@ const TableManager = ({
     setSelectedCells([]);
   };
 
-  // Поворот текста в ячейке
+  // Поворот текста в ячейке (вертикально)
   const rotateCell = () => {
     if (selectedCells.length === 0) {
       alert('Сначала выделите ячейку или область');
@@ -260,7 +258,6 @@ const TableManager = ({
     const newMergedCells = { ...mergedCells };
     const newData = [...tableData];
     
-    // Собираем значения
     const mergedValue = [];
     for (let r = minRow; r <= maxRow; r++) {
       for (let c = minCol; c <= maxCol; c++) {
@@ -278,7 +275,6 @@ const TableManager = ({
       }
     }
 
-    // Удаляем старые объединения
     const cellsToRemove = [];
     for (const key of Object.keys(newMergedCells)) {
       const [r, c] = key.split('-').map(Number);
@@ -288,7 +284,6 @@ const TableManager = ({
     }
     cellsToRemove.forEach(key => delete newMergedCells[key]);
 
-    // Создаем новую объединенную ячейку
     const mainKey = `${minRow}-${minCol}`;
     newMergedCells[mainKey] = {
       rowspan: maxRow - minRow + 1,
@@ -296,7 +291,6 @@ const TableManager = ({
       value: mergedValue.join(' ')
     };
 
-    // Очищаем данные
     for (let r = minRow; r <= maxRow; r++) {
       for (let c = minCol; c <= maxCol; c++) {
         if (r === minRow && c === minCol) {
@@ -312,7 +306,6 @@ const TableManager = ({
     setSelectedCells([]);
   };
 
-  // Разъединение ячеек
   const splitCell = (row, col) => {
     const actual = getActualCell(row, col);
     if (!actual.merged) return;
@@ -336,7 +329,6 @@ const TableManager = ({
     setTableData(newData);
   };
 
-  // Форматирование текста
   const applyFormatting = (format) => {
     if (selectedCells.length === 0) {
       alert('Сначала выделите ячейку или область');
@@ -379,7 +371,80 @@ const TableManager = ({
     setMergedCells(newMergedCells);
   };
 
-  // Проверка заполненности таблицы
+  // Импорт из Excel
+  const importFromExcel = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+      
+      if (jsonData.length > 0) {
+        const newRows = Math.min(jsonData.length, 20);
+        const newCols = Math.min(Math.max(...jsonData.map(row => row.length)), 10);
+        
+        const newData = Array(newRows).fill().map((_, i) => 
+          Array(newCols).fill('').map((_, j) => jsonData[i]?.[j] || '')
+        );
+        
+        setTableRows(newRows);
+        setTableCols(newCols);
+        setTableData(newData);
+        alert(`✅ Импортировано ${newRows} строк и ${newCols} столбцов`);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  // Стиль ячейки с поддержкой вертикального текста
+  const getCellStyle = (isSelected, isEmpty, isRotated, cellValue) => {
+    const baseStyle = {
+      padding: isRotated ? '2px' : '8px',
+      border: '1px solid #000',
+      fontFamily: 'Times New Roman, serif',
+      fontSize: '14px',
+      backgroundColor: isSelected ? '#e6f2ff' : isEmpty ? '#fff3f3' : 'transparent',
+      cursor: 'pointer',
+      textAlign: 'center',
+      verticalAlign: 'middle',
+      whiteSpace: 'normal',
+      wordWrap: 'break-word',
+      maxWidth: '200px',
+      minWidth: '60px'
+    };
+
+    if (isRotated) {
+      return {
+        ...baseStyle,
+        writingMode: 'vertical-rl',
+        textOrientation: 'mixed',
+        whiteSpace: 'normal',
+        minWidth: '40px',
+        maxWidth: '60px',
+        height: 'auto',
+        minHeight: '80px'
+      };
+    }
+
+    const textLength = (cellValue || '').length;
+    if (textLength > 50) {
+      baseStyle.minWidth = '150px';
+      baseStyle.maxWidth = '300px';
+    } else if (textLength > 20) {
+      baseStyle.minWidth = '100px';
+      baseStyle.maxWidth = '200px';
+    } else {
+      baseStyle.minWidth = '60px';
+      baseStyle.width = 'auto';
+    }
+
+    return baseStyle;
+  };
+
   const isTableValid = () => {
     for (let r = 0; r < tableRows; r++) {
       for (let c = 0; c < tableCols; c++) {
@@ -401,67 +466,6 @@ const TableManager = ({
     return true;
   };
 
-  // Сохранение черновика
-  const saveDraft = () => {
-    const cleanData = tableData.map(row => 
-      row.map(cell => cell === '__MERGED__' ? '' : cell)
-    );
-    
-    const draft = {
-      caption: tableCaption,
-      data: cleanData,
-      rows: tableRows,
-      cols: tableCols,
-      mergedCells: mergedCells,
-      rotatedCells: rotatedCells,
-      timestamp: new Date().toLocaleString()
-    };
-    localStorage.setItem('tableDraft', JSON.stringify(draft));
-    setShowDraftMessage(true);
-    setTimeout(() => setShowDraftMessage(false), 3000);
-  };
-
-  // Загрузка черновика
-  const loadDraft = () => {
-    const savedDraft = localStorage.getItem('tableDraft');
-    if (savedDraft) {
-      try {
-        const draft = JSON.parse(savedDraft);
-        setTableRows(draft.rows);
-        setTableCols(draft.cols);
-        setTableCaption(draft.caption || '');
-        setRotatedCells(draft.rotatedCells || {});
-        
-        const newData = draft.data.map(row => [...row]);
-        
-        if (draft.mergedCells) {
-          const newMergedCells = {};
-          Object.entries(draft.mergedCells).forEach(([key, info]) => {
-            newMergedCells[key] = { ...info };
-            
-            const [startRow, startCol] = key.split('-').map(Number);
-            for (let r = startRow; r < startRow + info.rowspan; r++) {
-              for (let c = startCol; c < startCol + info.colspan; c++) {
-                if (r !== startRow || c !== startCol) {
-                  if (!newData[r]) newData[r] = [];
-                  newData[r][c] = '__MERGED__';
-                }
-              }
-            }
-          });
-          setMergedCells(newMergedCells);
-        }
-        
-        setTableData(newData);
-        alert('✅ Черновик загружен');
-      } catch (error) {
-        alert('❌ Ошибка при загрузке черновика');
-      }
-    } else {
-      alert('❌ Нет сохраненного черновика');
-    }
-  };
-
   const handleSave = () => {
     if (!isTableValid()) {
       alert('❌ Заполните все ячейки таблицы перед сохранением');
@@ -472,12 +476,9 @@ const TableManager = ({
       row.map(cell => cell === '__MERGED__' ? '' : cell)
     );
     
-    // Пустые заголовки, чтобы они не отображались в предпросмотре
-    const headers = Array(tableCols).fill('');
-    
     const tableDataToSave = {
       caption: tableCaption.trim() || `Таблица ${editingBlock?.number || tableCounter}`,
-      headers: headers,
+      headers: Array(tableCols).fill(''),
       data: cleanData,
       rows: tableRows,
       cols: tableCols,
@@ -493,241 +494,20 @@ const TableManager = ({
     setSelectedCells([]);
     setMergedCells({});
     setRotatedCells({});
-    setShowDraftMessage(false);
     onClose();
   };
 
   if (!isOpen && !editingBlock) return null;
 
-  const styles = {
-    overlay: {
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      zIndex: 1000
-    },
-    modal: {
-      backgroundColor: '#fff',
-      padding: '20px',
-      borderRadius: '8px',
-      maxWidth: '900px',
-      width: '95%',
-      maxHeight: '90vh',
-      overflow: 'auto',
-      border: '1px solid #000',
-      position: 'relative'
-    },
-    title: {
-      fontSize: '18px',
-      fontWeight: 'bold',
-      marginBottom: '15px',
-      textAlign: 'center',
-      fontFamily: 'Times New Roman, serif'
-    },
-    captionInput: {
-      width: '100%',
-      padding: '8px',
-      border: '1px solid #000',
-      fontSize: '14px',
-      fontFamily: 'Times New Roman, serif',
-      marginBottom: '15px',
-      borderRadius: '4px'
-    },
-    controlsRow: {
-      display: 'flex',
-      gap: '15px',
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexWrap: 'wrap',
-      marginBottom: '15px',
-      padding: '10px',
-      backgroundColor: '#f8f9fa',
-      borderRadius: '4px'
-    },
-    controlGroup: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px'
-    },
-    label: {
-      fontFamily: 'Times New Roman, serif',
-      fontSize: '14px'
-    },
-    numberInput: {
-      width: '60px',
-      padding: '4px',
-      border: '1px solid #000',
-      fontSize: '14px',
-      fontFamily: 'Times New Roman, serif',
-      textAlign: 'center'
-    },
-    toolbar: {
-      display: 'flex',
-      gap: '10px',
-      flexWrap: 'wrap',
-      marginBottom: '15px',
-      padding: '10px',
-      backgroundColor: '#f8f9fa',
-      border: '1px solid #000',
-      borderRadius: '4px',
-      justifyContent: 'center'
-    },
-    toolGroup: {
-      display: 'flex',
-      gap: '5px',
-      alignItems: 'center',
-      padding: '0 10px',
-      borderRight: '1px solid #ccc'
-    },
-    toolButton: {
-      padding: '5px 10px',
-      backgroundColor: '#fff',
-      border: '1px solid #000',
-      cursor: 'pointer',
-      fontSize: '12px',
-      fontFamily: 'Times New Roman, serif',
-      borderRadius: '3px',
-      minWidth: '60px',
-      ':hover': {
-        backgroundColor: '#e9ecef'
-      }
-    },
-    toolButtonSmall: {
-      padding: '5px 10px',
-      backgroundColor: '#fff',
-      border: '1px solid #000',
-      cursor: 'pointer',
-      fontSize: '12px',
-      fontFamily: 'Times New Roman, serif',
-      borderRadius: '3px',
-      minWidth: '30px',
-      ':hover': {
-        backgroundColor: '#e9ecef'
-      }
-    },
-    dataTable: {
-      width: '100%',
-      borderCollapse: 'collapse',
-      marginBottom: '15px',
-      tableLayout: 'fixed'
-    },
-    td: (isSelected, isEmpty, isRotated) => ({
-      padding: isRotated ? '2px' : '6px',
-      border: '1px solid #000',
-      fontFamily: 'Times New Roman, serif',
-      fontSize: '14px',
-      backgroundColor: isSelected ? '#e6f2ff' : isEmpty ? '#fff3f3' : 'transparent',
-      cursor: 'pointer',
-      height: isRotated ? '60px' : '40px',
-      width: isRotated ? '40px' : 'auto',
-      ...(isRotated && {
-        writingMode: 'vertical-rl',
-        textOrientation: 'mixed',
-        whiteSpace: 'nowrap'
-      })
-    }),
-    cellInput: {
-      width: '100%',
-      height: '100%',
-      padding: '4px',
-      border: '1px solid transparent',
-      textAlign: 'center',
-      fontFamily: 'Times New Roman, serif',
-      fontSize: '14px',
-      backgroundColor: 'transparent',
-      outline: 'none',
-      boxSizing: 'border-box',
-      ':focus': {
-        border: '1px solid #007bff'
-      }
-    },
-    buttonGroup: {
-      display: 'flex',
-      gap: '10px',
-      justifyContent: 'center',
-      marginTop: '15px',
-      flexWrap: 'wrap'
-    },
-    primaryButton: {
-      padding: '8px 25px',
-      backgroundColor: '#28a745',
-      color: '#fff',
-      border: 'none',
-      cursor: 'pointer',
-      fontSize: '14px',
-      fontFamily: 'Times New Roman, serif',
-      borderRadius: '4px',
-      ':hover': {
-        backgroundColor: '#218838'
-      }
-    },
-    draftButton: {
-      padding: '8px 25px',
-      backgroundColor: '#ffc107',
-      color: '#000',
-      border: 'none',
-      cursor: 'pointer',
-      fontSize: '14px',
-      fontFamily: 'Times New Roman, serif',
-      borderRadius: '4px',
-      ':hover': {
-        backgroundColor: '#e0a800'
-      }
-    },
-    cancelButton: {
-      padding: '8px 25px',
-      backgroundColor: '#dc3545',
-      color: '#fff',
-      border: 'none',
-      cursor: 'pointer',
-      fontSize: '14px',
-      fontFamily: 'Times New Roman, serif',
-      borderRadius: '4px',
-      ':hover': {
-        backgroundColor: '#c82333'
-      }
-    },
-    infoText: {
-      fontSize: '12px',
-      color: '#666',
-      marginBottom: '8px',
-      fontFamily: 'Times New Roman, serif',
-      textAlign: 'center'
-    },
-    draftMessage: {
-      position: 'absolute',
-      top: '10px',
-      right: '10px',
-      backgroundColor: '#28a745',
-      color: '#fff',
-      padding: '8px 15px',
-      borderRadius: '4px',
-      fontSize: '14px',
-      fontFamily: 'Times New Roman, serif',
-      animation: 'fadeInOut 3s ease'
-    }
-  };
+  const fileInputRef = React.createRef();
 
   return (
     <div style={styles.overlay} onClick={handleClose}>
       <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-        {showDraftMessage && (
-          <div style={styles.draftMessage}>
-            ✅ Черновик сохранен
-          </div>
-        )}
-        
         <h3 style={styles.title}>
           {editingBlock ? '✏️ Редактирование таблицы' : '📊 Создание таблицы'}
         </h3>
 
-        {/* Название таблицы */}
         <input
           type="text"
           value={tableCaption}
@@ -736,14 +516,13 @@ const TableManager = ({
           placeholder={`Название таблицы (например: Таблица ${editingBlock?.number || tableCounter})`}
         />
 
-        {/* Настройки размеров таблицы */}
         <div style={styles.controlsRow}>
           <div style={styles.controlGroup}>
             <span style={styles.label}>Строки:</span>
             <input
               type="number"
               min="1"
-              max="15"
+              max="20"
               value={tableRows}
               onChange={(e) => {
                 const newRows = parseInt(e.target.value) || 1;
@@ -758,7 +537,7 @@ const TableManager = ({
             <input
               type="number"
               min="1"
-              max="8"
+              max="10"
               value={tableCols}
               onChange={(e) => {
                 const newCols = parseInt(e.target.value) || 1;
@@ -767,9 +546,22 @@ const TableManager = ({
               style={styles.numberInput}
             />
           </div>
+
+          <div style={styles.controlGroup}>
+            <button onClick={() => fileInputRef.current.click()} style={styles.importButton}>
+              📂 Импорт Excel
+            </button>
+          </div>
         </div>
 
-        {/* Панель инструментов */}
+        <input
+          type="file"
+          ref={fileInputRef}
+          accept=".xlsx, .xls, .csv"
+          style={{ display: 'none' }}
+          onChange={importFromExcel}
+        />
+
         {tableData.length > 0 && (
           <>
             <div style={styles.infoText}>
@@ -782,22 +574,19 @@ const TableManager = ({
               <div style={styles.toolGroup}>
                 <button onClick={() => applyFormatting('bold')} style={styles.toolButtonSmall} title="Жирный">B</button>
                 <button onClick={() => applyFormatting('italic')} style={styles.toolButtonSmall} title="Курсив">I</button>
-                <button onClick={rotateCell} style={styles.toolButtonSmall} title="Повернуть текст">↻</button>
+                <button onClick={rotateCell} style={styles.toolButtonSmall} title="Повернуть текст вертикально">↻</button>
               </div>
               
               <div style={styles.toolGroup}>
                 <button onClick={insertRowAbove} style={styles.toolButton} title="Вставить строку сверху">↑ Строка</button>
                 <button onClick={insertRowBelow} style={styles.toolButton} title="Вставить строку снизу">↓ Строка</button>
+                <button onClick={deleteRows} style={styles.toolButton} title="Удалить строки">🗑 Строки</button>
               </div>
               
               <div style={styles.toolGroup}>
                 <button onClick={insertColumnLeft} style={styles.toolButton} title="Вставить колонку слева">← Колонка</button>
                 <button onClick={insertColumnRight} style={styles.toolButton} title="Вставить колонку справа">→ Колонка</button>
-              </div>
-              
-              <div style={styles.toolGroup}>
-                <button onClick={deleteRows} style={styles.toolButton} title="Удалить выделенные строки">🗑 Строки</button>
-                <button onClick={deleteColumns} style={styles.toolButton} title="Удалить выделенные колонки">🗑 Колонки</button>
+                <button onClick={deleteColumns} style={styles.toolButton} title="Удалить колонки">🗑 Колонки</button>
               </div>
               
               <div style={styles.toolGroup}>
@@ -808,7 +597,7 @@ const TableManager = ({
           </>
         )}
 
-        {/* Таблица */}
+                {/* Таблица */}
         {tableData.length > 0 && (
           <div style={{ overflowX: 'auto' }}>
             <table style={styles.dataTable}>
@@ -839,7 +628,7 @@ const TableManager = ({
                       return (
                         <td
                           key={`${rowIndex}-${colIndex}`}
-                          style={styles.td(isSelected, isEmpty, isRotated)}
+                          style={getCellStyle(isSelected, isEmpty, isRotated, cellValue)}
                           rowSpan={mergedInfo?.rowspan || 1}
                           colSpan={mergedInfo?.colspan || 1}
                           onMouseDown={(e) => {
@@ -859,10 +648,24 @@ const TableManager = ({
                           onMouseUp={handleMouseUp}
                           onDoubleClick={() => splitCell(rowIndex, colIndex)}
                         >
-                          <input
+                          <textarea
                             value={cellValue}
                             onChange={(e) => updateTableCell(rowIndex, colIndex, e.target.value)}
-                            style={styles.cellInput}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              minHeight: '40px',
+                              padding: '4px',
+                              border: '1px solid transparent',
+                              textAlign: 'center',
+                              fontFamily: 'Times New Roman, serif',
+                              fontSize: '14px',
+                              backgroundColor: 'transparent',
+                              outline: 'none',
+                              resize: 'vertical',
+                              boxSizing: 'border-box'
+                            }}
+                            rows={isRotated ? 3 : 1}
                             placeholder=""
                           />
                         </td>
@@ -875,23 +678,10 @@ const TableManager = ({
           </div>
         )}
 
-        {/* Кнопки действий */}
         <div style={styles.buttonGroup}>
-          <button onClick={saveDraft} style={styles.draftButton}>
-            💾 Черновик
+          <button onClick={handleSave} style={styles.primaryButton}>
+            {editingBlock ? '💾 Сохранить изменения' : `+ Вставить таблицу ${tableCounter}`}
           </button>
-          <button onClick={loadDraft} style={styles.draftButton}>
-            📂 Загрузить
-          </button>
-          {editingBlock ? (
-            <button onClick={handleSave} style={styles.primaryButton}>
-              💾 Сохранить изменения
-            </button>
-          ) : (
-            <button onClick={handleSave} style={styles.primaryButton}>
-              + Вставить таблицу {tableCounter}
-            </button>
-          )}
           <button onClick={handleClose} style={styles.cancelButton}>
             ✕ Отмена
           </button>
@@ -899,6 +689,152 @@ const TableManager = ({
       </div>
     </div>
   );
+};
+
+const styles = {
+  overlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000
+  },
+  modal: {
+    backgroundColor: '#fff',
+    padding: '20px',
+    borderRadius: '8px',
+    maxWidth: '900px',
+    width: '95%',
+    maxHeight: '90vh',
+    overflow: 'auto',
+    border: '1px solid #000'
+  },
+  title: {
+    fontSize: '18px',
+    fontWeight: 'bold',
+    marginBottom: '15px',
+    textAlign: 'center'
+  },
+  captionInput: {
+    width: '100%',
+    padding: '8px',
+    border: '1px solid #000',
+    fontSize: '14px',
+    marginBottom: '15px',
+    borderRadius: '4px'
+  },
+  controlsRow: {
+    display: 'flex',
+    gap: '15px',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    marginBottom: '15px',
+    padding: '10px',
+    backgroundColor: '#f8f9fa',
+    borderRadius: '4px'
+  },
+  controlGroup: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px'
+  },
+  label: {
+    fontSize: '14px'
+  },
+  numberInput: {
+    width: '60px',
+    padding: '4px',
+    border: '1px solid #000',
+    fontSize: '14px',
+    textAlign: 'center'
+  },
+  toolbar: {
+    display: 'flex',
+    gap: '10px',
+    flexWrap: 'wrap',
+    marginBottom: '15px',
+    padding: '10px',
+    backgroundColor: '#f8f9fa',
+    border: '1px solid #000',
+    borderRadius: '4px',
+    justifyContent: 'center'
+  },
+  toolGroup: {
+    display: 'flex',
+    gap: '5px',
+    alignItems: 'center',
+    padding: '0 10px',
+    borderRight: '1px solid #ccc'
+  },
+  toolButton: {
+    padding: '5px 10px',
+    backgroundColor: '#fff',
+    border: '1px solid #000',
+    cursor: 'pointer',
+    fontSize: '12px',
+    borderRadius: '3px'
+  },
+  toolButtonSmall: {
+    padding: '5px 10px',
+    backgroundColor: '#fff',
+    border: '1px solid #000',
+    cursor: 'pointer',
+    fontSize: '12px',
+    borderRadius: '3px',
+    fontWeight: 'bold'
+  },
+  dataTable: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    marginBottom: '15px',
+    tableLayout: 'auto'
+  },
+  buttonGroup: {
+    display: 'flex',
+    gap: '10px',
+    justifyContent: 'center',
+    marginTop: '15px',
+    flexWrap: 'wrap'
+  },
+  primaryButton: {
+    padding: '8px 25px',
+    backgroundColor: '#28a745',
+    color: '#fff',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: '14px',
+    borderRadius: '4px'
+  },
+  cancelButton: {
+    padding: '8px 25px',
+    backgroundColor: '#dc3545',
+    color: '#fff',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: '14px',
+    borderRadius: '4px'
+  },
+  infoText: {
+    fontSize: '12px',
+    color: '#666',
+    marginBottom: '8px',
+    textAlign: 'center'
+  },
+  importButton: {
+    padding: '5px 10px',
+    backgroundColor: '#17a2b8',
+    color: '#fff',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: '12px',
+    borderRadius: '3px'
+  }
 };
 
 export default TableManager;
