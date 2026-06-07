@@ -22,6 +22,18 @@ const ReportAll = () => {
     const [previewStyles, setPreviewStyles] = useState({});
     const [isGenerating, setIsGenerating] = useState(false);
 
+    // ========== ФУНКЦИЯ ФОРМАТИРОВАНИЯ ДАТЫ ==========
+    const formatDate = (dateString) => {
+        if (!dateString) return 'Дата не указана';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('ru-RU', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        });
+    };
+
+    // ========== ЗАГРУЗКА ДАННЫХ ==========
     useEffect(() => {
         const fetchReports = async () => {
             let userId = null;
@@ -61,16 +73,15 @@ const ReportAll = () => {
                 const data = await response.json();
                 
                 if (data.success && data.conferences) {
-                    // Загружаем полные данные для каждого доклада из report_versions
+                    // Загружаем полные данные для каждого доклада
                     const conferencesWithFullReports = await Promise.all(
                         data.conferences.map(async (conference) => {
                             const sectionsWithFullReports = await Promise.all(
                                 (conference.sections || []).map(async (section) => {
                                     const reportsWithFullContent = await Promise.all(
                                         (section.reports || []).map(async (report) => {
-                                            // Загружаем полную версию доклада
                                             try {
-                                                const versionResponse = await fetch(`https://diplom-j6uo.onrender.com/api/reports/${report.report_id}/full`);
+                                                const versionResponse = await fetch(`https://diplom-j6uo.onrender.com/api/reports/${report.report_id}`);
                                                 if (versionResponse.ok) {
                                                     const versionData = await versionResponse.json();
                                                     if (versionData.success && versionData.report) {
@@ -86,7 +97,7 @@ const ReportAll = () => {
                                                     }
                                                 }
                                             } catch (err) {
-                                                console.error(`Ошибка загрузки версии доклада ${report.report_id}:`, err);
+                                                console.error(`Ошибка загрузки доклада ${report.report_id}:`, err);
                                             }
                                             return report;
                                         })
@@ -130,6 +141,7 @@ const ReportAll = () => {
         fetchReports();
     }, [user]);
 
+    // ========== ПОЛУЧЕНИЕ СТИЛЕЙ КОНФЕРЕНЦИИ ==========
     const fetchConferenceStyles = async (conferenceId) => {
         try {
             const response = await fetch(`https://diplom-j6uo.onrender.com/api/conferences/${conferenceId}/styles`);
@@ -143,399 +155,7 @@ const ReportAll = () => {
         return null;
     };
 
-    // ========== ГЕНЕРАЦИЯ DOCX ==========
-    
-    const generateDOCX = async (conference, sections, styles) => {
-        setIsGenerating(true);
-        
-        try {
-            const { Document, Packer, Paragraph, TextRun, AlignmentType, PageBreak } = await import('docx');
-            
-            const defaultStyles = {
-                font_family: 'Times New Roman',
-                title_font_size: 28,
-                title_font_weight: 'bold',
-                title_color: '000000',
-                title_text_align: 'center',
-                authors_font_size: 14,
-                authors_color: '333333',
-                abstract_font_size: 12,
-                text_font_size: 12,
-                section_title_font_size: 18,
-                section_title_font_weight: 'bold',
-                section_title_color: '000000',
-                references_font_size: 11
-            };
-            
-            const s = { ...defaultStyles, ...styles };
-            
-            const docChildren = [];
-            
-            // Титульная страница
-            docChildren.push(new Paragraph({
-                children: [new TextRun({
-                    text: conference.title,
-                    bold: s.title_font_weight === 'bold',
-                    size: s.title_font_size * 2,
-                    font: s.font_family
-                })],
-                alignment: AlignmentType.CENTER,
-                spacing: { before: 400, after: 200 }
-            }));
-            
-            docChildren.push(new Paragraph({
-                children: [new TextRun({
-                    text: "СБОРНИК МАТЕРИАЛОВ",
-                    bold: true,
-                    size: 24,
-                    font: s.font_family
-                })],
-                alignment: AlignmentType.CENTER,
-                spacing: { before: 0, after: 200 }
-            }));
-            
-            docChildren.push(new Paragraph({
-                children: [new TextRun({
-                    text: conference.location || "Место проведения не указано",
-                    size: 20,
-                    font: s.font_family
-                })],
-                alignment: AlignmentType.CENTER,
-                spacing: { before: 0, after: 0 }
-            }));
-            
-            docChildren.push(new Paragraph({
-                children: [new TextRun({
-                    text: formatDate(conference.start_date),
-                    size: 20,
-                    font: s.font_family
-                })],
-                alignment: AlignmentType.CENTER,
-                spacing: { after: 400 }
-            }));
-            
-            docChildren.push(new Paragraph({ children: [new PageBreak()] }));
-            
-            // Оглавление
-            docChildren.push(new Paragraph({
-                children: [new TextRun({
-                    text: "СОДЕРЖАНИЕ",
-                    bold: true,
-                    size: 24,
-                    font: s.font_family
-                })],
-                alignment: AlignmentType.CENTER,
-                spacing: { after: 200 }
-            }));
-            
-            let reportCounter = 1;
-            for (const section of sections) {
-                docChildren.push(new Paragraph({
-                    children: [new TextRun({
-                        text: section.name,
-                        bold: true,
-                        size: 20,
-                        font: s.font_family
-                    })],
-                    spacing: { before: 80, after: 20 }
-                }));
-                
-                for (const report of (section.reports || [])) {
-                    docChildren.push(new Paragraph({
-                        children: [
-                            new TextRun({
-                                text: `${reportCounter}. ${report.title}`,
-                                size: 18,
-                                font: s.font_family
-                            }),
-                            new TextRun({
-                                text: "........................................................",
-                                size: 18,
-                                font: s.font_family
-                            })
-                        ],
-                        spacing: { before: 0, after: 0 },
-                        indent: { left: 720 }
-                    }));
-                    reportCounter++;
-                }
-            }
-            
-            docChildren.push(new Paragraph({ children: [new PageBreak()] }));
-            
-            // Доклады по секциям
-            let globalReportCounter = 1;
-            for (const section of sections) {
-                docChildren.push(new Paragraph({
-                    children: [new TextRun({
-                        text: section.name,
-                        bold: true,
-                        size: s.section_title_font_size * 1.5,
-                        font: s.font_family
-                    })],
-                    alignment: AlignmentType.CENTER,
-                    spacing: { before: 200, after: 100 }
-                }));
-                
-                for (const report of (section.reports || [])) {
-                    // Заголовок доклада
-                    docChildren.push(new Paragraph({
-                        children: [new TextRun({
-                            text: `${globalReportCounter}. ${report.title}`,
-                            bold: true,
-                            size: 20,
-                            font: s.font_family
-                        })],
-                        alignment: AlignmentType.CENTER,
-                        spacing: { before: 160, after: 80 }
-                    }));
-                    
-                    // Авторы
-                    let authorsText = report.author_name || '';
-                    if (report.coauthors && report.coauthors.length > 0) {
-                        authorsText += `, ${report.coauthors.map(c => c.name).join(', ')}`;
-                    }
-                    docChildren.push(new Paragraph({
-                        children: [new TextRun({
-                            text: authorsText,
-                            italics: true,
-                            size: s.authors_font_size * 1.2,
-                            color: s.authors_color.replace('#', ''),
-                            font: s.font_family
-                        })],
-                        alignment: AlignmentType.CENTER,
-                        spacing: { before: 0, after: 60 }
-                    }));
-                    
-                    // Аннотация
-                    if (report.abstract) {
-                        docChildren.push(new Paragraph({
-                            children: [new TextRun({
-                                text: "Аннотация",
-                                bold: true,
-                                size: s.abstract_font_size + 2,
-                                font: s.font_family
-                            })],
-                            spacing: { before: 40, after: 20 }
-                        }));
-                        docChildren.push(new Paragraph({
-                            children: [new TextRun({
-                                text: report.abstract,
-                                size: s.abstract_font_size,
-                                font: s.font_family
-                            })],
-                            spacing: { before: 0, after: 40 },
-                            indent: { left: 720, right: 720 }
-                        }));
-                    }
-                    
-                    // Ключевые слова
-                    if (report.keywords) {
-                        docChildren.push(new Paragraph({
-                            children: [
-                                new TextRun({
-                                    text: "Ключевые слова: ",
-                                    bold: true,
-                                    size: s.text_font_size,
-                                    font: s.font_family
-                                }),
-                                new TextRun({
-                                    text: report.keywords,
-                                    italics: true,
-                                    size: s.text_font_size,
-                                    font: s.font_family
-                                })
-                            ],
-                            spacing: { before: 20, after: 40 }
-                        }));
-                    }
-                    
-                    // Основной контент из БД (content из report_versions)
-                    if (report.content && Array.isArray(report.content) && report.content.length > 0) {
-                        for (const block of report.content) {
-                            if (block.type === 'text' && block.content) {
-                                const plainText = block.content.replace(/<[^>]*>/g, '');
-                                if (plainText.trim()) {
-                                    docChildren.push(new Paragraph({
-                                        children: [new TextRun({
-                                            text: plainText,
-                                            size: s.text_font_size,
-                                            font: s.font_family
-                                        })],
-                                        spacing: { before: 0, after: 40 },
-                                        indent: { firstLine: 720 }
-                                    }));
-                                }
-                            }
-                            if (block.type === 'table' && block.data) {
-                                if (block.caption) {
-                                    docChildren.push(new Paragraph({
-                                        children: [new TextRun({
-                                            text: `Таблица ${block.number || ''} — ${block.caption}`,
-                                            italics: true,
-                                            size: s.text_font_size - 2,
-                                            font: s.font_family
-                                        })],
-                                        alignment: AlignmentType.CENTER,
-                                        spacing: { before: 20, after: 10 }
-                                    }));
-                                }
-                                
-                                let tableText = '';
-                                if (block.headers && block.headers.length > 0) {
-                                    tableText += block.headers.join(' | ') + '\n';
-                                    tableText += block.headers.map(() => '---').join(' | ') + '\n';
-                                }
-                                for (const row of (block.data || [])) {
-                                    tableText += row.join(' | ') + '\n';
-                                }
-                                
-                                docChildren.push(new Paragraph({
-                                    children: [new TextRun({
-                                        text: tableText,
-                                        size: s.text_font_size - 2,
-                                        font: "Courier New"
-                                    })],
-                                    spacing: { before: 0, after: 20 }
-                                }));
-                            }
-                            if (block.type === 'image' && block.src) {
-                                docChildren.push(new Paragraph({
-                                    children: [new TextRun({
-                                        text: `Рисунок ${block.number || ''} — ${block.caption || ''}`,
-                                        italics: true,
-                                        size: s.text_font_size - 2,
-                                        font: s.font_family
-                                    })],
-                                    alignment: AlignmentType.CENTER,
-                                    spacing: { before: 20, after: 10 }
-                                }));
-                                docChildren.push(new Paragraph({
-                                    children: [new TextRun({
-                                        text: `[Изображение: ${block.src}]`,
-                                        size: s.text_font_size - 2,
-                                        font: s.font_family
-                                    })],
-                                    alignment: AlignmentType.CENTER,
-                                    spacing: { before: 0, after: 20 }
-                                }));
-                            }
-                            if (block.type === 'formula' && block.formulaString) {
-                                docChildren.push(new Paragraph({
-                                    children: [new TextRun({
-                                        text: `Формула ${block.number || ''}: ${block.formulaString}`,
-                                        italics: true,
-                                        size: s.text_font_size,
-                                        font: s.font_family
-                                    })],
-                                    alignment: AlignmentType.CENTER,
-                                    spacing: { before: 20, after: 20 }
-                                }));
-                            }
-                        }
-                    }
-                    
-                    // Дополнительная информация
-                    if (report.additional_info) {
-                        docChildren.push(new Paragraph({
-                            children: [new TextRun({
-                                text: `Дополнительная информация: ${report.additional_info}`,
-                                size: s.text_font_size - 2,
-                                italics: true,
-                                font: s.font_family
-                            })],
-                            spacing: { before: 20, after: 20 }
-                        }));
-                    }
-                    
-                    // Список литературы
-                    if (report.literature && report.literature.trim()) {
-                        docChildren.push(new Paragraph({
-                            children: [new TextRun({
-                                text: "Список литературы",
-                                bold: true,
-                                size: s.references_font_size + 2,
-                                font: s.font_family
-                            })],
-                            spacing: { before: 60, after: 20 }
-                        }));
-                        
-                        const litItems = report.literature.split('\n');
-                        let litNumber = 1;
-                        for (const item of litItems) {
-                            if (item.trim()) {
-                                docChildren.push(new Paragraph({
-                                    children: [
-                                        new TextRun({
-                                            text: `${litNumber}. `,
-                                            size: s.references_font_size,
-                                            font: s.font_family
-                                        }),
-                                        new TextRun({
-                                            text: item.trim(),
-                                            size: s.references_font_size,
-                                            font: s.font_family
-                                        })
-                                    ],
-                                    spacing: { before: 0, after: 8 },
-                                    indent: { hanging: 360 }
-                                }));
-                                litNumber++;
-                            }
-                        }
-                    }
-                    
-                    docChildren.push(new Paragraph({ children: [new PageBreak()] }));
-                    globalReportCounter++;
-                }
-            }
-            
-            const doc = new Document({
-                styles: {
-                    default: {
-                        document: {
-                            run: {
-                                font: s.font_family
-                            }
-                        }
-                    }
-                },
-                sections: [{
-                    properties: {},
-                    children: docChildren
-                }]
-            });
-            
-            const blob = await Packer.toBlob(doc);
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `${conference.title.replace(/[^а-яА-Яa-zA-Z0-9]/g, '_')}_сборник_материалов.docx`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-            
-        } catch (error) {
-            console.error('Ошибка генерации DOCX:', error);
-            alert('Ошибка при формировании сборника DOCX: ' + error.message);
-        } finally {
-            setIsGenerating(false);
-        }
-    };
-
-    // ========== ОСТАЛЬНЫЕ ФУНКЦИИ ==========
-    
-    const handleSearch = (query) => {
-        setSearchQuery(query);
-        filterConferences(query, searchFilter);
-    };
-
-    const handleFilterChange = (filter) => {
-        setSearchFilter(filter);
-        filterConferences(searchQuery, filter);
-    };
-
+    // ========== ФИЛЬТРАЦИЯ И ПОИСК ==========
     const filterConferences = (query, filter) => {
         let filtered = [...conferences];
         
@@ -566,12 +186,23 @@ const ReportAll = () => {
         setFilteredConferences(filtered);
     };
 
+    const handleSearch = (query) => {
+        setSearchQuery(query);
+        filterConferences(query, searchFilter);
+    };
+
+    const handleFilterChange = (filter) => {
+        setSearchFilter(filter);
+        filterConferences(searchQuery, filter);
+    };
+
     const clearSearch = () => {
         setSearchQuery('');
         setSearchFilter('all');
         setFilteredConferences(conferences);
     };
 
+    // ========== СОРТИРОВКА ==========
     const sortReports = (reports, order) => {
         if (!reports) return [];
         if (order === 'alphabetical') {
@@ -584,6 +215,7 @@ const ReportAll = () => {
         setSortOrder(order);
     };
 
+    // ========== DRAG & DROP для секций ==========
     const handleSectionDragStart = (conferenceId, sectionIndex) => {
         setDraggedSection({ conferenceId, sectionIndex });
     };
@@ -607,6 +239,7 @@ const ReportAll = () => {
         setDraggedSection(null);
     };
 
+    // ========== DRAG & DROP для докладов ==========
     const handleReportDragStart = (conferenceId, sectionId, reportIndex) => {
         setDraggedReport({ conferenceId, sectionId, reportIndex });
     };
@@ -633,6 +266,7 @@ const ReportAll = () => {
         setDraggedReport(null);
     };
 
+    // ========== ПРЕДПРОСМОТР ==========
     const openPreview = async (conference) => {
         const styles = await fetchConferenceStyles(conference.id);
         setPreviewStyles(styles || {});
@@ -648,6 +282,7 @@ const ReportAll = () => {
         setPreviewStyles({});
     };
 
+    // ========== РАСКРЫТИЕ/СВЁРТЫВАНИЕ ==========
     const toggleConference = (conferenceId) => {
         setExpandedConferences(prev => ({
             ...prev,
@@ -665,16 +300,7 @@ const ReportAll = () => {
         }));
     };
 
-    const formatDate = (dateString) => {
-        if (!dateString) return 'Дата не указана';
-        const date = new Date(dateString);
-        return date.toLocaleDateString('ru-RU', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric'
-        });
-    };
-
+    // ========== СТАТУСЫ ==========
     const getStatusText = (status) => {
         const statusMap = {
             'accepted': 'Принят',
@@ -701,6 +327,7 @@ const ReportAll = () => {
         return classMap[status] || '';
     };
 
+    // ========== ПОДСЧЁТ ДОКЛАДОВ ==========
     const getTotalAcceptedReports = () => {
         let total = 0;
         conferences.forEach(conference => {
@@ -719,6 +346,7 @@ const ReportAll = () => {
         ) || 0;
     };
 
+    // ========== СТИЛИ ДЛЯ ПРЕДПРОСМОТРА ==========
     const getPreviewStyle = (styleName, defaultValue) => {
         if (previewStyles && previewStyles[styleName] !== undefined && previewStyles[styleName] !== null) {
             return previewStyles[styleName];
@@ -726,6 +354,411 @@ const ReportAll = () => {
         return defaultValue;
     };
 
+    // ========== ГЕНЕРАЦИЯ DOCX (ИСПРАВЛЕННАЯ) ==========
+const generateDOCX = async (conference, sections, styles) => {
+    setIsGenerating(true);
+    try {
+        const docx = await import('docx');
+        const { 
+            Document, Packer, Paragraph, TextRun, 
+            AlignmentType, PageBreak, HeadingLevel, 
+            TableOfContents, ImageRun
+        } = docx;
+
+        // Функция загрузки изображения
+        const fetchImageForDocx = async (src) => {
+            try {
+                let imageData = null;
+                let mimeType = 'image/png';
+                if (src && src.startsWith('data:image')) {
+                    const matches = src.match(/^data:image\/(\w+);base64,(.+)$/);
+                    if (matches) {
+                        mimeType = `image/${matches[1]}`;
+                        const binary = atob(matches[2]);
+                        const arr = new Uint8Array(binary.length);
+                        for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
+                        return { data: arr, mime: mimeType };
+                    }
+                } else {
+                    let fullUrl = src;
+                    if (src.startsWith('/')) fullUrl = `https://diplom-j6uo.onrender.com${src}`;
+                    else if (!src.startsWith('http')) fullUrl = `https://diplom-j6uo.onrender.com/${src}`;
+                    const resp = await fetch(fullUrl);
+                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                    const blob = await resp.blob();
+                    const buffer = await blob.arrayBuffer();
+                    return { data: new Uint8Array(buffer), mime: blob.type || 'image/png' };
+                }
+            } catch (err) {
+                console.error('Ошибка загрузки изображения:', src, err);
+                return null;
+            }
+        };
+
+        // Стили по умолчанию
+        // Стили по умолчанию (УВЕЛИЧЕННЫЕ РАЗМЕРЫ)
+const defaultStyles = {
+    font_family: 'Times New Roman',
+    title_font_size: 32,           // было 28 → 32
+    title_font_weight: 'bold',
+    title_color: '000000',
+    title_text_align: 'center',
+    title_margin_bottom: 40,
+    authors_font_size: 18,          // было 14 → 18
+    authors_font_weight: '400',
+    authors_color: '333333',
+    authors_text_align: 'center',
+    authors_margin_bottom: 25,
+    abstract_font_size: 14,         // было 12 → 14
+    abstract_font_weight: '400',
+    abstract_color: '333333',
+    abstract_line_height: 1.6,
+    abstract_margin_bottom: 40,
+    keywords_font_size: 14,         // было 12 → 14
+    keywords_font_weight: 'bold',
+    keywords_color: 'e67e22',
+    keywords_margin_bottom: 40,
+    section_title_font_size: 28,    // было 24 → 28
+    section_title_font_weight: 'bold',
+    section_title_color: '000000',
+    section_title_margin_top: 40,
+    section_title_margin_bottom: 20,
+    text_font_size: 14,             // было 12 → 14
+    text_line_height: 1.6,
+    text_color: '333333',
+    text_margin_bottom: 20,
+    table_border_color: '000000',
+    table_header_bg: 'f8f9fa',
+    table_cell_padding: 8,
+    image_max_width: '100%',
+    image_margin_top: 30,
+    image_margin_bottom: 30,
+    formula_font_size: 18,          // было 16 → 18
+    formula_color: '333333',
+    formula_text_align: 'center',
+    references_font_size: 13,       // было 11 → 13
+    references_line_height: 1.4,
+    references_color: '666666',
+    container_padding: 40,
+    page_background: '#ffffff'
+};
+        
+        const s = { ...defaultStyles, ...(styles || {}) };
+        Object.keys(defaultStyles).forEach(key => {
+            if (s[key] == null) s[key] = defaultStyles[key];
+        });
+        const hexToRgb = (color) => (!color ? '000000' : color.replace('#', ''));
+
+        const docChildren = [];
+
+        // ---- ТИТУЛЬНАЯ СТРАНИЦА (применены стили) ----
+        docChildren.push(new Paragraph({
+            children: [new TextRun({
+                text: conference.title || '',
+                bold: s.title_font_weight === 'bold',
+                size: s.title_font_size * 2,
+                font: s.font_family,
+                color: hexToRgb(s.title_color)
+            })],
+            alignment: s.title_text_align === 'center' ? AlignmentType.CENTER : AlignmentType.LEFT,
+            spacing: { before: 400, after: s.title_margin_bottom * 2 }
+        }));
+        docChildren.push(new Paragraph({
+            children: [new TextRun({ text: "СБОРНИК МАТЕРИАЛОВ", bold: true, size: 24, font: s.font_family })],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 200 }
+        }));
+        docChildren.push(new Paragraph({
+            children: [new TextRun({ text: conference.location || "Место проведения не указано", size: 20, font: s.font_family })],
+            alignment: AlignmentType.CENTER
+        }));
+        docChildren.push(new Paragraph({
+            children: [new TextRun({ text: formatDate(conference.start_date), size: 20, font: s.font_family })],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 400 }
+        }));
+        docChildren.push(new Paragraph({ children: [new PageBreak()] }));
+
+        // ---- ОГЛАВЛЕНИЕ ----
+        docChildren.push(new Paragraph({
+            children: [new TextRun({ text: "СОДЕРЖАНИЕ", bold: true, size: 24, font: s.font_family, color: hexToRgb(s.title_color) })],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 200 }
+        }));
+        docChildren.push(new TableOfContents("Оглавление", { hyperlink: true, headingStyleRange: "1-3" }));
+        docChildren.push(new Paragraph({ children: [new PageBreak()] }));
+
+        // ---- ДОКЛАДЫ ----
+        let reportCounter = 1;
+        for (const section of sections) {
+            // Заголовок секции – уровень 2 (применены стили)
+            docChildren.push(new Paragraph({
+                children: [new TextRun({
+                    text: section.name || '',
+                    bold: s.section_title_font_weight === 'bold',
+                    size: s.section_title_font_size,
+                    font: s.font_family,
+                    color: hexToRgb(s.section_title_color)
+                })],
+                alignment: AlignmentType.CENTER,
+                heading: HeadingLevel.HEADING_2,
+                spacing: { before: s.section_title_margin_top * 2, after: s.section_title_margin_bottom * 2 }
+            }));
+            
+            for (const report of (section.reports || [])) {
+                // Заголовок доклада – уровень 3 (применены стили)
+                docChildren.push(new Paragraph({
+                    children: [new TextRun({
+                        text: `${reportCounter}. ${report.title || ''}`,
+                        bold: true,
+                        size: s.text_font_size + 2,
+                        font: s.font_family,
+                        color: hexToRgb(s.title_color)
+                    })],
+                    alignment: AlignmentType.CENTER,
+                    heading: HeadingLevel.HEADING_3,
+                    spacing: { before: 160, after: 80 }
+                }));
+                
+                // Авторы (применены стили из БД)
+                let authorsText = report.author_name || '';
+                if (report.coauthors?.length) authorsText += `, ${report.coauthors.map(c => c.name).join(', ')}`;
+                docChildren.push(new Paragraph({
+                    children: [new TextRun({ text: authorsText, italics: true, size: s.authors_font_size, color: hexToRgb(s.authors_color), font: s.font_family })],
+                    alignment: s.authors_text_align === 'center' ? AlignmentType.CENTER : AlignmentType.LEFT,
+                    spacing: { after: s.authors_margin_bottom }
+                }));
+                
+                // Аннотация (применены стили из БД)
+                if (report.abstract) {
+                    docChildren.push(new Paragraph({
+                        children: [new TextRun({ text: "Аннотация", bold: s.abstract_font_weight === 'bold', size: s.abstract_font_size + 2, color: hexToRgb(s.abstract_color), font: s.font_family })],
+                        spacing: { after: 10 }
+                    }));
+                    // Разбиваем аннотацию на абзацы с отступами
+                    const abstractLines = report.abstract.split(/\r?\n/);
+                    for (const line of abstractLines) {
+                        if (line.trim()) {
+                            docChildren.push(new Paragraph({
+                                children: [new TextRun({ text: line, size: s.abstract_font_size, color: hexToRgb(s.abstract_color), font: s.font_family })],
+                                spacing: { after: 5 },
+                                indent: { left: 720, right: 720, firstLine: 720 }
+                            }));
+                        } else {
+                            docChildren.push(new Paragraph({ spacing: { after: 5 } }));
+                        }
+                    }
+                    docChildren.push(new Paragraph({ spacing: { after: s.abstract_margin_bottom } }));
+                }
+                
+                // Ключевые слова (применены стили из БД)
+                if (report.keywords) {
+                    docChildren.push(new Paragraph({
+                        children: [
+                            new TextRun({ text: "Ключевые слова: ", bold: s.keywords_font_weight === 'bold', size: s.keywords_font_size, color: hexToRgb(s.keywords_color), font: s.font_family }),
+                            new TextRun({ text: report.keywords, italics: true, size: s.keywords_font_size, color: hexToRgb(s.keywords_color), font: s.font_family })
+                        ],
+                        spacing: { after: s.keywords_margin_bottom }
+                    }));
+                }
+                
+                // Контент (текст, таблицы, формулы, изображения)
+                if (report.content && Array.isArray(report.content)) {
+                    for (const block of report.content) {
+                        // Текст (применены стили из БД)
+                        if (block.type === 'text' && block.content) {
+                            const plainText = block.content.replace(/<[^>]*>/g, '');
+                            const paragraphs = plainText.split(/\r?\n/);
+                            for (const para of paragraphs) {
+                                if (para.trim()) {
+                                    docChildren.push(new Paragraph({
+                                        children: [new TextRun({ text: para, size: s.text_font_size, color: hexToRgb(s.text_color), font: s.font_family })],
+                                        spacing: { after: s.text_margin_bottom },
+                                        indent: { firstLine: 720 }
+                                    }));
+                                } else {
+                                    docChildren.push(new Paragraph({ spacing: { after: s.text_margin_bottom } }));
+                                }
+                            }
+                        }
+                        // Таблица
+                        if (block.type === 'table' && block.data) {
+                            if (block.caption) {
+                                docChildren.push(new Paragraph({
+                                    children: [new TextRun({ text: `Таблица ${block.number || ''} — ${block.caption}`, italics: true, size: s.text_font_size - 2, font: s.font_family, color: hexToRgb(s.text_color) })],
+                                    alignment: AlignmentType.CENTER,
+                                    spacing: { after: 10 }
+                                }));
+                            }
+                            let tableText = '';
+                            if (block.headers?.length) {
+                                tableText += block.headers.join(' | ') + '\n';
+                                tableText += block.headers.map(() => '---').join(' | ') + '\n';
+                            }
+                            for (const row of (block.data || [])) {
+                                tableText += row.join(' | ') + '\n';
+                            }
+                            if (tableText.trim()) {
+                                const tableLines = tableText.split('\n');
+                                for (const line of tableLines) {
+                                    if (line.trim()) {
+                                        docChildren.push(new Paragraph({
+                                            children: [new TextRun({ text: line, size: s.text_font_size - 2, font: "Courier New", color: hexToRgb(s.text_color) })],
+                                            spacing: { after: 8 }
+                                        }));
+                                    }
+                                }
+                            }
+                            docChildren.push(new Paragraph({ spacing: { after: 20 } }));
+                        }
+                        // Изображение
+                        if (block.type === 'image' && block.src) {
+                            try {
+                                const img = await fetchImageForDocx(block.src);
+                                if (img?.data?.length) {
+                                    let imgWidth = 400;
+                                    let imgHeight = 300;
+                                    try {
+                                        const blob = new Blob([img.data], { type: img.mime });
+                                        const url = URL.createObjectURL(blob);
+                                        const image = new Image();
+                                        await new Promise((resolve, reject) => {
+                                            image.onload = () => {
+                                                const aspect = image.height / image.width;
+                                                imgHeight = Math.round(imgWidth * aspect);
+                                                URL.revokeObjectURL(url);
+                                                resolve();
+                                            };
+                                            image.onerror = () => {
+                                                URL.revokeObjectURL(url);
+                                                reject(new Error('Не удалось загрузить изображение'));
+                                            };
+                                            image.src = url;
+                                        });
+                                    } catch (err) {
+                                        console.warn('Не удалось вычислить пропорции, используется высота 300', err);
+                                        imgHeight = 300;
+                                    }
+                                    const imageRun = new ImageRun({
+                                        data: img.data,
+                                        transformation: { width: imgWidth, height: imgHeight },
+                                        type: img.mime
+                                    });
+                                    docChildren.push(new Paragraph({
+                                        children: [imageRun],
+                                        alignment: AlignmentType.CENTER,
+                                        spacing: { before: s.image_margin_top, after: s.image_margin_bottom / 2 }
+                                    }));
+                                    if (block.caption) {
+                                        docChildren.push(new Paragraph({
+                                            children: [new TextRun({ text: `Рисунок ${block.number || ''} — ${block.caption}`, italics: true, size: s.text_font_size - 2, font: s.font_family, color: hexToRgb(s.text_color) })],
+                                            alignment: AlignmentType.CENTER,
+                                            spacing: { before: 5, after: s.image_margin_bottom / 2 }
+                                        }));
+                                    }
+                                } else {
+                                    docChildren.push(new Paragraph({
+                                        children: [new TextRun({ text: `[Изображение не загружено: ${block.caption || block.src}]`, size: s.text_font_size - 2, italics: true, color: '888888' })],
+                                        alignment: AlignmentType.CENTER,
+                                        spacing: { after: 20 }
+                                    }));
+                                }
+                            } catch (err) {
+                                console.error('Ошибка вставки изображения:', err);
+                                docChildren.push(new Paragraph({
+                                    children: [new TextRun({ text: `[Ошибка вставки изображения]`, size: s.text_font_size - 2, italics: true, color: 'red' })],
+                                    alignment: AlignmentType.CENTER,
+                                    spacing: { after: 20 }
+                                }));
+                            }
+                        }
+                        // Формула
+                        if (block.type === 'formula' && block.formulaString) {
+                            docChildren.push(new Paragraph({
+                                children: [new TextRun({ text: `Формула ${block.number || ''}: ${block.formulaString}`, italics: true, size: s.formula_font_size, color: hexToRgb(s.formula_color), font: s.font_family })],
+                                alignment: s.formula_text_align === 'center' ? AlignmentType.CENTER : AlignmentType.LEFT,
+                                spacing: { after: 20 }
+                            }));
+                        }
+                    }
+                }
+                
+                // Дополнительная информация
+                if (report.additional_info) {
+                    const lines = report.additional_info.split(/\r?\n/);
+                    for (const line of lines) {
+                        if (line.trim()) {
+                            docChildren.push(new Paragraph({
+                                children: [new TextRun({ text: line, size: s.text_font_size - 2, italics: true, color: hexToRgb(s.text_color), font: s.font_family })],
+                                spacing: { after: 10 }
+                            }));
+                        } else {
+                            docChildren.push(new Paragraph({ spacing: { after: 10 } }));
+                        }
+                    }
+                }
+                
+                // СПИСОК ЛИТЕРАТУРЫ (применены стили из БД)
+                let literatureText = report.literature || '';
+                if (Array.isArray(literatureText)) literatureText = literatureText.join('\n');
+                if (typeof literatureText === 'object') literatureText = JSON.stringify(literatureText, null, 2);
+                if (literatureText.trim()) {
+                    docChildren.push(new Paragraph({
+                        children: [new TextRun({ text: "Список литературы", bold: true, size: s.references_font_size + 2, color: hexToRgb(s.references_color), font: s.font_family })],
+                        spacing: { before: 60, after: 20 }
+                    }));
+                    const items = literatureText.split(/\r?\n/);
+                    let litNum = 1;
+                    for (const item of items) {
+                        if (item.trim()) {
+                            docChildren.push(new Paragraph({
+                                children: [
+                                    new TextRun({ text: `${litNum}. `, size: s.references_font_size, color: hexToRgb(s.references_color), font: s.font_family }),
+                                    new TextRun({ text: item.trim(), size: s.references_font_size, color: hexToRgb(s.references_color), font: s.font_family })
+                                ],
+                                spacing: { after: 8 },
+                                indent: { hanging: 360 }
+                            }));
+                            litNum++;
+                        }
+                    }
+                }
+                
+                docChildren.push(new Paragraph({ children: [new PageBreak()] }));
+                reportCounter++;
+            }
+        }
+        
+        const doc = new Document({
+            styles: {
+                default: {
+                    document: { run: { font: s.font_family } }
+                }
+            },
+            sections: [{
+                properties: { page: { margin: { top: 720, right: 720, bottom: 720, left: 720 } } },
+                children: docChildren
+            }]
+        });
+        
+        const blob = await Packer.toBlob(doc);
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${(conference.title || 'conference').replace(/[^а-яА-Яa-zA-Z0-9]/g, '_')}_сборник_материалов.docx`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+    } catch (error) {
+        console.error('Ошибка генерации DOCX:', error);
+        alert('Ошибка при формировании сборника DOCX: ' + (error.message || 'Неизвестная ошибка'));
+    } finally {
+        setIsGenerating(false);
+    }
+};
+    // ========== УСЛОВНЫЙ РЕНДЕРИНГ ==========
     if (loading) {
         return <div className="section-reports-loading">Загрузка принятых докладов...</div>;
     }
@@ -875,7 +908,7 @@ const ReportAll = () => {
                 </div>
             </div>
 
-            {/* МОДАЛЬНОЕ ОКНО ПРЕДПРОСМОТРА СБОРНИКА */}
+            {/* МОДАЛЬНОЕ ОКНО ПРЕДПРОСМОТРА */}
             {showPreview && previewConference && (
                 <div className="preview-modal-overlay" onClick={closePreview}>
                     <div className="preview-modal" onClick={(e) => e.stopPropagation()}>
@@ -904,53 +937,17 @@ const ReportAll = () => {
                                     ))}
                                 </div>
                             </div>
-                            <div className="page-break"></div>
-                            {previewSections.map((section, sIdx) => (
-                                <div key={section.id} className="preview-section">
-                                    <div className="preview-section-header"><h2 style={{ fontSize: `${getPreviewStyle('section_title_font_size', 24)}px`, fontWeight: getPreviewStyle('section_title_font_weight', 'bold'), color: getPreviewStyle('section_title_color', '#000000') }}>{sIdx + 1}. {section.name}</h2></div>
-                                    {(section.reports || []).map((report, rIdx) => (
-                                        <div key={report.report_id} className="preview-report">
-                                            <div className="preview-report-title">{sIdx + 1}.{rIdx + 1} {report.title}</div>
-                                            <div className="preview-report-authors" style={{ fontSize: `${getPreviewStyle('authors_font_size', 16)}px`, color: getPreviewStyle('authors_color', '#e67e22') }}>{report.author_name}{report.coauthors && report.coauthors.length > 0 && (`, ${report.coauthors.map(c => c.name).join(', ')}`)}</div>
-                                            {report.abstract && (<div className="preview-report-abstract" style={{ fontSize: `${getPreviewStyle('abstract_font_size', 14)}px`, color: getPreviewStyle('abstract_color', '#333333'), lineHeight: getPreviewStyle('abstract_line_height', 1.6) }}><strong>Аннотация:</strong> {report.abstract}</div>)}
-                                            {report.keywords && (<div className="preview-report-keywords" style={{ fontSize: `${getPreviewStyle('keywords_font_size', 14)}px`, fontWeight: getPreviewStyle('keywords_font_weight', 'bold'), color: getPreviewStyle('keywords_color', '#e67e22') }}><strong>Ключевые слова:</strong> {report.keywords}</div>)}
-                                            {report.content && Array.isArray(report.content) && report.content.length > 0 && (
-                                                <div className="preview-report-content" style={{ fontSize: `${getPreviewStyle('text_font_size', 14)}px`, lineHeight: getPreviewStyle('text_line_height', 1.6), color: getPreviewStyle('text_color', '#333333') }}>
-                                                    {report.content.map((block, idx) => {
-                                                        if (block.type === 'text' && block.content) {
-                                                            return <div key={idx} className="preview-text-block" dangerouslySetInnerHTML={{ __html: block.content }} />;
-                                                        }
-                                                        if (block.type === 'table' && block.data) {
-                                                            return (
-                                                                <div key={idx} className="preview-table-block">
-                                                                    <table className="preview-table" style={{ borderColor: getPreviewStyle('table_border_color', '#000000') }}>
-                                                                        {block.headers && (<thead><tr>{block.headers.map((header, hidx) => (<th key={hidx} style={{ backgroundColor: getPreviewStyle('table_header_bg', '#f8f9fa'), padding: `${getPreviewStyle('table_cell_padding', 8)}px` }}>{header}</th>))}</tr></thead>)}
-                                                                        <tbody>{block.data.map((row, ridx) => (<tr key={ridx}>{row.map((cell, cidx) => (<td key={cidx} style={{ padding: `${getPreviewStyle('table_cell_padding', 8)}px` }}>{cell}</td>))}</tr>))}</tbody>
-                                                                    </table>
-                                                                    {block.caption && (<div className="preview-table-caption">Таблица {block.number} — {block.caption}</div>)}
-                                                                </div>
-                                                            );
-                                                        }
-                                                        return null;
-                                                    })}
-                                                </div>
-                                            )}
-                                            {report.literature && (<div className="preview-report-literature" style={{ fontSize: `${getPreviewStyle('references_font_size', 12)}px`, lineHeight: getPreviewStyle('references_line_height', 1.4), color: getPreviewStyle('references_color', '#666666') }}><strong>Список литературы:</strong><div dangerouslySetInnerHTML={{ __html: report.literature.replace(/\n/g, '<br/>') }} /></div>)}
-                                            <div className="preview-report-separator"></div>
-                                        </div>
-                                    ))}
-                                </div>
-                            ))}
-                        </div>
+                                                    </div>
                         <div className="preview-modal-footer">
                             <button className="preview-close-btn" onClick={closePreview}>Закрыть</button>
                             <button className="preview-generate-docx-btn" onClick={async () => { const styles = await fetchConferenceStyles(previewConference.id); generateDOCX(previewConference, previewSections, styles); closePreview(); }}>📝 Скачать DOCX</button>
                         </div>
-                    </div>
-                </div>
-            )}
-        </>
-    );
-};
+                    </div> 
+                </div>     
+            )}             
+        </>               
+    );                    
+};                    
+
 
 export default ReportAll;
