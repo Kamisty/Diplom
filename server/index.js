@@ -30,19 +30,14 @@ app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
 
 
-
-
-
-
-
 // ============================================
-// ПРЯМЫЕ МАРШРУТЫ ДЛЯ СТИЛЕЙ (РАБОТАЮТ 100%)
+// МАРШРУТЫ ДЛЯ СТИЛЕЙ КОНФЕРЕНЦИЙ (ДИНАМИЧЕСКИЙ)
 // ============================================
 
-// Получить стили конференции
+// Получить стили конференции (GET)
 app.get('/api/conferences/:conferenceId/styles', async (req, res) => {
     const { conferenceId } = req.params;
-    console.log('🔍 GET /api/conferences/' + conferenceId + '/styles - ВЫЗВАН');
+    console.log('🔍 GET стили для конференции:', conferenceId);
     
     try {
         const conferenceIdInt = parseInt(conferenceId);
@@ -56,157 +51,361 @@ app.get('/api/conferences/:conferenceId/styles', async (req, res) => {
         }
         res.json({ success: true, styles: result.rows[0] });
     } catch (error) {
-        console.error('❌ Ошибка:', error);
+        console.error('❌ Ошибка получения стилей:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// Сохранить стили конференции
+// Сохранить стили конференции (POST)
+
 app.post('/api/conferences/:conferenceId/styles', async (req, res) => {
     const { conferenceId } = req.params;
     const styles = req.body;
     
-    console.log('💾 POST /api/conferences/' + conferenceId + '/styles - ВЫЗВАН');
-    console.log('📦 Стили для сохранения:', Object.keys(styles));
+    console.log('💾 POST сохранение стилей для конференции:', conferenceId);
+    console.log('📦 Полученные поля:', Object.keys(styles));
     
     try {
         const conferenceIdInt = parseInt(conferenceId);
         
-        // Проверяем, существует ли конференция
+        // Проверяем существование конференции
         const conferenceCheck = await pool.query(
             'SELECT id FROM conferences WHERE id = $1',
             [conferenceIdInt]
         );
-        
         if (conferenceCheck.rows.length === 0) {
             return res.status(404).json({ success: false, error: 'Конференция не найдена' });
         }
         
-        // Проверяем, есть ли уже стили
+        // Список ВСЕХ колонок таблицы (без id, created_at, updated_at)
+        const allColumns = [
+            'conference_id',
+            'page_background', 'container_padding', 'font_family',
+            'title_font_size', 'title_font_weight', 'title_color', 'title_text_align', 'title_margin_bottom',
+            'authors_font_size', 'authors_font_weight', 'authors_color', 'authors_text_align', 'authors_margin_bottom',
+            'abstract_font_size', 'abstract_font_weight', 'abstract_color', 'abstract_line_height', 'abstract_margin_bottom',
+            'keywords_font_size', 'keywords_font_weight', 'keywords_color', 'keywords_margin_bottom',
+            'section_title_font_size', 'section_title_font_weight', 'section_title_color', 'section_title_margin_top', 'section_title_margin_bottom',
+            'text_font_size', 'text_line_height', 'text_color', 'text_margin_bottom',
+            'table_border_color', 'table_header_bg', 'table_cell_padding',
+            'image_max_width', 'image_margin_top', 'image_margin_bottom',
+            'formula_font_size', 'formula_color', 'formula_text_align',
+            'references_font_size', 'references_line_height', 'references_color',
+            'created_by'
+        ];
+        
+        // Проверяем, есть ли уже запись стилей
         const existing = await pool.query(
             'SELECT id FROM conference_styles WHERE conference_id = $1',
             [conferenceIdInt]
         );
         
         if (existing.rows.length === 0) {
-            // Вставка
-            await pool.query(
-                `INSERT INTO conference_styles (
-                    conference_id, page_background, container_padding, font_family,
-                    title_font_size, title_font_weight, title_color, title_text_align, title_margin_bottom,
-                    authors_font_size, authors_font_weight, authors_color, authors_text_align, authors_margin_bottom,
-                    abstract_font_size, abstract_font_weight, abstract_color, abstract_line_height, abstract_margin_bottom,
-                    text_font_size, text_line_height, text_color, text_margin_bottom,
-                    table_border_color, table_header_bg, table_cell_padding
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
-                `,
-                [
-                    conferenceIdInt,
-                    styles.page_background || '#ffffff',
-                    styles.container_padding || 40,
-                    styles.font_family || 'Arial, sans-serif',
-                    styles.title_font_size || 32,
-                    styles.title_font_weight || '600',
-                    styles.title_color || '#f39c12',
-                    styles.title_text_align || 'center',
-                    styles.title_margin_bottom || 30,
-                    styles.authors_font_size || 16,
-                    styles.authors_font_weight || '400',
-                    styles.authors_color || '#e67e22',
-                    styles.authors_text_align || 'center',
-                    styles.authors_margin_bottom || 20,
-                    styles.abstract_font_size || 14,
-                    styles.abstract_font_weight || '400',
-                    styles.abstract_color || '#333333',
-                    styles.abstract_line_height || 1.6,
-                    styles.abstract_margin_bottom || 30,
-                    styles.text_font_size || 14,
-                    styles.text_line_height || 1.6,
-                    styles.text_color || '#333333',
-                    styles.text_margin_bottom || 15,
-                    styles.table_border_color || '#000000',
-                    styles.table_header_bg || '#f8f9fa',
-                    styles.table_cell_padding || 8
-                ]
-            );
-            console.log('✅ Стили вставлены');
+            // ===== INSERT =====
+            // Формируем значения для вставки – только те поля, которые есть в allColumns
+            const insertValues = allColumns.map(column => {
+                if (column === 'conference_id') return conferenceIdInt;
+                // Если в присланном объекте есть значение – берём его, иначе null
+                return styles[column] !== undefined ? styles[column] : null;
+            });
+            
+            const placeholders = allColumns.map((_, i) => `$${i + 1}`).join(', ');
+            const insertQuery = `INSERT INTO conference_styles (${allColumns.join(', ')}) VALUES (${placeholders})`;
+            
+            console.log('📝 INSERT запрос:', insertQuery);
+            await pool.query(insertQuery, insertValues);
+            console.log('✅ Стили вставлены для конференции', conferenceIdInt);
+            
         } else {
-            // Обновление
-            await pool.query(
-                `UPDATE conference_styles SET
-                    page_background = COALESCE($1, page_background),
-                    container_padding = COALESCE($2, container_padding),
-                    font_family = COALESCE($3, font_family),
-                    title_font_size = COALESCE($4, title_font_size),
-                    title_font_weight = COALESCE($5, title_font_weight),
-                    title_color = COALESCE($6, title_color),
-                    title_text_align = COALESCE($7, title_text_align),
-                    title_margin_bottom = COALESCE($8, title_margin_bottom),
-                    authors_font_size = COALESCE($9, authors_font_size),
-                    authors_font_weight = COALESCE($10, authors_font_weight),
-                    authors_color = COALESCE($11, authors_color),
-                    authors_text_align = COALESCE($12, authors_text_align),
-                    authors_margin_bottom = COALESCE($13, authors_margin_bottom),
-                    abstract_font_size = COALESCE($14, abstract_font_size),
-                    abstract_font_weight = COALESCE($15, abstract_font_weight),
-                    abstract_color = COALESCE($16, abstract_color),
-                    abstract_line_height = COALESCE($17, abstract_line_height),
-                    abstract_margin_bottom = COALESCE($18, abstract_margin_bottom),
-                    text_font_size = COALESCE($19, text_font_size),
-                    text_line_height = COALESCE($20, text_line_height),
-                    text_color = COALESCE($21, text_color),
-                    text_margin_bottom = COALESCE($22, text_margin_bottom),
-                    table_border_color = COALESCE($23, table_border_color),
-                    table_header_bg = COALESCE($24, table_header_bg),
-                    table_cell_padding = COALESCE($25, table_cell_padding),
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE conference_id = $26
-                `,
-                [
-                    styles.page_background || null,
-                    styles.container_padding || null,
-                    styles.font_family || null,
-                    styles.title_font_size || null,
-                    styles.title_font_weight || null,
-                    styles.title_color || null,
-                    styles.title_text_align || null,
-                    styles.title_margin_bottom || null,
-                    styles.authors_font_size || null,
-                    styles.authors_font_weight || null,
-                    styles.authors_color || null,
-                    styles.authors_text_align || null,
-                    styles.authors_margin_bottom || null,
-                    styles.abstract_font_size || null,
-                    styles.abstract_font_weight || null,
-                    styles.abstract_color || null,
-                    styles.abstract_line_height || null,
-                    styles.abstract_margin_bottom || null,
-                    styles.text_font_size || null,
-                    styles.text_line_height || null,
-                    styles.text_color || null,
-                    styles.text_margin_bottom || null,
-                    styles.table_border_color || null,
-                    styles.table_header_bg || null,
-                    styles.table_cell_padding || null,
-                    conferenceIdInt
-                ]
-            );
-            console.log('✅ Стили обновлены');
+            // ===== UPDATE =====
+            // Определяем, какие поля из присланных можно обновлять (только те, что есть в allColumns, исключая conference_id)
+            const updatableColumns = allColumns.filter(col => col !== 'conference_id');
+            
+            const updateFields = [];
+            const updateValues = [];
+            let paramIndex = 1;
+            
+            for (const col of updatableColumns) {
+                // Если в присланном объекте есть значение для этой колонки – добавляем в SET
+                if (styles.hasOwnProperty(col)) {
+                    updateFields.push(`${col} = COALESCE($${paramIndex}, ${col})`);
+                    updateValues.push(styles[col]);
+                    paramIndex++;
+                }
+            }
+            
+            // Если нет ни одного поля для обновления – просто возвращаем успех
+            if (updateFields.length === 0) {
+                return res.json({ success: true, message: 'Нет данных для обновления' });
+            }
+            
+            // Добавляем conference_id в конец массива значений для WHERE
+            updateValues.push(conferenceIdInt);
+            
+            const updateQuery = `
+                UPDATE conference_styles 
+                SET ${updateFields.join(', ')}, updated_at = CURRENT_TIMESTAMP
+                WHERE conference_id = $${paramIndex}
+            `;
+            
+            console.log('📝 UPDATE запрос:', updateQuery);
+            await pool.query(updateQuery, updateValues);
+            console.log('✅ Стили обновлены для конференции', conferenceIdInt);
         }
         
         res.json({ success: true, message: 'Стили успешно сохранены' });
+        
     } catch (error) {
-        console.error('❌ Ошибка:', error);
+        console.error('❌ Ошибка сохранения стилей:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
-console.log('✅ Прямые маршруты для стилей зарегистрированы');
 
 
 
 
 
+
+
+
+
+
+
+
+
+// // ============================================
+// // МАРШРУТЫ ДЛЯ СТИЛЕЙ КОНФЕРЕНЦИЙ (44 поля)
+// // ============================================
+
+// // Получить стили конференции (GET)
+// app.get('/api/conferences/:conferenceId/styles', async (req, res) => {
+//     const { conferenceId } = req.params;
+//     console.log('🔍 GET стили для конференции:', conferenceId);
+    
+//     try {
+//         const conferenceIdInt = parseInt(conferenceId);
+//         const result = await pool.query(
+//             'SELECT * FROM conference_styles WHERE conference_id = $1',
+//             [conferenceIdInt]
+//         );
+        
+//         if (result.rows.length === 0) {
+//             return res.json({ success: true, styles: null });
+//         }
+//         res.json({ success: true, styles: result.rows[0] });
+//     } catch (error) {
+//         console.error('❌ Ошибка получения стилей:', error);
+//         res.status(500).json({ success: false, error: error.message });
+//     }
+// });
+
+// // Сохранить стили конференции (POST)
+// app.post('/api/conferences/:conferenceId/styles', async (req, res) => {
+//     const { conferenceId } = req.params;
+//     const styles = req.body;
+    
+//     console.log('💾 POST сохранение стилей для конференции:', conferenceId);
+//     console.log('📦 Полученные поля:', Object.keys(styles));
+    
+//     try {
+//         const conferenceIdInt = parseInt(conferenceId);
+        
+//         // Проверяем, существует ли конференция
+//         const conferenceCheck = await pool.query(
+//             'SELECT id FROM conferences WHERE id = $1',
+//             [conferenceIdInt]
+//         );
+        
+//         if (conferenceCheck.rows.length === 0) {
+//             return res.status(404).json({ success: false, error: 'Конференция не найдена' });
+//         }
+        
+//         // Проверяем, есть ли уже стили
+//         const existing = await pool.query(
+//             'SELECT id FROM conference_styles WHERE conference_id = $1',
+//             [conferenceIdInt]
+//         );
+        
+//         // ВСТАВКА (44 поля)
+//         const insertValues = [
+//             conferenceIdInt,
+//             styles.page_background || '#ffffff',
+//             styles.container_padding || 40,
+//             styles.font_family || 'Arial, sans-serif',
+//             styles.title_font_size || 32,
+//             styles.title_font_weight || '600',
+//             styles.title_color || '#f39c12',
+//             styles.title_text_align || 'center',
+//             styles.title_margin_bottom || 30,
+//             styles.authors_font_size || 16,
+//             styles.authors_font_weight || '400',
+//             styles.authors_color || '#e67e22',
+//             styles.authors_text_align || 'center',
+//             styles.authors_margin_bottom || 20,
+//             styles.abstract_font_size || 14,
+//             styles.abstract_font_weight || '400',
+//             styles.abstract_color || '#333333',
+//             styles.abstract_line_height || 1.6,
+//             styles.abstract_margin_bottom || 30,
+//             styles.keywords_font_size || 14,
+//             styles.keywords_font_weight || '600',
+//             styles.keywords_color || '#e67e22',
+//             styles.keywords_margin_bottom || 30,
+//             styles.section_title_font_size || 24,
+//             styles.section_title_font_weight || '500',
+//             styles.section_title_color || '#e67e22',
+//             styles.section_title_margin_top || 30,
+//             styles.section_title_margin_bottom || 15,
+//             styles.text_font_size || 14,
+//             styles.text_line_height || 1.6,
+//             styles.text_color || '#333333',
+//             styles.text_margin_bottom || 15,
+//             styles.table_border_color || '#000000',
+//             styles.table_header_bg || '#f8f9fa',
+//             styles.table_cell_padding || 8,
+//             styles.image_max_width || '100%',
+//             styles.image_margin_top || 20,
+//             styles.image_margin_bottom || 20,
+//             styles.formula_font_size || 16,
+//             styles.formula_color || '#333333',
+//             styles.formula_text_align || 'center',
+//             styles.references_font_size || 12,
+//             styles.references_line_height || 1.4,
+//             styles.references_color || '#666666',
+//             styles.created_by || null
+//         ];
+        
+//         if (existing.rows.length === 0) {
+//             await pool.query(
+//                 `INSERT INTO conference_styles (
+//                     conference_id, page_background, container_padding, font_family,
+//                     title_font_size, title_font_weight, title_color, title_text_align, title_margin_bottom,
+//                     authors_font_size, authors_font_weight, authors_color, authors_text_align, authors_margin_bottom,
+//                     abstract_font_size, abstract_font_weight, abstract_color, abstract_line_height, abstract_margin_bottom,
+//                     keywords_font_size, keywords_font_weight, keywords_color, keywords_margin_bottom,
+//                     section_title_font_size, section_title_font_weight, section_title_color, section_title_margin_top, section_title_margin_bottom,
+//                     text_font_size, text_line_height, text_color, text_margin_bottom,
+//                     table_border_color, table_header_bg, table_cell_padding,
+//                     image_max_width, image_margin_top, image_margin_bottom,
+//                     formula_font_size, formula_color, formula_text_align,
+//                     references_font_size, references_line_height, references_color,
+//                     created_by
+//                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44)`,
+//                 insertValues
+//             );
+//             console.log('✅ Стили вставлены для конференции', conferenceIdInt);
+//         } else {
+//             // ОБНОВЛЕНИЕ
+//             await pool.query(
+//                 `UPDATE conference_styles SET
+//                     page_background = COALESCE($1, page_background),
+//                     container_padding = COALESCE($2, container_padding),
+//                     font_family = COALESCE($3, font_family),
+//                     title_font_size = COALESCE($4, title_font_size),
+//                     title_font_weight = COALESCE($5, title_font_weight),
+//                     title_color = COALESCE($6, title_color),
+//                     title_text_align = COALESCE($7, title_text_align),
+//                     title_margin_bottom = COALESCE($8, title_margin_bottom),
+//                     authors_font_size = COALESCE($9, authors_font_size),
+//                     authors_font_weight = COALESCE($10, authors_font_weight),
+//                     authors_color = COALESCE($11, authors_color),
+//                     authors_text_align = COALESCE($12, authors_text_align),
+//                     authors_margin_bottom = COALESCE($13, authors_margin_bottom),
+//                     abstract_font_size = COALESCE($14, abstract_font_size),
+//                     abstract_font_weight = COALESCE($15, abstract_font_weight),
+//                     abstract_color = COALESCE($16, abstract_color),
+//                     abstract_line_height = COALESCE($17, abstract_line_height),
+//                     abstract_margin_bottom = COALESCE($18, abstract_margin_bottom),
+//                     keywords_font_size = COALESCE($19, keywords_font_size),
+//                     keywords_font_weight = COALESCE($20, keywords_font_weight),
+//                     keywords_color = COALESCE($21, keywords_color),
+//                     keywords_margin_bottom = COALESCE($22, keywords_margin_bottom),
+//                     section_title_font_size = COALESCE($23, section_title_font_size),
+//                     section_title_font_weight = COALESCE($24, section_title_font_weight),
+//                     section_title_color = COALESCE($25, section_title_color),
+//                     section_title_margin_top = COALESCE($26, section_title_margin_top),
+//                     section_title_margin_bottom = COALESCE($27, section_title_margin_bottom),
+//                     text_font_size = COALESCE($28, text_font_size),
+//                     text_line_height = COALESCE($29, text_line_height),
+//                     text_color = COALESCE($30, text_color),
+//                     text_margin_bottom = COALESCE($31, text_margin_bottom),
+//                     table_border_color = COALESCE($32, table_border_color),
+//                     table_header_bg = COALESCE($33, table_header_bg),
+//                     table_cell_padding = COALESCE($34, table_cell_padding),
+//                     image_max_width = COALESCE($35, image_max_width),
+//                     image_margin_top = COALESCE($36, image_margin_top),
+//                     image_margin_bottom = COALESCE($37, image_margin_bottom),
+//                     formula_font_size = COALESCE($38, formula_font_size),
+//                     formula_color = COALESCE($39, formula_color),
+//                     formula_text_align = COALESCE($40, formula_text_align),
+//                     references_font_size = COALESCE($41, references_font_size),
+//                     references_line_height = COALESCE($42, references_line_height),
+//                     references_color = COALESCE($43, references_color),
+//                     created_by = COALESCE($44, created_by),
+//                     updated_at = CURRENT_TIMESTAMP
+//                 WHERE conference_id = $45`,
+//                 [
+//                     styles.page_background || null,
+//                     styles.container_padding || null,
+//                     styles.font_family || null,
+//                     styles.title_font_size || null,
+//                     styles.title_font_weight || null,
+//                     styles.title_color || null,
+//                     styles.title_text_align || null,
+//                     styles.title_margin_bottom || null,
+//                     styles.authors_font_size || null,
+//                     styles.authors_font_weight || null,
+//                     styles.authors_color || null,
+//                     styles.authors_text_align || null,
+//                     styles.authors_margin_bottom || null,
+//                     styles.abstract_font_size || null,
+//                     styles.abstract_font_weight || null,
+//                     styles.abstract_color || null,
+//                     styles.abstract_line_height || null,
+//                     styles.abstract_margin_bottom || null,
+//                     styles.keywords_font_size || null,
+//                     styles.keywords_font_weight || null,
+//                     styles.keywords_color || null,
+//                     styles.keywords_margin_bottom || null,
+//                     styles.section_title_font_size || null,
+//                     styles.section_title_font_weight || null,
+//                     styles.section_title_color || null,
+//                     styles.section_title_margin_top || null,
+//                     styles.section_title_margin_bottom || null,
+//                     styles.text_font_size || null,
+//                     styles.text_line_height || null,
+//                     styles.text_color || null,
+//                     styles.text_margin_bottom || null,
+//                     styles.table_border_color || null,
+//                     styles.table_header_bg || null,
+//                     styles.table_cell_padding || null,
+//                     styles.image_max_width || null,
+//                     styles.image_margin_top || null,
+//                     styles.image_margin_bottom || null,
+//                     styles.formula_font_size || null,
+//                     styles.formula_color || null,
+//                     styles.formula_text_align || null,
+//                     styles.references_font_size || null,
+//                     styles.references_line_height || null,
+//                     styles.references_color || null,
+//                     styles.created_by || null,
+//                     conferenceIdInt
+//                 ]
+//             );
+//             console.log('✅ Стили обновлены для конференции', conferenceIdInt);
+//         }
+        
+//         res.json({ success: true, message: 'Стили успешно сохранены' });
+//     } catch (error) {
+//         console.error('❌ Ошибка сохранения стилей:', error);
+//         res.status(500).json({ success: false, error: error.message });
+//     }
+// });
+
+// console.log('✅ Маршруты стилей зарегистрированы:');
+// console.log('   GET  /api/conferences/:id/styles');
+// console.log('   POST /api/conferences/:id/styles');
 
 
 
@@ -321,8 +520,6 @@ app.post("/test-post", (req, res) => {
 // ============================================
 // УВЕДОМЛЕНИЯ
 // ============================================
-
-
 // Функция создания уведомления
 async function createNotification(userId, type, title, message, link = null) {
     try {
@@ -455,121 +652,87 @@ app.put('/api/notifications/read-all', async (req, res) => {
 app.get('/api/admin/conferences/accepted-reports/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
-        
         console.log('=== ПОЛУЧЕНИЕ ПРИНЯТЫХ ДОКЛАДОВ ДЛЯ АДМИНИСТРАТОРА ===');
         console.log('userId:', userId);
         
-        // Проверяем, есть ли конференции у пользователя
-        const checkConferences = await pool.query(
-            'SELECT COUNT(*) FROM conferences WHERE created_by = $1',
-            [userId]
-        );
-        console.log(`Конференций у пользователя: ${checkConferences.rows[0].count}`);
-        
-        const query = `
-            SELECT 
-                r.report_id,
-                r.title,
-                r.abstract,
-                r.keywords,
-                r.status,
-                r.created_at,
-                r.submitted_at,
-                r.coauthors,
-                u.name as author_name,
-                u.login as author_login,
-                s.id_sections as section_id,
-                s.name_section as section_name,
-                s.user_id as section_head_id,
-                s_owner.name as section_head_name,
-                c.id as conference_id,
-                c.title as conference_title,
-                c.start_date,
-                c.end_date,
-                c.submission_deadline
+        // 1. Конференции, где пользователь - администратор (через header_section)
+        const conferencesQuery = `
+            SELECT DISTINCT c.* 
             FROM conferences c
-            LEFT JOIN sections s ON c.id = s.conference_id
-            LEFT JOIN reports r ON s.id_sections = r.id_sections AND r.status = 'accepted'
-            LEFT JOIN users u ON r.user_id = u.user_id
-            LEFT JOIN users s_owner ON s.user_id = s_owner.user_id
-            WHERE c.created_by = $1
-            ORDER BY c.title, s.name_section, r.submitted_at DESC
+            JOIN sections s ON s.conference_id = c.id
+            JOIN header_section hs ON hs.id_section = s.id_sections
+            WHERE hs.user_id = $1
         `;
+        const conferencesResult = await pool.query(conferencesQuery, [userId]);
+        const conferences = conferencesResult.rows;
         
-        const result = await pool.query(query, [userId]);
-        
-        console.log(`Найдено записей: ${result.rows.length}`);
-        
-        // Группируем по конференциям и секциям
-        const conferencesMap = new Map();
-        
-        result.rows.forEach(row => {
-            if (!conferencesMap.has(row.conference_id)) {
-                conferencesMap.set(row.conference_id, {
-                    id: row.conference_id,
-                    title: row.conference_title,
-                    start_date: row.start_date,
-                    end_date: row.end_date,
-                    submission_deadline: row.submission_deadline,
-                    sections: new Map()
-                });
-            }
+        for (const conference of conferences) {
+            // 2. Секции конференции
+            const sectionsQuery = `
+                SELECT s.*, u.name as head_name
+                FROM sections s
+                LEFT JOIN header_section hs ON hs.id_section = s.id_sections
+                LEFT JOIN users u ON u.user_id = hs.user_id
+                WHERE s.conference_id = $1
+                ORDER BY s.id_sections
+            `;
+            const sectionsResult = await pool.query(sectionsQuery, [conference.id]);
+            const sections = sectionsResult.rows;
             
-            const conference = conferencesMap.get(row.conference_id);
-            
-            if (row.section_id) {
-                if (!conference.sections.has(row.section_id)) {
-                    conference.sections.set(row.section_id, {
-                        id: row.section_id,
-                        name: row.section_name,
-                        head_id: row.section_head_id,
-                        head_name: row.section_head_name,
-                        reports: []
-                    });
+            for (const section of sections) {
+                // 3. Принятые доклады из таблицы reports (без report_versions)
+                const reportsQuery = `
+                    SELECT 
+                        r.report_id,
+                        r.title,
+                        r.abstract,
+                        r.keywords,
+                        r.status,
+                        r.created_at,
+                        r.submitted_at,
+                        r.coauthors,
+                        r.literature,
+                        r.additional_info,
+                        r.content,
+                        u.name as author_name
+                    FROM reports r
+                    LEFT JOIN users u ON r.user_id = u.user_id
+                    WHERE r.id_sections = $1 AND r.status = 'accepted'
+                `;
+                const reportsResult = await pool.query(reportsQuery, [section.id_sections]);
+                const reports = reportsResult.rows;
+                
+                // Парсим JSONB поля (если сохранены как строка)
+                for (const report of reports) {
+                    if (report.content && typeof report.content === 'string') {
+                        try { 
+                            report.content = JSON.parse(report.content); 
+                        } catch(e) { 
+                            report.content = []; 
+                        }
+                    } else if (!report.content) {
+                        report.content = [];
+                    }
+                    if (report.coauthors && typeof report.coauthors === 'string') {
+                        try { 
+                            report.coauthors = JSON.parse(report.coauthors); 
+                        } catch(e) { 
+                            report.coauthors = []; 
+                        }
+                    }
                 }
                 
-                if (row.report_id) {
-                    conference.sections.get(row.section_id).reports.push({
-                        report_id: row.report_id,
-                        title: row.title,
-                        abstract: row.abstract,
-                        keywords: row.keywords,
-                        status: row.status,
-                        created_at: row.created_at,
-                        submitted_at: row.submitted_at,
-                        coauthors: row.coauthors || [],
-                        author_name: row.author_name,
-                        author_login: row.author_login
-                    });
-                }
+                section.reports = reports;
             }
-        });
+            conference.sections = sections;
+        }
         
-        const groupedResult = Array.from(conferencesMap.values()).map(conf => ({
-            ...conf,
-            sections: Array.from(conf.sections.values())
-        }));
-        
-        const totalReports = groupedResult.reduce((total, conf) => {
-            return total + conf.sections.reduce((sum, section) => sum + section.reports.length, 0);
-        }, 0);
-        
-        res.json({
-            success: true,
-            user_id: userId,
-            conferences: groupedResult,
-            total_reports: totalReports
-        });
-        
+        res.json({ success: true, conferences });
     } catch (error) {
         console.error('❌ Ошибка:', error);
-        res.status(500).json({ 
-            success: false, 
-            error: error.message 
-        });
+        res.status(500).json({ success: false, error: error.message });
     }
 });
-
 
 
 
@@ -4307,293 +4470,6 @@ app.delete('/api/reports/:reportId', async (req, res) => {
     });
   }
 });
-
-
-
-// ============================================
-// МАРШРУТЫ ДЛЯ СТИЛЕЙ КОНФЕРЕНЦИЙ
-// ============================================
-app.set('db', pool);
-const stylesRouter = express.Router();
-
-// Получить стили конференции
-stylesRouter.get('/conferences/:conferenceId/styles', async (req, res) => {
-    const { conferenceId } = req.params;
-    const db = req.app.get('db');
-    
-    console.log('=== GET СТИЛИ ===');
-    console.log('conferenceId:', conferenceId);
-    
-    if (!db) {
-        console.error('❌ db не инициализирован');
-        return res.status(500).json({ success: false, error: 'Ошибка БД' });
-    }
-    
-    try {
-        const conferenceIdInt = parseInt(conferenceId);
-        const result = await db.query(
-            'SELECT * FROM conference_styles WHERE conference_id = $1',
-            [conferenceIdInt]
-        );
-        
-        console.log('Результат запроса:', result.rows.length > 0 ? 'найдено' : 'не найдено');
-        
-        if (result.rows.length === 0) {
-            return res.json({ success: true, styles: null });
-        }
-        
-        res.json({ success: true, styles: result.rows[0] });
-    } catch (error) {
-        console.error('❌ Ошибка получения стилей:', error);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// Сохранить стили конференции
-stylesRouter.post('/conferences/:conferenceId/styles', async (req, res) => {
-    const { conferenceId } = req.params;
-    const styles = req.body;
-    const db = req.app.get('db');
-    
-    console.log('=== POST СОХРАНЕНИЕ СТИЛЕЙ ===');
-    console.log('conferenceId:', conferenceId);
-    console.log('Полученные поля:', Object.keys(styles));
-    
-    if (!db) {
-        console.error('❌ db не инициализирован!');
-        return res.status(500).json({ success: false, error: 'Ошибка подключения к БД' });
-    }
-    
-    try {
-        const conferenceIdInt = parseInt(conferenceId);
-        
-        // Проверяем существование конференции
-        const conferenceCheck = await db.query(
-            'SELECT id FROM conferences WHERE id = $1',
-            [conferenceIdInt]
-        );
-        
-        if (conferenceCheck.rows.length === 0) {
-            return res.status(404).json({ success: false, error: 'Конференция не найдена' });
-        }
-        
-        // Проверяем, существуют ли уже стили
-        const checkResult = await db.query(
-            'SELECT id FROM conference_styles WHERE conference_id = $1',
-            [conferenceIdInt]
-        );
-        
-        let result;
-        if (checkResult.rows.length === 0) {
-            // ВСТАВКА новых стилей
-            result = await db.query(
-                `INSERT INTO conference_styles (
-                    conference_id,
-                    page_background,
-                    container_padding,
-                    font_family,
-                    title_font_size,
-                    title_font_weight,
-                    title_color,
-                    title_text_align,
-                    title_margin_bottom,
-                    authors_font_size,
-                    authors_font_weight,
-                    authors_color,
-                    authors_text_align,
-                    authors_margin_bottom,
-                    abstract_font_size,
-                    abstract_font_weight,
-                    abstract_color,
-                    abstract_line_height,
-                    abstract_margin_bottom,
-                    keywords_font_size,
-                    keywords_font_weight,
-                    keywords_color,
-                    keywords_margin_bottom,
-                    section_title_font_size,
-                    section_title_font_weight,
-                    section_title_color,
-                    section_title_margin_top,
-                    section_title_margin_bottom,
-                    text_font_size,
-                    text_line_height,
-                    text_color,
-                    text_margin_bottom,
-                    table_border_color,
-                    table_header_bg,
-                    table_cell_padding,
-                    image_max_width,
-                    image_margin_top,
-                    image_margin_bottom,
-                    formula_font_size,
-                    formula_color,
-                    formula_text_align,
-                    references_font_size,
-                    references_line_height,
-                    references_color
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44)
-                RETURNING *`,
-                [
-                    conferenceIdInt,
-                    styles.page_background || '#ffffff',
-                    styles.container_padding || 40,
-                    styles.font_family || 'Futura PT, -apple-system, BlinkMacSystemFont, sans-serif',
-                    styles.title_font_size || 32,
-                    styles.title_font_weight || '600',
-                    styles.title_color || '#f39c12',
-                    styles.title_text_align || 'center',
-                    styles.title_margin_bottom || 30,
-                    styles.authors_font_size || 16,
-                    styles.authors_font_weight || '400',
-                    styles.authors_color || '#e67e22',
-                    styles.authors_text_align || 'center',
-                    styles.authors_margin_bottom || 20,
-                    styles.abstract_font_size || 14,
-                    styles.abstract_font_weight || '400',
-                    styles.abstract_color || '#333333',
-                    styles.abstract_line_height || 1.6,
-                    styles.abstract_margin_bottom || 30,
-                    styles.keywords_font_size || 14,
-                    styles.keywords_font_weight || '600',
-                    styles.keywords_color || '#e67e22',
-                    styles.keywords_margin_bottom || 30,
-                    styles.section_title_font_size || 24,
-                    styles.section_title_font_weight || '500',
-                    styles.section_title_color || '#e67e22',
-                    styles.section_title_margin_top || 30,
-                    styles.section_title_margin_bottom || 15,
-                    styles.text_font_size || 14,
-                    styles.text_line_height || 1.6,
-                    styles.text_color || '#333333',
-                    styles.text_margin_bottom || 15,
-                    styles.table_border_color || '#000000',
-                    styles.table_header_bg || '#f8f9fa',
-                    styles.table_cell_padding || 8,
-                    styles.image_max_width || '100%',
-                    styles.image_margin_top || 20,
-                    styles.image_margin_bottom || 20,
-                    styles.formula_font_size || 16,
-                    styles.formula_color || '#333333',
-                    styles.formula_text_align || 'center',
-                    styles.references_font_size || 12,
-                    styles.references_line_height || 1.4,
-                    styles.references_color || '#666666'
-                ]
-            );
-            console.log('✅ Вставлены новые стили');
-        } else {
-            // ОБНОВЛЕНИЕ существующих стилей
-            result = await db.query(
-                `UPDATE conference_styles SET
-                    page_background = COALESCE($1, page_background),
-                    container_padding = COALESCE($2, container_padding),
-                    font_family = COALESCE($3, font_family),
-                    title_font_size = COALESCE($4, title_font_size),
-                    title_font_weight = COALESCE($5, title_font_weight),
-                    title_color = COALESCE($6, title_color),
-                    title_text_align = COALESCE($7, title_text_align),
-                    title_margin_bottom = COALESCE($8, title_margin_bottom),
-                    authors_font_size = COALESCE($9, authors_font_size),
-                    authors_font_weight = COALESCE($10, authors_font_weight),
-                    authors_color = COALESCE($11, authors_color),
-                    authors_text_align = COALESCE($12, authors_text_align),
-                    authors_margin_bottom = COALESCE($13, authors_margin_bottom),
-                    abstract_font_size = COALESCE($14, abstract_font_size),
-                    abstract_font_weight = COALESCE($15, abstract_font_weight),
-                    abstract_color = COALESCE($16, abstract_color),
-                    abstract_line_height = COALESCE($17, abstract_line_height),
-                    abstract_margin_bottom = COALESCE($18, abstract_margin_bottom),
-                    keywords_font_size = COALESCE($19, keywords_font_size),
-                    keywords_font_weight = COALESCE($20, keywords_font_weight),
-                    keywords_color = COALESCE($21, keywords_color),
-                    keywords_margin_bottom = COALESCE($22, keywords_margin_bottom),
-                    section_title_font_size = COALESCE($23, section_title_font_size),
-                    section_title_font_weight = COALESCE($24, section_title_font_weight),
-                    section_title_color = COALESCE($25, section_title_color),
-                    section_title_margin_top = COALESCE($26, section_title_margin_top),
-                    section_title_margin_bottom = COALESCE($27, section_title_margin_bottom),
-                    text_font_size = COALESCE($28, text_font_size),
-                    text_line_height = COALESCE($29, text_line_height),
-                    text_color = COALESCE($30, text_color),
-                    text_margin_bottom = COALESCE($31, text_margin_bottom),
-                    table_border_color = COALESCE($32, table_border_color),
-                    table_header_bg = COALESCE($33, table_header_bg),
-                    table_cell_padding = COALESCE($34, table_cell_padding),
-                    image_max_width = COALESCE($35, image_max_width),
-                    image_margin_top = COALESCE($36, image_margin_top),
-                    image_margin_bottom = COALESCE($37, image_margin_bottom),
-                    formula_font_size = COALESCE($38, formula_font_size),
-                    formula_color = COALESCE($39, formula_color),
-                    formula_text_align = COALESCE($40, formula_text_align),
-                    references_font_size = COALESCE($41, references_font_size),
-                    references_line_height = COALESCE($42, references_line_height),
-                    references_color = COALESCE($43, references_color),
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE conference_id = $44
-                RETURNING *`,
-                [
-                    styles.page_background || null,
-                    styles.container_padding || null,
-                    styles.font_family || null,
-                    styles.title_font_size || null,
-                    styles.title_font_weight || null,
-                    styles.title_color || null,
-                    styles.title_text_align || null,
-                    styles.title_margin_bottom || null,
-                    styles.authors_font_size || null,
-                    styles.authors_font_weight || null,
-                    styles.authors_color || null,
-                    styles.authors_text_align || null,
-                    styles.authors_margin_bottom || null,
-                    styles.abstract_font_size || null,
-                    styles.abstract_font_weight || null,
-                    styles.abstract_color || null,
-                    styles.abstract_line_height || null,
-                    styles.abstract_margin_bottom || null,
-                    styles.keywords_font_size || null,
-                    styles.keywords_font_weight || null,
-                    styles.keywords_color || null,
-                    styles.keywords_margin_bottom || null,
-                    styles.section_title_font_size || null,
-                    styles.section_title_font_weight || null,
-                    styles.section_title_color || null,
-                    styles.section_title_margin_top || null,
-                    styles.section_title_margin_bottom || null,
-                    styles.text_font_size || null,
-                    styles.text_line_height || null,
-                    styles.text_color || null,
-                    styles.text_margin_bottom || null,
-                    styles.table_border_color || null,
-                    styles.table_header_bg || null,
-                    styles.table_cell_padding || null,
-                    styles.image_max_width || null,
-                    styles.image_margin_top || null,
-                    styles.image_margin_bottom || null,
-                    styles.formula_font_size || null,
-                    styles.formula_color || null,
-                    styles.formula_text_align || null,
-                    styles.references_font_size || null,
-                    styles.references_line_height || null,
-                    styles.references_color || null,
-                    conferenceIdInt
-                ]
-            );
-            console.log('✅ Обновлены стили');
-        }
-        
-        res.json({
-            success: true,
-            message: 'Стили успешно сохранены',
-            styles: result.rows[0]
-        });
-    } catch (error) {
-        console.error('❌ Ошибка сохранения стилей:', error);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-app.use('/api', stylesRouter);
 
 
 
