@@ -6,13 +6,7 @@ import { parseMath } from "latex-math";
 
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
-import { 
-    Document, Packer, Paragraph, TextRun, 
-    AlignmentType, PageBreak, HeadingLevel, 
-    TableOfContents, ImageRun,
-    Table, TableRow, TableCell, WidthType, BorderStyle,
-    Header, Footer, PageNumber  
-} from 'docx';
+
 
 const ReportAll = () => {
     const { user } = useContext(AuthContext);
@@ -372,6 +366,13 @@ const ReportAll = () => {
 const generateDOCX = async (conference, sections, styles) => {
     setIsGenerating(true);
     try {
+         const { 
+            Document, Packer, Paragraph, TextRun, 
+            AlignmentType, PageBreak, HeadingLevel, 
+            TableOfContents, ImageRun,
+            Table, TableRow, TableCell, WidthType, BorderStyle,
+            Header, Footer, PageNumber 
+        } = await import('docx');
         const fetchImageForDocx = async (src) => {
             try {
                 if (src && src.startsWith('data:image')) {
