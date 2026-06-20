@@ -2,6 +2,10 @@ import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../../context/AuthContext/Auth';
 import './Admin.css';
 
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
+
+
 const ReportAll = () => {
     const { user } = useContext(AuthContext);
     const [conferences, setConferences] = useState([]);
@@ -355,267 +359,530 @@ const ReportAll = () => {
     };
 
     // ========== ГЕНЕРАЦИЯ DOCX (ИСПРАВЛЕННАЯ) ==========
+
+
 const generateDOCX = async (conference, sections, styles) => {
     setIsGenerating(true);
     try {
-        const docx = await import('docx');
-        const { 
+         const { 
             Document, Packer, Paragraph, TextRun, 
             AlignmentType, PageBreak, HeadingLevel, 
-            TableOfContents, ImageRun
-        } = docx;
-
-        // Функция загрузки изображения
+            TableOfContents, ImageRun,
+            Table, TableRow, TableCell, WidthType, BorderStyle,
+            Header, Footer, PageNumber 
+        } = await import('docx');
         const fetchImageForDocx = async (src) => {
             try {
-                let imageData = null;
-                let mimeType = 'image/png';
                 if (src && src.startsWith('data:image')) {
                     const matches = src.match(/^data:image\/(\w+);base64,(.+)$/);
                     if (matches) {
-                        mimeType = `image/${matches[1]}`;
+                        const mimeType = `image/${matches[1]}`;
                         const binary = atob(matches[2]);
                         const arr = new Uint8Array(binary.length);
                         for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
                         return { data: arr, mime: mimeType };
                     }
-                } else {
+                } else if (src) {
                     let fullUrl = src;
-                    if (src.startsWith('/')) fullUrl = `https://diplom-j6uo.onrender.com${src}`;
-                    else if (!src.startsWith('http')) fullUrl = `https://diplom-j6uo.onrender.com/${src}`;
+                    if (src.startsWith('/')) {
+                        fullUrl = `https://diplom-j6uo.onrender.com${src}`;
+                    } else if (!src.startsWith('http')) {
+                        fullUrl = `https://diplom-j6uo.onrender.com/${src}`;
+                    }
                     const resp = await fetch(fullUrl);
                     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                     const blob = await resp.blob();
                     const buffer = await blob.arrayBuffer();
                     return { data: new Uint8Array(buffer), mime: blob.type || 'image/png' };
                 }
+                return null;
             } catch (err) {
                 console.error('Ошибка загрузки изображения:', src, err);
                 return null;
             }
         };
 
-        // Стили по умолчанию
-        // Стили по умолчанию (УВЕЛИЧЕННЫЕ РАЗМЕРЫ)
-const defaultStyles = {
-    font_family: 'Times New Roman',
-    title_font_size: 32,           // было 28 → 32
-    title_font_weight: 'bold',
-    title_color: '000000',
-    title_text_align: 'center',
-    title_margin_bottom: 40,
-    authors_font_size: 18,          // было 14 → 18
-    authors_font_weight: '400',
-    authors_color: '333333',
-    authors_text_align: 'center',
-    authors_margin_bottom: 25,
-    abstract_font_size: 14,         // было 12 → 14
-    abstract_font_weight: '400',
-    abstract_color: '333333',
-    abstract_line_height: 1.6,
-    abstract_margin_bottom: 40,
-    keywords_font_size: 14,         // было 12 → 14
-    keywords_font_weight: 'bold',
-    keywords_color: 'e67e22',
-    keywords_margin_bottom: 40,
-    section_title_font_size: 28,    // было 24 → 28
-    section_title_font_weight: 'bold',
-    section_title_color: '000000',
-    section_title_margin_top: 40,
-    section_title_margin_bottom: 20,
-    text_font_size: 14,             // было 12 → 14
-    text_line_height: 1.6,
-    text_color: '333333',
-    text_margin_bottom: 20,
-    table_border_color: '000000',
-    table_header_bg: 'f8f9fa',
-    table_cell_padding: 8,
-    image_max_width: '100%',
-    image_margin_top: 30,
-    image_margin_bottom: 30,
-    formula_font_size: 18,          // было 16 → 18
-    formula_color: '333333',
-    formula_text_align: 'center',
-    references_font_size: 13,       // было 11 → 13
-    references_line_height: 1.4,
-    references_color: '666666',
-    container_padding: 40,
-    page_background: '#ffffff'
-};
-        
-        const s = { ...defaultStyles, ...(styles || {}) };
-        Object.keys(defaultStyles).forEach(key => {
-            if (s[key] == null) s[key] = defaultStyles[key];
-        });
-        const hexToRgb = (color) => (!color ? '000000' : color.replace('#', ''));
+        const htmlToStructuredContent = (html) => {
+            if (!html) return [];
+            const result = [];
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            
+            const processNode = (node) => {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    const text = node.textContent;
+                    if (text && text.trim()) return text;
+                    return '';
+                }
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    const tagName = node.tagName.toLowerCase();
+                    if (tagName === 'p') {
+                        let text = '';
+                        for (const child of node.childNodes) text += processNode(child);
+                        if (text.trim()) result.push({ type: 'paragraph', content: text.trim() });
+                        return '';
+                    }
+                    if (tagName.match(/^h[1-6]$/)) {
+                        let text = '';
+                        for (const child of node.childNodes) text += processNode(child);
+                        if (text.trim()) result.push({ type: 'heading', level: parseInt(tagName[1]), content: text.trim() });
+                        return '';
+                    }
+                    if (tagName === 'ul') {
+                        for (const li of node.children) {
+                            if (li.tagName.toLowerCase() === 'li') {
+                                let text = '';
+                                for (const child of li.childNodes) text += processNode(child);
+                                if (text.trim()) result.push({ type: 'listItem', bullet: '•', content: text.trim(), listType: 'bullet' });
+                            }
+                        }
+                        return '';
+                    }
+                    if (tagName === 'ol') {
+                        let counter = 1;
+                        for (const li of node.children) {
+                            if (li.tagName.toLowerCase() === 'li') {
+                                let text = '';
+                                for (const child of li.childNodes) text += processNode(child);
+                                if (text.trim()) {
+                                    result.push({ type: 'listItem', bullet: `${counter}.`, content: text.trim(), listType: 'numbered' });
+                                    counter++;
+                                }
+                            }
+                        }
+                        return '';
+                    }
+                    if (tagName === 'br') return '\n';
+                    let text = '';
+                    for (const child of node.childNodes) text += processNode(child);
+                    return text;
+                }
+                return '';
+            };
+            
+            for (const child of doc.body.childNodes) processNode(child);
+            
+            if (result.length === 0) {
+                const plainText = html.replace(/<[^>]*>/g, '').trim();
+                if (plainText) {
+                    const paragraphs = plainText.split(/\n\s*\n/);
+                    for (const para of paragraphs) {
+                        if (para.trim()) result.push({ type: 'paragraph', content: para.trim() });
+                    }
+                }
+            }
+            return result;
+        };
+
+        const formatLatexToText = (latex) => {
+            if (!latex) return '';
+            let result = latex;
+            result = result.replace(/\\sqrt\[(\d+)\]\{([^}]+)\}/g, '√[$1]($2)');
+            result = result.replace(/\\sqrt\{([^}]+)\}/g, '√($1)');
+            result = result.replace(/\\iiint/g, '∭');
+            result = result.replace(/\\iint/g, '∬');
+            result = result.replace(/\\int/g, '∫');
+            result = result.replace(/_\{([^}]+)\}/g, '₍$1₎');
+            result = result.replace(/\^\{([^}]+)\}/g, '⁽$1⁾');
+            result = result.replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '$1/$2');
+            result = result.replace(/\\alpha/g, 'α');
+            result = result.replace(/\\beta/g, 'β');
+            result = result.replace(/\\gamma/g, 'γ');
+            result = result.replace(/\\delta/g, 'δ');
+            result = result.replace(/\\epsilon/g, 'ε');
+            result = result.replace(/\\pi/g, 'π');
+            result = result.replace(/\\sigma/g, 'σ');
+            result = result.replace(/\\omega/g, 'ω');
+            result = result.replace(/\\infty/g, '∞');
+            result = result.replace(/\\times/g, '×');
+            result = result.replace(/\\div/g, '÷');
+            result = result.replace(/\\pm/g, '±');
+            result = result.replace(/\\le/g, '≤');
+            result = result.replace(/\\ge/g, '≥');
+            result = result.replace(/\\neq/g, '≠');
+            result = result.replace(/\\approx/g, '≈');
+            result = result.replace(/\\sum/g, 'Σ');
+            result = result.replace(/\\prod/g, 'Π');
+            result = result.replace(/\\[a-zA-Z]+/g, '');
+            result = result.replace(/[{}]/g, '');
+            return result;
+        };
+
+        const defaultStyles = {
+            font_family: 'Times New Roman',
+            title_font_size: 32,
+            title_font_weight: 'bold',
+            title_color: '000000',
+            title_text_align: 'center',
+            title_margin_bottom: 40,
+            authors_font_size: 18,
+            authors_font_weight: '400',
+            authors_color: '333333',
+            authors_text_align: 'center',
+            authors_margin_bottom: 25,
+            abstract_font_size: 14,
+            abstract_font_weight: '400',
+            abstract_color: '333333',
+            abstract_margin_bottom: 40,
+            keywords_font_size: 14,
+            keywords_font_weight: 'bold',
+            keywords_color: 'e67e22',
+            keywords_margin_bottom: 40,
+            section_title_font_size: 28,
+            section_title_font_weight: 'bold',
+            section_title_color: '000000',
+            section_title_margin_top: 40,
+            section_title_margin_bottom: 20,
+            text_font_size: 14,
+            text_color: '333333',
+            text_margin_bottom: 20,
+            formula_font_size: 16,
+            formula_color: '333333',
+            formula_text_align: 'center',
+            references_font_size: 13,
+            references_color: '666666',
+            image_margin_top: 30,
+            image_margin_bottom: 30,
+            table_border_color: '000000',
+            table_header_bg: 'f0f0f0',
+            table_cell_padding: 8
+        };
+
+        const safeNumber = (value, defaultValue) => {
+            if (value === null || value === undefined || value === '') return defaultValue;
+            const num = Number(value);
+            return isNaN(num) ? defaultValue : num;
+        };
+
+        const safeString = (value, defaultValue) => {
+            if (value === undefined || value === null) return defaultValue;
+            return String(value);
+        };
+
+        const s = { ...defaultStyles };
+        if (styles) {
+            Object.keys(defaultStyles).forEach(key => {
+                if (styles[key] !== undefined && styles[key] !== null) {
+                    const defaultValue = defaultStyles[key];
+                    if (typeof defaultValue === 'number') {
+                        s[key] = safeNumber(styles[key], defaultValue);
+                    } else {
+                        s[key] = safeString(styles[key], defaultValue);
+                    }
+                }
+            });
+        }
+
+        // ВАЖНО: УМНОЖАЕМ НА 2, так как docx использует полупункты (half-points)
+        // 1 пункт в Word = 2 полупункта в коде
+        const titleFontSize = safeNumber(s.title_font_size, 32) * 2;
+        const titleMarginBottom = safeNumber(s.title_margin_bottom, 40);
+        const titleColor = safeString(s.title_color, '000000').replace('#', '');
+        const titleTextAlign = safeString(s.title_text_align, 'center');
+        const titleFontWeight = safeString(s.title_font_weight, 'bold');
+
+        const authorsFontSize = safeNumber(s.authors_font_size, 18) * 2;
+        const authorsMarginBottom = safeNumber(s.authors_margin_bottom, 25);
+        const authorsColor = safeString(s.authors_color, '333333').replace('#', '');
+        const authorsTextAlign = safeString(s.authors_text_align, 'center');
+
+        const abstractFontSize = safeNumber(s.abstract_font_size, 14) * 2;
+        const abstractMarginBottom = safeNumber(s.abstract_margin_bottom, 40);
+        const abstractColor = safeString(s.abstract_color, '333333').replace('#', '');
+        const abstractFontWeight = safeString(s.abstract_font_weight, '400');
+
+        const keywordsFontSize = safeNumber(s.keywords_font_size, 14) * 2;
+        const keywordsMarginBottom = safeNumber(s.keywords_margin_bottom, 40);
+        const keywordsColor = safeString(s.keywords_color, 'e67e22').replace('#', '');
+        const keywordsFontWeight = safeString(s.keywords_font_weight, 'bold');
+
+        const sectionTitleFontSize = safeNumber(s.section_title_font_size, 28) * 2;
+        const sectionTitleMarginTop = safeNumber(s.section_title_margin_top, 40);
+        const sectionTitleMarginBottom = safeNumber(s.section_title_margin_bottom, 20);
+        const sectionTitleColor = safeString(s.section_title_color, '000000').replace('#', '');
+        const sectionTitleFontWeight = safeString(s.section_title_font_weight, 'bold');
+
+        const textFontSize = safeNumber(s.text_font_size, 14) * 2;
+        const textMarginBottom = safeNumber(s.text_margin_bottom, 20);
+        const textColor = safeString(s.text_color, '333333').replace('#', '');
+
+        const referencesFontSize = safeNumber(s.references_font_size, 13) * 2;
+        const referencesColor = safeString(s.references_color, '666666').replace('#', '');
+
+        const formulaFontSize = safeNumber(s.formula_font_size, 16) * 2;
+        const formulaColor = safeString(s.formula_color, '333333').replace('#', '');
+        const formulaTextAlign = safeString(s.formula_text_align, 'center');
+
+        const imageMarginTop = safeNumber(s.image_margin_top, 30);
+        const imageMarginBottom = safeNumber(s.image_margin_bottom, 30);
+        const tableCellPadding = safeNumber(s.table_cell_padding, 8);
+        const tableBorderColor = safeString(s.table_border_color, '000000').replace('#', '');
+        const tableHeaderBg = safeString(s.table_header_bg, 'f0f0f0');
+
+        const formatDateLocal = (dateString) => {
+            if (!dateString) return 'Дата не указана';
+            const date = new Date(dateString);
+            return date.toLocaleDateString('ru-RU', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+        };
 
         const docChildren = [];
 
-        // ---- ТИТУЛЬНАЯ СТРАНИЦА (применены стили) ----
+        // Титульная страница
         docChildren.push(new Paragraph({
             children: [new TextRun({
                 text: conference.title || '',
-                bold: s.title_font_weight === 'bold',
-                size: s.title_font_size * 2,
+                bold: titleFontWeight === 'bold',
+                size: titleFontSize,
                 font: s.font_family,
-                color: hexToRgb(s.title_color)
+                color: titleColor
             })],
-            alignment: s.title_text_align === 'center' ? AlignmentType.CENTER : AlignmentType.LEFT,
-            spacing: { before: 400, after: s.title_margin_bottom * 2 }
+            alignment: titleTextAlign === 'center' ? AlignmentType.CENTER : AlignmentType.LEFT,
+            spacing: { before: 400, after: titleMarginBottom }
         }));
+
         docChildren.push(new Paragraph({
-            children: [new TextRun({ text: "СБОРНИК МАТЕРИАЛОВ", bold: true, size: 24, font: s.font_family })],
+            children: [new TextRun({ text: "СБОРНИК МАТЕРИАЛОВ", bold: true, size: titleFontSize - 16, font: s.font_family })],
             alignment: AlignmentType.CENTER,
             spacing: { after: 200 }
         }));
+
         docChildren.push(new Paragraph({
-            children: [new TextRun({ text: conference.location || "Место проведения не указано", size: 20, font: s.font_family })],
+            children: [new TextRun({ text: conference.location || "Место проведения не указано", size: titleFontSize - 24, font: s.font_family })],
             alignment: AlignmentType.CENTER
         }));
+
         docChildren.push(new Paragraph({
-            children: [new TextRun({ text: formatDate(conference.start_date), size: 20, font: s.font_family })],
+            children: [new TextRun({ text: formatDateLocal(conference.start_date), size: titleFontSize - 24, font: s.font_family })],
             alignment: AlignmentType.CENTER,
             spacing: { after: 400 }
         }));
+
         docChildren.push(new Paragraph({ children: [new PageBreak()] }));
 
-        // ---- ОГЛАВЛЕНИЕ ----
+        // Оглавление
         docChildren.push(new Paragraph({
-            children: [new TextRun({ text: "СОДЕРЖАНИЕ", bold: true, size: 24, font: s.font_family, color: hexToRgb(s.title_color) })],
+            children: [new TextRun({ text: "СОДЕРЖАНИЕ", bold: true, size: sectionTitleFontSize, font: s.font_family, color: sectionTitleColor })],
             alignment: AlignmentType.CENTER,
             spacing: { after: 200 }
         }));
+
         docChildren.push(new TableOfContents("Оглавление", { hyperlink: true, headingStyleRange: "1-3" }));
         docChildren.push(new Paragraph({ children: [new PageBreak()] }));
 
-        // ---- ДОКЛАДЫ ----
-        let reportCounter = 1;
+        // Доклады
         for (const section of sections) {
-            // Заголовок секции – уровень 2 (применены стили)
+            if (!section) continue;
+
             docChildren.push(new Paragraph({
                 children: [new TextRun({
                     text: section.name || '',
-                    bold: s.section_title_font_weight === 'bold',
-                    size: s.section_title_font_size,
+                    bold: sectionTitleFontWeight === 'bold',
+                    size: sectionTitleFontSize,
                     font: s.font_family,
-                    color: hexToRgb(s.section_title_color)
+                    color: sectionTitleColor
                 })],
                 alignment: AlignmentType.CENTER,
                 heading: HeadingLevel.HEADING_2,
-                spacing: { before: s.section_title_margin_top * 2, after: s.section_title_margin_bottom * 2 }
+                spacing: { before: sectionTitleMarginTop, after: sectionTitleMarginBottom }
             }));
-            
-            for (const report of (section.reports || [])) {
-                // Заголовок доклада – уровень 3 (применены стили)
+
+            const reports = section.reports || [];
+            for (const report of reports) {
+                if (!report) continue;
+
+                // Заголовок доклада
                 docChildren.push(new Paragraph({
                     children: [new TextRun({
-                        text: `${reportCounter}. ${report.title || ''}`,
+                        text: report.title || '',
                         bold: true,
-                        size: s.text_font_size + 2,
+                        size: titleFontSize,
                         font: s.font_family,
-                        color: hexToRgb(s.title_color)
+                        color: titleColor
                     })],
                     alignment: AlignmentType.CENTER,
                     heading: HeadingLevel.HEADING_3,
                     spacing: { before: 160, after: 80 }
                 }));
-                
-                // Авторы (применены стили из БД)
+
+                // Авторы
                 let authorsText = report.author_name || '';
-                if (report.coauthors?.length) authorsText += `, ${report.coauthors.map(c => c.name).join(', ')}`;
-                docChildren.push(new Paragraph({
-                    children: [new TextRun({ text: authorsText, italics: true, size: s.authors_font_size, color: hexToRgb(s.authors_color), font: s.font_family })],
-                    alignment: s.authors_text_align === 'center' ? AlignmentType.CENTER : AlignmentType.LEFT,
-                    spacing: { after: s.authors_margin_bottom }
-                }));
-                
-                // Аннотация (применены стили из БД)
+                if (report.coauthors && report.coauthors.length > 0) {
+                    const coauthorNames = report.coauthors.map(c => c.name).filter(n => n);
+                    if (coauthorNames.length > 0) {
+                        authorsText += `, ${coauthorNames.join(', ')}`;
+                    }
+                }
+                if (authorsText) {
+                    docChildren.push(new Paragraph({
+                        children: [new TextRun({ text: authorsText, italics: true, size: authorsFontSize, color: authorsColor, font: s.font_family })],
+                        alignment: authorsTextAlign === 'center' ? AlignmentType.CENTER : AlignmentType.LEFT,
+                        spacing: { after: authorsMarginBottom }
+                    }));
+                }
+
+                // Аннотация
                 if (report.abstract) {
                     docChildren.push(new Paragraph({
-                        children: [new TextRun({ text: "Аннотация", bold: s.abstract_font_weight === 'bold', size: s.abstract_font_size + 2, color: hexToRgb(s.abstract_color), font: s.font_family })],
+                        children: [new TextRun({ text: "Аннотация", bold: abstractFontWeight === 'bold', size: abstractFontSize, color: abstractColor, font: s.font_family })],
                         spacing: { after: 10 }
                     }));
-                    // Разбиваем аннотацию на абзацы с отступами
+
                     const abstractLines = report.abstract.split(/\r?\n/);
                     for (const line of abstractLines) {
                         if (line.trim()) {
                             docChildren.push(new Paragraph({
-                                children: [new TextRun({ text: line, size: s.abstract_font_size, color: hexToRgb(s.abstract_color), font: s.font_family })],
+                                children: [new TextRun({ text: line, size: abstractFontSize, color: abstractColor, font: s.font_family })],
                                 spacing: { after: 5 },
+                                alignment: AlignmentType.JUSTIFIED,
                                 indent: { left: 720, right: 720, firstLine: 720 }
                             }));
                         } else {
                             docChildren.push(new Paragraph({ spacing: { after: 5 } }));
                         }
                     }
-                    docChildren.push(new Paragraph({ spacing: { after: s.abstract_margin_bottom } }));
+                    docChildren.push(new Paragraph({ spacing: { after: abstractMarginBottom } }));
                 }
-                
-                // Ключевые слова (применены стили из БД)
+
+                // Ключевые слова
                 if (report.keywords) {
                     docChildren.push(new Paragraph({
                         children: [
-                            new TextRun({ text: "Ключевые слова: ", bold: s.keywords_font_weight === 'bold', size: s.keywords_font_size, color: hexToRgb(s.keywords_color), font: s.font_family }),
-                            new TextRun({ text: report.keywords, italics: true, size: s.keywords_font_size, color: hexToRgb(s.keywords_color), font: s.font_family })
+                            new TextRun({ text: "Ключевые слова: ", bold: keywordsFontWeight === 'bold', size: keywordsFontSize, color: keywordsColor, font: s.font_family }),
+                            new TextRun({ text: report.keywords, italics: true, size: keywordsFontSize, color: keywordsColor, font: s.font_family })
                         ],
-                        spacing: { after: s.keywords_margin_bottom }
+                        spacing: { after: keywordsMarginBottom }
                     }));
                 }
-                
-                // Контент (текст, таблицы, формулы, изображения)
+
+                // Контент
                 if (report.content && Array.isArray(report.content)) {
                     for (const block of report.content) {
-                        // Текст (применены стили из БД)
+                        if (!block) continue;
+
                         if (block.type === 'text' && block.content) {
-                            const plainText = block.content.replace(/<[^>]*>/g, '');
-                            const paragraphs = plainText.split(/\r?\n/);
-                            for (const para of paragraphs) {
-                                if (para.trim()) {
+                            const structuredContent = htmlToStructuredContent(block.content);
+                            for (const item of structuredContent) {
+                                if (item.type === 'paragraph') {
                                     docChildren.push(new Paragraph({
-                                        children: [new TextRun({ text: para, size: s.text_font_size, color: hexToRgb(s.text_color), font: s.font_family })],
-                                        spacing: { after: s.text_margin_bottom },
+                                        children: [new TextRun({ text: item.content, size: textFontSize, color: textColor, font: s.font_family })],
+                                        spacing: { after: textMarginBottom },
+                                        alignment: AlignmentType.JUSTIFIED,
                                         indent: { firstLine: 720 }
                                     }));
-                                } else {
-                                    docChildren.push(new Paragraph({ spacing: { after: s.text_margin_bottom } }));
+                                } else if (item.type === 'heading') {
+                                    docChildren.push(new Paragraph({
+                                        children: [new TextRun({ text: item.content, bold: true, size: textFontSize, color: sectionTitleColor, font: s.font_family })],
+                                        spacing: { before: textMarginBottom, after: textMarginBottom / 2 }
+                                    }));
+                                } else if (item.type === 'listItem') {
+                                    docChildren.push(new Paragraph({
+                                        children: [
+                                            new TextRun({ text: `${item.bullet} `, size: textFontSize, color: textColor, font: s.font_family }),
+                                            new TextRun({ text: item.content, size: textFontSize, color: textColor, font: s.font_family })
+                                        ],
+                                        spacing: { after: textMarginBottom / 2 },
+                                        indent: { left: 720 }
+                                    }));
                                 }
                             }
                         }
+
                         // Таблица
-                        if (block.type === 'table' && block.data) {
-                            if (block.caption) {
-                                docChildren.push(new Paragraph({
-                                    children: [new TextRun({ text: `Таблица ${block.number || ''} — ${block.caption}`, italics: true, size: s.text_font_size - 2, font: s.font_family, color: hexToRgb(s.text_color) })],
-                                    alignment: AlignmentType.CENTER,
-                                    spacing: { after: 10 }
-                                }));
-                            }
-                            let tableText = '';
-                            if (block.headers?.length) {
-                                tableText += block.headers.join(' | ') + '\n';
-                                tableText += block.headers.map(() => '---').join(' | ') + '\n';
-                            }
-                            for (const row of (block.data || [])) {
-                                tableText += row.join(' | ') + '\n';
-                            }
-                            if (tableText.trim()) {
-                                const tableLines = tableText.split('\n');
-                                for (const line of tableLines) {
-                                    if (line.trim()) {
-                                        docChildren.push(new Paragraph({
-                                            children: [new TextRun({ text: line, size: s.text_font_size - 2, font: "Courier New", color: hexToRgb(s.text_color) })],
-                                            spacing: { after: 8 }
-                                        }));
+                        if (block.type === 'table' && block.data && block.data.length > 0) {
+                            const tableData = block.data || [];
+                            const headers = block.headers || [];
+                            const mergedCells = block.mergedCells || {};
+                            const hasHeaders = headers.length > 0 && headers.some(h => h && h.trim());
+                            
+                            const numRows = tableData.length;
+                            const numCols = Math.max(headers.length, ...tableData.map(row => row?.length || 0));
+                            
+                            const borderStyle = { style: BorderStyle.SINGLE, size: 1, color: tableBorderColor };
+                            const cellBorders = { top: borderStyle, bottom: borderStyle, left: borderStyle, right: borderStyle };
+                            
+                            const shouldRenderCell = (row, col) => {
+                                for (const [key, info] of Object.entries(mergedCells)) {
+                                    const [startRow, startCol] = key.split('-').map(Number);
+                                    if (row >= startRow && row < startRow + info.rowspan && col >= startCol && col < startCol + info.colspan) {
+                                        return startRow === row && startCol === col;
                                     }
                                 }
+                                return true;
+                            };
+                            
+                            const getMerge = (row, col) => {
+                                for (const [key, info] of Object.entries(mergedCells)) {
+                                    const [startRow, startCol] = key.split('-').map(Number);
+                                    if (row === startRow && col === startCol) {
+                                        return { rowSpan: info.rowspan, colSpan: info.colspan };
+                                    }
+                                }
+                                return { rowSpan: 1, colSpan: 1 };
+                            };
+                            
+                            const getCellValue = (row, col) => {
+                                for (const [key, info] of Object.entries(mergedCells)) {
+                                    const [startRow, startCol] = key.split('-').map(Number);
+                                    if (row >= startRow && row < startRow + info.rowspan && col >= startCol && col < startCol + info.colspan) {
+                                        return info.value !== undefined ? info.value : (tableData[startRow]?.[startCol] || '');
+                                    }
+                                }
+                                const value = tableData[row]?.[col];
+                                return value !== undefined && value !== null ? String(value) : '';
+                            };
+                            
+                            const tableRows = [];
+                            
+                            if (hasHeaders) {
+                                const headerCells = [];
+                                for (let col = 0; col < numCols; col++) {
+                                    headerCells.push(new TableCell({
+                                        children: [new Paragraph({ children: [new TextRun({ text: headers[col] || '', bold: true, size: textFontSize, font: s.font_family, color: textColor })] })],
+                                        shading: { fill: tableHeaderBg },
+                                        borders: cellBorders
+                                    }));
+                                }
+                                tableRows.push(new TableRow({ children: headerCells }));
                             }
-                            docChildren.push(new Paragraph({ spacing: { after: 20 } }));
+                            
+                            for (let row = 0; row < numRows; row++) {
+                                const cells = [];
+                                for (let col = 0; col < numCols; col++) {
+                                    if (!shouldRenderCell(row, col)) continue;
+                                    const { rowSpan, colSpan } = getMerge(row, col);
+                                    const cellValue = getCellValue(row, col);
+                                    cells.push(new TableCell({
+                                        children: [new Paragraph({ children: [new TextRun({ text: cellValue, size: textFontSize, font: s.font_family, color: textColor })] })],
+                                        rowSpan: rowSpan,
+                                        columnSpan: colSpan,
+                                        borders: cellBorders
+                                    }));
+                                }
+                                if (cells.length > 0) tableRows.push(new TableRow({ children: cells }));
+                            }
+                            
+                            if (tableRows.length > 0) {
+                                docChildren.push(new Table({ rows: tableRows, width: { size: 100, type: WidthType.PERCENTAGE }, margins: { top: tableCellPadding, bottom: tableCellPadding, left: tableCellPadding, right: tableCellPadding } }));
+                            }
+                            
+                            if (block.caption) {
+                                docChildren.push(new Paragraph({
+                                    children: [new TextRun({ text: `Таблица ${block.number || ''} — ${block.caption}`, italics: true, size: textFontSize, font: s.font_family, color: textColor })],
+                                    alignment: AlignmentType.CENTER,
+                                    spacing: { before: 10, after: 20 }
+                                }));
+                            }
                         }
+
                         // Изображение
                         if (block.type === 'image' && block.src) {
                             try {
                                 const img = await fetchImageForDocx(block.src);
-                                if (img?.data?.length) {
+                                if (img && img.data && img.data.length > 0) {
                                     let imgWidth = 400;
                                     let imgHeight = 300;
                                     try {
@@ -624,97 +891,75 @@ const defaultStyles = {
                                         const image = new Image();
                                         await new Promise((resolve, reject) => {
                                             image.onload = () => {
-                                                const aspect = image.height / image.width;
-                                                imgHeight = Math.round(imgWidth * aspect);
+                                                imgHeight = Math.round(imgWidth * (image.height / image.width));
                                                 URL.revokeObjectURL(url);
                                                 resolve();
                                             };
-                                            image.onerror = () => {
-                                                URL.revokeObjectURL(url);
-                                                reject(new Error('Не удалось загрузить изображение'));
-                                            };
+                                            image.onerror = () => { URL.revokeObjectURL(url); reject(); };
                                             image.src = url;
                                         });
-                                    } catch (err) {
-                                        console.warn('Не удалось вычислить пропорции, используется высота 300', err);
-                                        imgHeight = 300;
-                                    }
-                                    const imageRun = new ImageRun({
-                                        data: img.data,
-                                        transformation: { width: imgWidth, height: imgHeight },
-                                        type: img.mime
-                                    });
-                                    docChildren.push(new Paragraph({
-                                        children: [imageRun],
-                                        alignment: AlignmentType.CENTER,
-                                        spacing: { before: s.image_margin_top, after: s.image_margin_bottom / 2 }
-                                    }));
+                                    } catch (err) { imgHeight = 300; }
+                                    
+                                    const imageRun = new ImageRun({ data: img.data, transformation: { width: imgWidth, height: imgHeight }, type: img.mime });
+                                    docChildren.push(new Paragraph({ children: [imageRun], alignment: AlignmentType.CENTER, spacing: { before: imageMarginTop, after: imageMarginBottom / 2 } }));
                                     if (block.caption) {
-                                        docChildren.push(new Paragraph({
-                                            children: [new TextRun({ text: `Рисунок ${block.number || ''} — ${block.caption}`, italics: true, size: s.text_font_size - 2, font: s.font_family, color: hexToRgb(s.text_color) })],
-                                            alignment: AlignmentType.CENTER,
-                                            spacing: { before: 5, after: s.image_margin_bottom / 2 }
-                                        }));
+                                        docChildren.push(new Paragraph({ children: [new TextRun({ text: `Рисунок ${block.number || ''} — ${block.caption}`, italics: true, size: textFontSize, font: s.font_family, color: textColor })], alignment: AlignmentType.CENTER, spacing: { before: 5, after: imageMarginBottom / 2 } }));
                                     }
-                                } else {
+                                }
+                            } catch (err) { console.error('Ошибка вставки изображения:', err); }
+                        }
+
+                        // Формула
+                        if (block.type === 'formula') {
+                            const formulaText = block.formulaString || block.latexString || block.content || '';
+                            if (formulaText) {
+                                const formattedFormula = formatLatexToText(formulaText);
+                                docChildren.push(new Paragraph({
+                                    children: [new TextRun({ text: formattedFormula, italics: true, size: formulaFontSize, font: 'Cambria Math', color: formulaColor })],
+                                    alignment: formulaTextAlign === 'center' ? AlignmentType.CENTER : AlignmentType.LEFT,
+                                    spacing: { before: 20, after: 10 }
+                                }));
+                                if (block.number) {
                                     docChildren.push(new Paragraph({
-                                        children: [new TextRun({ text: `[Изображение не загружено: ${block.caption || block.src}]`, size: s.text_font_size - 2, italics: true, color: '888888' })],
+                                        children: [new TextRun({ text: `(${block.number})`, size: textFontSize, font: s.font_family, color: textColor })],
                                         alignment: AlignmentType.CENTER,
-                                        spacing: { after: 20 }
+                                        spacing: { before: 5, after: 15 }
                                     }));
                                 }
-                            } catch (err) {
-                                console.error('Ошибка вставки изображения:', err);
-                                docChildren.push(new Paragraph({
-                                    children: [new TextRun({ text: `[Ошибка вставки изображения]`, size: s.text_font_size - 2, italics: true, color: 'red' })],
-                                    alignment: AlignmentType.CENTER,
-                                    spacing: { after: 20 }
-                                }));
                             }
-                        }
-                        // Формула
-                        if (block.type === 'formula' && block.formulaString) {
-                            docChildren.push(new Paragraph({
-                                children: [new TextRun({ text: `Формула ${block.number || ''}: ${block.formulaString}`, italics: true, size: s.formula_font_size, color: hexToRgb(s.formula_color), font: s.font_family })],
-                                alignment: s.formula_text_align === 'center' ? AlignmentType.CENTER : AlignmentType.LEFT,
-                                spacing: { after: 20 }
-                            }));
                         }
                     }
                 }
-                
-                // Дополнительная информация
+
                 if (report.additional_info) {
                     const lines = report.additional_info.split(/\r?\n/);
                     for (const line of lines) {
                         if (line.trim()) {
                             docChildren.push(new Paragraph({
-                                children: [new TextRun({ text: line, size: s.text_font_size - 2, italics: true, color: hexToRgb(s.text_color), font: s.font_family })],
+                                children: [new TextRun({ text: line, size: textFontSize, italics: true, color: textColor, font: s.font_family })],
                                 spacing: { after: 10 }
                             }));
-                        } else {
-                            docChildren.push(new Paragraph({ spacing: { after: 10 } }));
                         }
                     }
                 }
-                
-                // СПИСОК ЛИТЕРАТУРЫ (применены стили из БД)
+
                 let literatureText = report.literature || '';
                 if (Array.isArray(literatureText)) literatureText = literatureText.join('\n');
                 if (typeof literatureText === 'object') literatureText = JSON.stringify(literatureText, null, 2);
-                if (literatureText.trim()) {
+
+                if (literatureText && literatureText.trim()) {
                     docChildren.push(new Paragraph({
-                        children: [new TextRun({ text: "Список литературы", bold: true, size: s.references_font_size + 2, color: hexToRgb(s.references_color), font: s.font_family })],
+                        children: [new TextRun({ text: "Список литературы", bold: true, size: referencesFontSize, color: referencesColor, font: s.font_family })],
                         spacing: { before: 60, after: 20 }
                     }));
                     const items = literatureText.split(/\r?\n/);
                     let litNum = 1;
                     for (const item of items) {
-                        if (item.trim()) {
+                        if (item && item.trim()) {
                             docChildren.push(new Paragraph({
                                 children: [
-                                    new TextRun({ text: `${litNum}. `, size: s.references_font_size, color: hexToRgb(s.references_color), font: s.font_family }),
-                                    new TextRun({ text: item.trim(), size: s.references_font_size, color: hexToRgb(s.references_color), font: s.font_family })
+                                    new TextRun({ text: `${litNum}. `, size: referencesFontSize, color: referencesColor, font: s.font_family }),
+                                    new TextRun({ text: item.trim(), size: referencesFontSize, color: referencesColor, font: s.font_family })
                                 ],
                                 spacing: { after: 8 },
                                 indent: { hanging: 360 }
@@ -723,34 +968,48 @@ const defaultStyles = {
                         }
                     }
                 }
-                
+
                 docChildren.push(new Paragraph({ children: [new PageBreak()] }));
-                reportCounter++;
             }
         }
-        
+
         const doc = new Document({
-            styles: {
-                default: {
-                    document: { run: { font: s.font_family } }
-                }
-            },
             sections: [{
-                properties: { page: { margin: { top: 720, right: 720, bottom: 720, left: 720 } } },
+                properties: {
+                    page: {
+                        margin: { top: 720, right: 720, bottom: 720, left: 720 }
+                    },
+                    footers: {
+                        default: new Footer({
+                            children: [
+                                new Paragraph({
+                                    children: [
+                                        new TextRun(`${conference.title || 'Сборник материалов'} | Страница `),
+                                        new TextRun({ children: [PageNumber.CURRENT] }),
+                                        new TextRun(` из `),
+                                        new TextRun({ children: [PageNumber.TOTAL_PAGES] })
+                                    ],
+                                    alignment: AlignmentType.CENTER
+                                })
+                            ]
+                        })
+                    }
+                },
                 children: docChildren
             }]
         });
-        
+
         const blob = await Packer.toBlob(doc);
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `${(conference.title || 'conference').replace(/[^а-яА-Яa-zA-Z0-9]/g, '_')}_сборник_материалов.docx`;
+        const fileName = `${(conference.title || 'conference').replace(/[^а-яА-Яa-zA-Z0-9]/g, '_')}_сборник_материалов.docx`;
+        link.download = fileName;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
-        
+
     } catch (error) {
         console.error('Ошибка генерации DOCX:', error);
         alert('Ошибка при формировании сборника DOCX: ' + (error.message || 'Неизвестная ошибка'));
