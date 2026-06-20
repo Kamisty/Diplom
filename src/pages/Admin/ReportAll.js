@@ -362,6 +362,7 @@ const ReportAll = () => {
 
 
 const generateDOCX = async (conference, sections, styles) => {
+    console.log('📍 DOCX Conference location:', conference.location);
     setIsGenerating(true);
     try {
          const { 
@@ -855,12 +856,17 @@ const generateDOCX = async (conference, sections, styles) => {
                                     if (!shouldRenderCell(row, col)) continue;
                                     const { rowSpan, colSpan } = getMerge(row, col);
                                     const cellValue = getCellValue(row, col);
-                                    cells.push(new TableCell({
-                                        children: [new Paragraph({ children: [new TextRun({ text: cellValue, size: textFontSize, font: s.font_family, color: textColor })] })],
-                                        rowSpan: rowSpan,
-                                        columnSpan: colSpan,
-                                        borders: cellBorders
-                                    }));
+                                   cells.push(new TableCell({
+    children: [new Paragraph({ 
+        children: [new TextRun({ text: cellValue, size: textFontSize, font: s.font_family, color: textColor })],
+        alignment: safeString(s.table_cell_text_align, 'center') === 'center' 
+            ? AlignmentType.CENTER 
+            : AlignmentType.LEFT
+    })],
+    rowSpan: rowSpan,
+    columnSpan: colSpan,
+    borders: cellBorders
+}));
                                 }
                                 if (cells.length > 0) tableRows.push(new TableRow({ children: cells }));
                             }
@@ -974,31 +980,98 @@ const generateDOCX = async (conference, sections, styles) => {
         }
 
         const doc = new Document({
-            sections: [{
-                properties: {
-                    page: {
-                        margin: { top: 720, right: 720, bottom: 720, left: 720 }
-                    },
-                    footers: {
-                        default: new Footer({
-                            children: [
-                                new Paragraph({
-                                    children: [
-                                        new TextRun(`${conference.title || 'Сборник материалов'} | Страница `),
-                                        new TextRun({ children: [PageNumber.CURRENT] }),
-                                        new TextRun(` из `),
-                                        new TextRun({ children: [PageNumber.TOTAL_PAGES] })
-                                    ],
-                                    alignment: AlignmentType.CENTER
-                                })
-                            ]
-                        })
-                    }
+    styles: {
+        default: {
+            document: {
+                run: {
+                    font: s.font_family || "Times New Roman",
+                    size: 24  // 12 pt по умолчанию
+                }
+            }
+        },
+        paragraphStyles: [
+            {
+                id: "TableOfContents",
+                name: "Table of Contents",
+                basedOn: "Normal",
+                next: "Normal",
+                run: {
+                    size: 36,        // ← 16 pt (32 полупункта) — ИЗМЕНИТЕ ЭТО ЗНАЧЕНИЕ
+                    font: s.font_family || "Times New Roman",
+                    color: "000000"
                 },
-                children: docChildren
-            }]
-        });
-
+                paragraph: {
+                    spacing: { 
+                        before: 60, 
+                        after: 60 
+                    }
+                }
+            },
+            {
+                id: "TableOfContentsTitle",
+                name: "Table of Contents Title",
+                basedOn: "Normal",
+                next: "Normal",
+                run: {
+                    size: 48,        // ← 24 pt для заголовка "СОДЕРЖАНИЕ"
+                    font: s.font_family || "Times New Roman",
+                    bold: true,
+                    color: "000000"
+                },
+                paragraph: {
+                    spacing: { 
+                        before: 200, 
+                        after: 200 
+                    }
+                }
+            }
+        ]
+    },
+    sections: [{
+        properties: {
+            page: {
+                margin: { 
+                    top: 720, 
+                    right: 720, 
+                    bottom: 720, 
+                    left: 720 
+                }
+            },
+            footers: {
+                default: new Footer({
+                    children: [
+                        new Paragraph({
+                            children: [
+                                new TextRun({
+                                    text: `${conference.title || 'Сборник материалов'} | Страница `,
+                                    font: s.font_family || "Times New Roman",
+                                    size: 20  // 10 pt для footer
+                                }),
+                                new TextRun({ 
+                                    children: [PageNumber.CURRENT],
+                                    font: s.font_family || "Times New Roman",
+                                    size: 20
+                                }),
+                                new TextRun({ 
+                                    text: ` из `,
+                                    font: s.font_family || "Times New Roman",
+                                    size: 20
+                                }),
+                                new TextRun({ 
+                                    children: [PageNumber.TOTAL_PAGES],
+                                    font: s.font_family || "Times New Roman",
+                                    size: 20
+                                })
+                            ],
+                            alignment: AlignmentType.CENTER
+                        })
+                    ]
+                })
+            }
+        },
+        children: docChildren
+    }]
+});
         const blob = await Packer.toBlob(doc);
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
