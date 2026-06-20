@@ -622,8 +622,6 @@ useEffect(() => {
     if (!formData.sectionId) newErrors.sectionId = 'Выберите секцию';
     if (!article.annotation.trim()) {
       newErrors.annotation = 'Введите аннотацию';
-    } else if (article.annotation.length < 50) {
-      newErrors.annotation = 'Аннотация должна содержать минимум 50 символов';
     }
     if (!article.keywords.trim()) newErrors.keywords = 'Введите ключевые слова';
     
@@ -1458,7 +1456,7 @@ const handleSubmit = async (e) => {
               onChange={(e) => setArticle({...article, annotation: e.target.value})}
               rows="4"
               style={styles.textarea}
-              placeholder="Краткое описание доклада (минимум 50 символов)"
+              placeholder="Краткое описание доклада"
               disabled={loading}
             />
             <div style={{ fontSize: '12px', color: '#999', marginTop: '5px' }}>

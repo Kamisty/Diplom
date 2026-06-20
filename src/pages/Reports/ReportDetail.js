@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import './Reports.css';
-
+import { BlockMath } from 'react-katex';
+import 'katex/dist/katex.min.css';
 const ReportDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -238,71 +239,241 @@ const ReportDetail = () => {
   };
 
   // Функция рендеринга контента
-  const renderContentBlocks = () => {
-    if (!report?.content || !Array.isArray(report.content) || report.content.length === 0) {
-      return <div className="empty-state">Содержание статьи пусто</div>;
-    }
+// Функция рендеринга контента
+const renderContentBlocks = () => {
+  if (!report?.content || !Array.isArray(report.content) || report.content.length === 0) {
+    return <div className="empty-state">Содержание статьи пусто</div>;
+  }
 
-    return report.content.map((block, index) => {
-      switch (block.type) {
-        case 'text':
-          return (
-            <div key={block.id || index} className="content-block text-block">
-              <div dangerouslySetInnerHTML={{ __html: block.content }} />
+  return report.content.map((block, index) => {
+    switch (block.type) {
+      case 'text':
+        return (
+          <div key={block.id || index} className="content-block text-block">
+            <div dangerouslySetInnerHTML={{ __html: block.content }} />
+          </div>
+        );
+
+      case 'table': {
+        // Получаем данные об объединенных и повернутых ячейках
+        const mergedCells = block.mergedCells || {};
+        const rotatedCells = block.rotatedCells || {};
+        const tableData = block.data || [];
+        const rows = tableData.length;
+        const cols = tableData[0]?.length || 0;
+
+        // Функция для определения, должна ли ячейка отображаться
+        const shouldRenderCell = (row, col) => {
+          for (const [key, info] of Object.entries(mergedCells)) {
+            const [startRow, startCol] = key.split('-').map(Number);
+            if (row >= startRow && row < startRow + info.rowspan &&
+                col >= startCol && col < startCol + info.colspan) {
+              return startRow === row && startCol === col;
+            }
+          }
+          return true;
+        };
+
+        // Функция для получения значения ячейки с учетом объединения
+        const getCellValue = (row, col) => {
+          for (const [key, info] of Object.entries(mergedCells)) {
+            const [startRow, startCol] = key.split('-').map(Number);
+            if (row >= startRow && row < startRow + info.rowspan &&
+                col >= startCol && col < startCol + info.colspan) {
+              return info.value || tableData[startRow]?.[startCol] || '';
+            }
+          }
+          return tableData[row]?.[col] || '';
+        };
+
+        // Функция для получения rowSpan/colSpan
+        const getSpan = (row, col) => {
+          for (const [key, info] of Object.entries(mergedCells)) {
+            const [startRow, startCol] = key.split('-').map(Number);
+            if (row === startRow && col === startCol) {
+              return { rowSpan: info.rowspan, colSpan: info.colspan };
+            }
+          }
+          return { rowSpan: 1, colSpan: 1 };
+        };
+
+        // Проверяем, повернута ли ячейка
+        const isRotated = (row, col) => {
+          return rotatedCells[`${row}-${col}`] || false;
+        };
+
+        // Проверяем, есть ли реальные заголовки
+        const hasHeaders = block.headers &&
+                          block.headers.length > 0 &&
+                          block.headers.some(header => header && header.trim() !== '');
+
+        return (
+          <div key={block.id || index} className="content-block table-block">
+            <div className="table-caption" style={{ textAlign: 'center', fontWeight: 'bold', marginBottom: '8px' }}>
+              Таблица {block.number || index + 1} — {block.caption || ''}
             </div>
-          );
-        
-        case 'table':
-          return (
-            <div key={block.id || index} className="content-block table-block">
-              <div className="table-caption">
-                Таблица {block.number || index + 1} — {block.caption}
-              </div>
-              <div className="table-wrapper">
-                <table className="styled-table">
+            <div className="table-wrapper" style={{ overflowX: 'auto' }}>
+              <table style={{
+                borderCollapse: 'collapse',
+                width: '100%',
+                border: '1px solid #000',
+                fontSize: '14px'
+              }}>
+                {/* Заголовки таблицы */}
+                {hasHeaders && (
                   <thead>
                     <tr>
-                      {block.headers?.map((header, i) => (
-                        <th key={i}>{header}</th>
+                      {block.headers.map((header, i) => (
+                        <th key={i} style={{
+                          border: '1px solid #000',
+                          padding: '8px',
+                          backgroundColor: '#f0f0f0',
+                          fontWeight: 'bold',
+                          textAlign: 'center'
+                        }}>
+                          {header || ''}
+                        </th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody>
-                    {block.data?.map((row, i) => (
-                      <tr key={i}>
-                        {row.map((cell, j) => (
-                          <td key={j}>{cell}</td>
-                        ))}
+                )}
+
+                {/* Тело таблицы с поддержкой объединенных ячеек */}
+                <tbody>
+                  {Array.from({ length: rows }).map((_, rowIndex) => {
+                    // Пропускаем строки, полностью скрытые объединениями
+                    let hasVisibleCells = false;
+                    for (let colIndex = 0; colIndex < cols; colIndex++) {
+                      if (shouldRenderCell(rowIndex, colIndex)) {
+                        hasVisibleCells = true;
+                        break;
+                      }
+                    }
+                    if (!hasVisibleCells) return null;
+
+                    return (
+                      <tr key={rowIndex}>
+                        {Array.from({ length: cols }).map((_, colIndex) => {
+                          if (!shouldRenderCell(rowIndex, colIndex)) {
+                            return null;
+                          }
+
+                          const { rowSpan, colSpan } = getSpan(rowIndex, colIndex);
+                          const cellValue = getCellValue(rowIndex, colIndex);
+                          const rotated = isRotated(rowIndex, colIndex);
+
+                          return (
+                            <td
+                              key={`${rowIndex}-${colIndex}`}
+                              rowSpan={rowSpan}
+                              colSpan={colSpan}
+                              style={{
+                                border: '1px solid #000',
+                                padding: rotated ? '4px' : '8px',
+                                textAlign: 'center',
+                                verticalAlign: 'middle',
+                                ...(rotated && {
+                                  writingMode: 'vertical-rl',
+                                  textOrientation: 'mixed',
+                                  whiteSpace: 'nowrap',
+                                  minWidth: '30px',
+                                  height: 'auto'
+                                })
+                              }}
+                            >
+                              {rotated ? (
+                                <div style={{
+                                  display: 'inline-block',
+                                  transform: 'rotate(0deg)'
+                                }}>
+                                  {cellValue}
+                                </div>
+                              ) : (
+                                cellValue
+                              )}
+                            </td>
+                          );
+                        })}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-          );
-        
-        case 'image':
-          return (
-            <div key={block.id || index} className="content-block image-block" style={{ textAlign: block.align || 'center' }}>
-              <img src={block.src} alt={block.caption} style={{ maxWidth: '100%', width: block.width || '100%' }} />
-              <div className="image-caption">
-                Рисунок {block.number || index + 1} — {block.caption}
-              </div>
-            </div>
-          );
-        
-        case 'formula':
-          return (
-            <div key={block.id || index} className="content-block formula-block" style={{ textAlign: block.align || 'center' }}>
-              <strong>Формула {block.number || index + 1}:</strong> {block.formulaString || block.content}
-            </div>
-          );
-        
-        default:
-          return null;
+          </div>
+        );
       }
-    });
-  };
+
+      case 'image': {
+        return (
+          <div key={block.id || index} className="content-block image-block" style={{
+            textAlign: block.align || 'center',
+            margin: '20px 0'
+          }}>
+            <img
+              src={block.src}
+              alt={block.caption || ''}
+              style={{
+                maxWidth: '100%',
+                width: block.width || 'auto',
+                height: 'auto'
+              }}
+            />
+            <div className="image-caption" style={{
+              marginTop: '8px',
+              fontSize: '12px',
+              color: '#666',
+              textAlign: 'center'
+            }}>
+              Рисунок {block.number || index + 1} — {block.caption || ''}
+            </div>
+          </div>
+        );
+      }
+
+      case 'formula': {
+        // Получаем LaTeX строку из блока
+        const formulaText = block.formulaString || block.content || '';
+
+        // Очищаем от лишних символов
+        const cleanFormula = formulaText
+          .replace(/\\\\/g, '\\')
+          .replace(/\\\[|\\\]|\\\(|\\\)/g, '');
+
+        return (
+          <div key={block.id || index} className="content-block formula-block" style={{
+            textAlign: block.align || 'center',
+            margin: '20px 0',
+            padding: '15px',
+            backgroundColor: '#f9f9f9',
+            borderRadius: '8px',
+            overflowX: 'auto'
+          }}>
+            <div style={{
+              fontSize: '18px',
+              fontFamily: '"Times New Roman", "Cambria Math", serif',
+              padding: '10px'
+            }}>
+              {/* Используем KaTeX для отображения формулы */}
+              <BlockMath math={cleanFormula} />
+            </div>
+            <div style={{
+              marginTop: '10px',
+              fontSize: '12px',
+              color: '#666',
+              fontStyle: 'italic'
+            }}>
+              Формула {block.number || index + 1}
+            </div>
+          </div>
+        );
+      }
+
+      default:
+        return null;
+    }
+  });
+};
 
   if (loading) {
     return (
