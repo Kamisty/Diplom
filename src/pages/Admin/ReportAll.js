@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../../context/AuthContext/Auth';
 import './Admin.css';
-import { mathPlugin } from "@m2d/math";
-import { parseMath } from "latex-math";
 
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
