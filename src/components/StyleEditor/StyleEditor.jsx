@@ -1,4 +1,4 @@
-// src/components/StyleEditor/StyleEditor.js
+// src/components/StyleEditor/StyleEditor.jsx
 import React, { useState, useEffect } from 'react';
 import './StyleEditor.css';
 
@@ -86,10 +86,8 @@ const StyleEditor = ({ conferenceId, onSave, onClose, embedded = false }) => {
         console.log('📦 Получены стили:', data);
         
         if (data.success && data.styles) {
-          // ✅ Проверяем и исправляем пустые значения цветов
           const loadedStyles = { ...data.styles };
           
-          // Список полей с цветами
           const colorFields = [
             'page_background', 'title_color', 'authors_color', 
             'abstract_color', 'keywords_color', 'section_title_color',
@@ -97,10 +95,8 @@ const StyleEditor = ({ conferenceId, onSave, onClose, embedded = false }) => {
             'formula_color', 'references_color'
           ];
           
-          // Если цвет пустой или невалидный - ставим значение по умолчанию
           for (const field of colorFields) {
             if (!loadedStyles[field] || loadedStyles[field] === '' || !loadedStyles[field].startsWith('#')) {
-              // Находим значение по умолчанию из initialStyles
               const defaultStyles = {
                 page_background: '#ffffff',
                 title_color: '#2c3e50',
@@ -149,15 +145,12 @@ const StyleEditor = ({ conferenceId, onSave, onClose, embedded = false }) => {
     setSuccess(null);
     
     try {
-      // ✅ ОЧИЩАЕМ ДАННЫЕ ПЕРЕД ОТПРАВКОЙ
       const cleanStyles = { ...styles };
       
-      // Удаляем поля, которых нет в таблице или они не нужны
       delete cleanStyles.updated_at;
       delete cleanStyles.created_at;
       delete cleanStyles.id;
       
-      // Проверяем все цвета
       const colorFields = [
         'page_background', 'title_color', 'authors_color', 
         'abstract_color', 'keywords_color', 'section_title_color',
@@ -167,7 +160,6 @@ const StyleEditor = ({ conferenceId, onSave, onClose, embedded = false }) => {
       
       for (const field of colorFields) {
         if (!cleanStyles[field] || cleanStyles[field] === '' || !cleanStyles[field].startsWith('#')) {
-          // Ставим значение по умолчанию
           const defaults = {
             page_background: '#ffffff',
             title_color: '#2c3e50',
