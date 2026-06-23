@@ -350,7 +350,7 @@ const ReportAll = () => {
         ) || 0;
     };
 
-    // ========== СТИЛИ ДЛЯ ПРЕДПРОСМОТРА ==========
+    // ========== СТИЛИ ДЛЯ ПРЕДПРОСМОТРА ИЗ БД ==========
     const getPreviewStyle = (styleName, defaultValue) => {
         if (previewStyles && previewStyles[styleName] !== undefined && previewStyles[styleName] !== null) {
             return previewStyles[styleName];
@@ -359,737 +359,724 @@ const ReportAll = () => {
     };
 
     // ========== ГЕНЕРАЦИЯ DOCX (ИСПРАВЛЕННАЯ) ==========
-
-
-const generateDOCX = async (conference, sections, styles) => {
-    console.log('📍 DOCX Conference location:', conference.location);
-    setIsGenerating(true);
-    try {
-         const { 
-            Document, Packer, Paragraph, TextRun, 
-            AlignmentType, PageBreak, HeadingLevel, 
-            TableOfContents, ImageRun,
-            Table, TableRow, TableCell, WidthType, BorderStyle,
-            Header, Footer, PageNumber 
-        } = await import('docx');
-        const fetchImageForDocx = async (src) => {
-            try {
-                if (src && src.startsWith('data:image')) {
-                    const matches = src.match(/^data:image\/(\w+);base64,(.+)$/);
-                    if (matches) {
-                        const mimeType = `image/${matches[1]}`;
-                        const binary = atob(matches[2]);
-                        const arr = new Uint8Array(binary.length);
-                        for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
-                        return { data: arr, mime: mimeType };
-                    }
-                } else if (src) {
-                    let fullUrl = src;
-                    if (src.startsWith('/')) {
-                        fullUrl = `https://diplom-j6uo.onrender.com${src}`;
-                    } else if (!src.startsWith('http')) {
-                        fullUrl = `https://diplom-j6uo.onrender.com/${src}`;
-                    }
-                    const resp = await fetch(fullUrl);
-                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-                    const blob = await resp.blob();
-                    const buffer = await blob.arrayBuffer();
-                    return { data: new Uint8Array(buffer), mime: blob.type || 'image/png' };
-                }
-                return null;
-            } catch (err) {
-                console.error('Ошибка загрузки изображения:', src, err);
-                return null;
-            }
-        };
-
-        const htmlToStructuredContent = (html) => {
-            if (!html) return [];
-            const result = [];
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(html, 'text/html');
+    const generateDOCX = async (conference, sections, styles) => {
+        console.log('📍 DOCX Conference location:', conference.location);
+        setIsGenerating(true);
+        try {
+            const { 
+                Document, Packer, Paragraph, TextRun, 
+                AlignmentType, PageBreak, HeadingLevel, 
+                TableOfContents, ImageRun,
+                Table, TableRow, TableCell, WidthType, BorderStyle,
+                Header, Footer, PageNumber 
+            } = await import('docx');
             
-            const processNode = (node) => {
-                if (node.nodeType === Node.TEXT_NODE) {
-                    const text = node.textContent;
-                    if (text && text.trim()) return text;
-                    return '';
-                }
-                if (node.nodeType === Node.ELEMENT_NODE) {
-                    const tagName = node.tagName.toLowerCase();
-                    if (tagName === 'p') {
-                        let text = '';
-                        for (const child of node.childNodes) text += processNode(child);
-                        if (text.trim()) result.push({ type: 'paragraph', content: text.trim() });
-                        return '';
-                    }
-                    if (tagName.match(/^h[1-6]$/)) {
-                        let text = '';
-                        for (const child of node.childNodes) text += processNode(child);
-                        if (text.trim()) result.push({ type: 'heading', level: parseInt(tagName[1]), content: text.trim() });
-                        return '';
-                    }
-                    if (tagName === 'ul') {
-                        for (const li of node.children) {
-                            if (li.tagName.toLowerCase() === 'li') {
-                                let text = '';
-                                for (const child of li.childNodes) text += processNode(child);
-                                if (text.trim()) result.push({ type: 'listItem', bullet: '•', content: text.trim(), listType: 'bullet' });
-                            }
+            const fetchImageForDocx = async (src) => {
+                try {
+                    if (src && src.startsWith('data:image')) {
+                        const matches = src.match(/^data:image\/(\w+);base64,(.+)$/);
+                        if (matches) {
+                            const mimeType = `image/${matches[1]}`;
+                            const binary = atob(matches[2]);
+                            const arr = new Uint8Array(binary.length);
+                            for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
+                            return { data: arr, mime: mimeType };
                         }
+                    } else if (src) {
+                        let fullUrl = src;
+                        if (src.startsWith('/')) {
+                            fullUrl = `https://diplom-j6uo.onrender.com${src}`;
+                        } else if (!src.startsWith('http')) {
+                            fullUrl = `https://diplom-j6uo.onrender.com/${src}`;
+                        }
+                        const resp = await fetch(fullUrl);
+                        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                        const blob = await resp.blob();
+                        const buffer = await blob.arrayBuffer();
+                        return { data: new Uint8Array(buffer), mime: blob.type || 'image/png' };
+                    }
+                    return null;
+                } catch (err) {
+                    console.error('Ошибка загрузки изображения:', src, err);
+                    return null;
+                }
+            };
+
+            const htmlToStructuredContent = (html) => {
+                if (!html) return [];
+                const result = [];
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                
+                const processNode = (node) => {
+                    if (node.nodeType === Node.TEXT_NODE) {
+                        const text = node.textContent;
+                        if (text && text.trim()) return text;
                         return '';
                     }
-                    if (tagName === 'ol') {
-                        let counter = 1;
-                        for (const li of node.children) {
-                            if (li.tagName.toLowerCase() === 'li') {
-                                let text = '';
-                                for (const child of li.childNodes) text += processNode(child);
-                                if (text.trim()) {
-                                    result.push({ type: 'listItem', bullet: `${counter}.`, content: text.trim(), listType: 'numbered' });
-                                    counter++;
+                    if (node.nodeType === Node.ELEMENT_NODE) {
+                        const tagName = node.tagName.toLowerCase();
+                        if (tagName === 'p') {
+                            let text = '';
+                            for (const child of node.childNodes) text += processNode(child);
+                            if (text.trim()) result.push({ type: 'paragraph', content: text.trim() });
+                            return '';
+                        }
+                        if (tagName.match(/^h[1-6]$/)) {
+                            let text = '';
+                            for (const child of node.childNodes) text += processNode(child);
+                            if (text.trim()) result.push({ type: 'heading', level: parseInt(tagName[1]), content: text.trim() });
+                            return '';
+                        }
+                        if (tagName === 'ul') {
+                            for (const li of node.children) {
+                                if (li.tagName.toLowerCase() === 'li') {
+                                    let text = '';
+                                    for (const child of li.childNodes) text += processNode(child);
+                                    if (text.trim()) result.push({ type: 'listItem', bullet: '•', content: text.trim(), listType: 'bullet' });
                                 }
                             }
+                            return '';
                         }
-                        return '';
+                        if (tagName === 'ol') {
+                            let counter = 1;
+                            for (const li of node.children) {
+                                if (li.tagName.toLowerCase() === 'li') {
+                                    let text = '';
+                                    for (const child of li.childNodes) text += processNode(child);
+                                    if (text.trim()) {
+                                        result.push({ type: 'listItem', bullet: `${counter}.`, content: text.trim(), listType: 'numbered' });
+                                        counter++;
+                                    }
+                                }
+                            }
+                            return '';
+                        }
+                        if (tagName === 'br') return '\n';
+                        let text = '';
+                        for (const child of node.childNodes) text += processNode(child);
+                        return text;
                     }
-                    if (tagName === 'br') return '\n';
-                    let text = '';
-                    for (const child of node.childNodes) text += processNode(child);
-                    return text;
+                    return '';
+                };
+                
+                for (const child of doc.body.childNodes) processNode(child);
+                
+                if (result.length === 0) {
+                    const plainText = html.replace(/<[^>]*>/g, '').trim();
+                    if (plainText) {
+                        const paragraphs = plainText.split(/\n\s*\n/);
+                        for (const para of paragraphs) {
+                            if (para.trim()) result.push({ type: 'paragraph', content: para.trim() });
+                        }
+                    }
                 }
-                return '';
+                return result;
             };
-            
-            for (const child of doc.body.childNodes) processNode(child);
-            
-            if (result.length === 0) {
-                const plainText = html.replace(/<[^>]*>/g, '').trim();
-                if (plainText) {
-                    const paragraphs = plainText.split(/\n\s*\n/);
-                    for (const para of paragraphs) {
-                        if (para.trim()) result.push({ type: 'paragraph', content: para.trim() });
+
+            const formatLatexToText = (latex) => {
+                if (!latex) return '';
+                let result = latex;
+                result = result.replace(/\\sqrt\[(\d+)\]\{([^}]+)\}/g, '√[$1]($2)');
+                result = result.replace(/\\sqrt\{([^}]+)\}/g, '√($1)');
+                result = result.replace(/\\iiint/g, '∭');
+                result = result.replace(/\\iint/g, '∬');
+                result = result.replace(/\\int/g, '∫');
+                result = result.replace(/_\{([^}]+)\}/g, '₍$1₎');
+                result = result.replace(/\^\{([^}]+)\}/g, '⁽$1⁾');
+                result = result.replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '$1/$2');
+                result = result.replace(/\\alpha/g, 'α');
+                result = result.replace(/\\beta/g, 'β');
+                result = result.replace(/\\gamma/g, 'γ');
+                result = result.replace(/\\delta/g, 'δ');
+                result = result.replace(/\\epsilon/g, 'ε');
+                result = result.replace(/\\pi/g, 'π');
+                result = result.replace(/\\sigma/g, 'σ');
+                result = result.replace(/\\omega/g, 'ω');
+                result = result.replace(/\\infty/g, '∞');
+                result = result.replace(/\\times/g, '×');
+                result = result.replace(/\\div/g, '÷');
+                result = result.replace(/\\pm/g, '±');
+                result = result.replace(/\\le/g, '≤');
+                result = result.replace(/\\ge/g, '≥');
+                result = result.replace(/\\neq/g, '≠');
+                result = result.replace(/\\approx/g, '≈');
+                result = result.replace(/\\sum/g, 'Σ');
+                result = result.replace(/\\prod/g, 'Π');
+                result = result.replace(/\\[a-zA-Z]+/g, '');
+                result = result.replace(/[{}]/g, '');
+                return result;
+            };
+
+            const defaultStyles = {
+                font_family: 'Times New Roman',
+                title_font_size: 32,
+                title_font_weight: 'bold',
+                title_color: '000000',
+                title_text_align: 'center',
+                title_margin_bottom: 40,
+                authors_font_size: 18,
+                authors_font_weight: '400',
+                authors_color: '333333',
+                authors_text_align: 'center',
+                authors_margin_bottom: 25,
+                abstract_font_size: 14,
+                abstract_font_weight: '400',
+                abstract_color: '333333',
+                abstract_margin_bottom: 40,
+                keywords_font_size: 14,
+                keywords_font_weight: 'bold',
+                keywords_color: 'e67e22',
+                keywords_margin_bottom: 40,
+                section_title_font_size: 28,
+                section_title_font_weight: 'bold',
+                section_title_color: '000000',
+                section_title_margin_top: 40,
+                section_title_margin_bottom: 20,
+                text_font_size: 14,
+                text_color: '333333',
+                text_margin_bottom: 20,
+                formula_font_size: 16,
+                formula_color: '333333',
+                formula_text_align: 'center',
+                references_font_size: 13,
+                references_color: '666666',
+                image_margin_top: 30,
+                image_margin_bottom: 30,
+                table_border_color: '000000',
+                table_header_bg: 'f0f0f0',
+                table_cell_padding: 8
+            };
+
+            const safeNumber = (value, defaultValue) => {
+                if (value === null || value === undefined || value === '') return defaultValue;
+                const num = Number(value);
+                return isNaN(num) ? defaultValue : num;
+            };
+
+            const safeString = (value, defaultValue) => {
+                if (value === undefined || value === null) return defaultValue;
+                return String(value);
+            };
+
+            const s = { ...defaultStyles };
+            if (styles) {
+                Object.keys(defaultStyles).forEach(key => {
+                    if (styles[key] !== undefined && styles[key] !== null) {
+                        const defaultValue = defaultStyles[key];
+                        if (typeof defaultValue === 'number') {
+                            s[key] = safeNumber(styles[key], defaultValue);
+                        } else {
+                            s[key] = safeString(styles[key], defaultValue);
+                        }
                     }
-                }
+                });
             }
-            return result;
-        };
 
-        const formatLatexToText = (latex) => {
-            if (!latex) return '';
-            let result = latex;
-            result = result.replace(/\\sqrt\[(\d+)\]\{([^}]+)\}/g, '√[$1]($2)');
-            result = result.replace(/\\sqrt\{([^}]+)\}/g, '√($1)');
-            result = result.replace(/\\iiint/g, '∭');
-            result = result.replace(/\\iint/g, '∬');
-            result = result.replace(/\\int/g, '∫');
-            result = result.replace(/_\{([^}]+)\}/g, '₍$1₎');
-            result = result.replace(/\^\{([^}]+)\}/g, '⁽$1⁾');
-            result = result.replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '$1/$2');
-            result = result.replace(/\\alpha/g, 'α');
-            result = result.replace(/\\beta/g, 'β');
-            result = result.replace(/\\gamma/g, 'γ');
-            result = result.replace(/\\delta/g, 'δ');
-            result = result.replace(/\\epsilon/g, 'ε');
-            result = result.replace(/\\pi/g, 'π');
-            result = result.replace(/\\sigma/g, 'σ');
-            result = result.replace(/\\omega/g, 'ω');
-            result = result.replace(/\\infty/g, '∞');
-            result = result.replace(/\\times/g, '×');
-            result = result.replace(/\\div/g, '÷');
-            result = result.replace(/\\pm/g, '±');
-            result = result.replace(/\\le/g, '≤');
-            result = result.replace(/\\ge/g, '≥');
-            result = result.replace(/\\neq/g, '≠');
-            result = result.replace(/\\approx/g, '≈');
-            result = result.replace(/\\sum/g, 'Σ');
-            result = result.replace(/\\prod/g, 'Π');
-            result = result.replace(/\\[a-zA-Z]+/g, '');
-            result = result.replace(/[{}]/g, '');
-            return result;
-        };
+            // Умножаем на 2 для docx
+            const titleFontSize = safeNumber(s.title_font_size, 32) * 2;
+            const titleMarginBottom = safeNumber(s.title_margin_bottom, 40);
+            const titleColor = safeString(s.title_color, '000000').replace('#', '');
+            const titleTextAlign = safeString(s.title_text_align, 'center');
+            const titleFontWeight = safeString(s.title_font_weight, 'bold');
 
-        const defaultStyles = {
-            font_family: 'Times New Roman',
-            title_font_size: 32,
-            title_font_weight: 'bold',
-            title_color: '000000',
-            title_text_align: 'center',
-            title_margin_bottom: 40,
-            authors_font_size: 18,
-            authors_font_weight: '400',
-            authors_color: '333333',
-            authors_text_align: 'center',
-            authors_margin_bottom: 25,
-            abstract_font_size: 14,
-            abstract_font_weight: '400',
-            abstract_color: '333333',
-            abstract_margin_bottom: 40,
-            keywords_font_size: 14,
-            keywords_font_weight: 'bold',
-            keywords_color: 'e67e22',
-            keywords_margin_bottom: 40,
-            section_title_font_size: 28,
-            section_title_font_weight: 'bold',
-            section_title_color: '000000',
-            section_title_margin_top: 40,
-            section_title_margin_bottom: 20,
-            text_font_size: 14,
-            text_color: '333333',
-            text_margin_bottom: 20,
-            formula_font_size: 16,
-            formula_color: '333333',
-            formula_text_align: 'center',
-            references_font_size: 13,
-            references_color: '666666',
-            image_margin_top: 30,
-            image_margin_bottom: 30,
-            table_border_color: '000000',
-            table_header_bg: 'f0f0f0',
-            table_cell_padding: 8
-        };
+            const authorsFontSize = safeNumber(s.authors_font_size, 18) * 2;
+            const authorsMarginBottom = safeNumber(s.authors_margin_bottom, 25);
+            const authorsColor = safeString(s.authors_color, '333333').replace('#', '');
+            const authorsTextAlign = safeString(s.authors_text_align, 'center');
 
-        const safeNumber = (value, defaultValue) => {
-            if (value === null || value === undefined || value === '') return defaultValue;
-            const num = Number(value);
-            return isNaN(num) ? defaultValue : num;
-        };
+            const abstractFontSize = safeNumber(s.abstract_font_size, 14) * 2;
+            const abstractMarginBottom = safeNumber(s.abstract_margin_bottom, 40);
+            const abstractColor = safeString(s.abstract_color, '333333').replace('#', '');
+            const abstractFontWeight = safeString(s.abstract_font_weight, '400');
 
-        const safeString = (value, defaultValue) => {
-            if (value === undefined || value === null) return defaultValue;
-            return String(value);
-        };
+            const keywordsFontSize = safeNumber(s.keywords_font_size, 14) * 2;
+            const keywordsMarginBottom = safeNumber(s.keywords_margin_bottom, 40);
+            const keywordsColor = safeString(s.keywords_color, 'e67e22').replace('#', '');
+            const keywordsFontWeight = safeString(s.keywords_font_weight, 'bold');
 
-        const s = { ...defaultStyles };
-        if (styles) {
-            Object.keys(defaultStyles).forEach(key => {
-                if (styles[key] !== undefined && styles[key] !== null) {
-                    const defaultValue = defaultStyles[key];
-                    if (typeof defaultValue === 'number') {
-                        s[key] = safeNumber(styles[key], defaultValue);
-                    } else {
-                        s[key] = safeString(styles[key], defaultValue);
-                    }
-                }
-            });
-        }
+            const sectionTitleFontSize = safeNumber(s.section_title_font_size, 28) * 2;
+            const sectionTitleMarginTop = safeNumber(s.section_title_margin_top, 40);
+            const sectionTitleMarginBottom = safeNumber(s.section_title_margin_bottom, 20);
+            const sectionTitleColor = safeString(s.section_title_color, '000000').replace('#', '');
+            const sectionTitleFontWeight = safeString(s.section_title_font_weight, 'bold');
 
-        // ВАЖНО: УМНОЖАЕМ НА 2, так как docx использует полупункты (half-points)
-        // 1 пункт в Word = 2 полупункта в коде
-        const titleFontSize = safeNumber(s.title_font_size, 32) * 2;
-        const titleMarginBottom = safeNumber(s.title_margin_bottom, 40);
-        const titleColor = safeString(s.title_color, '000000').replace('#', '');
-        const titleTextAlign = safeString(s.title_text_align, 'center');
-        const titleFontWeight = safeString(s.title_font_weight, 'bold');
+            const textFontSize = safeNumber(s.text_font_size, 14) * 2;
+            const textMarginBottom = safeNumber(s.text_margin_bottom, 20);
+            const textColor = safeString(s.text_color, '333333').replace('#', '');
 
-        const authorsFontSize = safeNumber(s.authors_font_size, 18) * 2;
-        const authorsMarginBottom = safeNumber(s.authors_margin_bottom, 25);
-        const authorsColor = safeString(s.authors_color, '333333').replace('#', '');
-        const authorsTextAlign = safeString(s.authors_text_align, 'center');
+            const referencesFontSize = safeNumber(s.references_font_size, 13) * 2;
+            const referencesColor = safeString(s.references_color, '666666').replace('#', '');
 
-        const abstractFontSize = safeNumber(s.abstract_font_size, 14) * 2;
-        const abstractMarginBottom = safeNumber(s.abstract_margin_bottom, 40);
-        const abstractColor = safeString(s.abstract_color, '333333').replace('#', '');
-        const abstractFontWeight = safeString(s.abstract_font_weight, '400');
+            const formulaFontSize = safeNumber(s.formula_font_size, 16) * 2;
+            const formulaColor = safeString(s.formula_color, '333333').replace('#', '');
+            const formulaTextAlign = safeString(s.formula_text_align, 'center');
 
-        const keywordsFontSize = safeNumber(s.keywords_font_size, 14) * 2;
-        const keywordsMarginBottom = safeNumber(s.keywords_margin_bottom, 40);
-        const keywordsColor = safeString(s.keywords_color, 'e67e22').replace('#', '');
-        const keywordsFontWeight = safeString(s.keywords_font_weight, 'bold');
+            const imageMarginTop = safeNumber(s.image_margin_top, 30);
+            const imageMarginBottom = safeNumber(s.image_margin_bottom, 30);
+            const tableCellPadding = safeNumber(s.table_cell_padding, 8);
+            const tableBorderColor = safeString(s.table_border_color, '000000').replace('#', '');
+            const tableHeaderBg = safeString(s.table_header_bg, 'f0f0f0');
 
-        const sectionTitleFontSize = safeNumber(s.section_title_font_size, 28) * 2;
-        const sectionTitleMarginTop = safeNumber(s.section_title_margin_top, 40);
-        const sectionTitleMarginBottom = safeNumber(s.section_title_margin_bottom, 20);
-        const sectionTitleColor = safeString(s.section_title_color, '000000').replace('#', '');
-        const sectionTitleFontWeight = safeString(s.section_title_font_weight, 'bold');
+            const formatDateLocal = (dateString) => {
+                if (!dateString) return 'Дата не указана';
+                const date = new Date(dateString);
+                return date.toLocaleDateString('ru-RU', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                });
+            };
 
-        const textFontSize = safeNumber(s.text_font_size, 14) * 2;
-        const textMarginBottom = safeNumber(s.text_margin_bottom, 20);
-        const textColor = safeString(s.text_color, '333333').replace('#', '');
+            const docChildren = [];
 
-        const referencesFontSize = safeNumber(s.references_font_size, 13) * 2;
-        const referencesColor = safeString(s.references_color, '666666').replace('#', '');
-
-        const formulaFontSize = safeNumber(s.formula_font_size, 16) * 2;
-        const formulaColor = safeString(s.formula_color, '333333').replace('#', '');
-        const formulaTextAlign = safeString(s.formula_text_align, 'center');
-
-        const imageMarginTop = safeNumber(s.image_margin_top, 30);
-        const imageMarginBottom = safeNumber(s.image_margin_bottom, 30);
-        const tableCellPadding = safeNumber(s.table_cell_padding, 8);
-        const tableBorderColor = safeString(s.table_border_color, '000000').replace('#', '');
-        const tableHeaderBg = safeString(s.table_header_bg, 'f0f0f0');
-
-        const formatDateLocal = (dateString) => {
-            if (!dateString) return 'Дата не указана';
-            const date = new Date(dateString);
-            return date.toLocaleDateString('ru-RU', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric'
-            });
-        };
-
-        const docChildren = [];
-
-        // Титульная страница
-        docChildren.push(new Paragraph({
-            children: [new TextRun({
-                text: conference.title || '',
-                bold: titleFontWeight === 'bold',
-                size: titleFontSize,
-                font: s.font_family,
-                color: titleColor
-            })],
-            alignment: titleTextAlign === 'center' ? AlignmentType.CENTER : AlignmentType.LEFT,
-            spacing: { before: 400, after: titleMarginBottom }
-        }));
-
-        docChildren.push(new Paragraph({
-            children: [new TextRun({ text: "СБОРНИК МАТЕРИАЛОВ", bold: true, size: titleFontSize - 16, font: s.font_family })],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 200 }
-        }));
-
-        docChildren.push(new Paragraph({
-            children: [new TextRun({ text: conference.location || "Место проведения не указано", size: titleFontSize - 24, font: s.font_family })],
-            alignment: AlignmentType.CENTER
-        }));
-
-        docChildren.push(new Paragraph({
-            children: [new TextRun({ text: formatDateLocal(conference.start_date), size: titleFontSize - 24, font: s.font_family })],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 400 }
-        }));
-
-        docChildren.push(new Paragraph({ children: [new PageBreak()] }));
-
-        // Оглавление
-        docChildren.push(new Paragraph({
-            children: [new TextRun({ text: "СОДЕРЖАНИЕ", bold: true, size: sectionTitleFontSize, font: s.font_family, color: sectionTitleColor })],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 200 }
-        }));
-
-        docChildren.push(new TableOfContents("Оглавление", { hyperlink: true, headingStyleRange: "1-3" }));
-        docChildren.push(new Paragraph({ children: [new PageBreak()] }));
-
-        // Доклады
-        for (const section of sections) {
-            if (!section) continue;
-
+            // Титульная страница
             docChildren.push(new Paragraph({
                 children: [new TextRun({
-                    text: section.name || '',
-                    bold: sectionTitleFontWeight === 'bold',
-                    size: sectionTitleFontSize,
+                    text: conference.title || '',
+                    bold: titleFontWeight === 'bold',
+                    size: titleFontSize,
                     font: s.font_family,
-                    color: sectionTitleColor
+                    color: titleColor
                 })],
-                alignment: AlignmentType.CENTER,
-                heading: HeadingLevel.HEADING_2,
-                spacing: { before: sectionTitleMarginTop, after: sectionTitleMarginBottom }
+                alignment: titleTextAlign === 'center' ? AlignmentType.CENTER : AlignmentType.LEFT,
+                spacing: { before: 400, after: titleMarginBottom }
             }));
 
-            const reports = section.reports || [];
-            for (const report of reports) {
-                if (!report) continue;
+            docChildren.push(new Paragraph({
+                children: [new TextRun({ text: "СБОРНИК МАТЕРИАЛОВ", bold: true, size: titleFontSize - 16, font: s.font_family })],
+                alignment: AlignmentType.CENTER,
+                spacing: { after: 200 }
+            }));
 
-                // Заголовок доклада
+            docChildren.push(new Paragraph({
+                children: [new TextRun({ text: conference.location || "Место проведения не указано", size: titleFontSize - 24, font: s.font_family })],
+                alignment: AlignmentType.CENTER
+            }));
+
+            docChildren.push(new Paragraph({
+                children: [new TextRun({ text: formatDateLocal(conference.start_date), size: titleFontSize - 24, font: s.font_family })],
+                alignment: AlignmentType.CENTER,
+                spacing: { after: 400 }
+            }));
+
+            docChildren.push(new Paragraph({ children: [new PageBreak()] }));
+
+            // Оглавление
+            docChildren.push(new Paragraph({
+                children: [new TextRun({ text: "СОДЕРЖАНИЕ", bold: true, size: sectionTitleFontSize, font: s.font_family, color: sectionTitleColor })],
+                alignment: AlignmentType.CENTER,
+                spacing: { after: 200 }
+            }));
+
+            docChildren.push(new TableOfContents("Оглавление", { hyperlink: true, headingStyleRange: "1-3" }));
+            docChildren.push(new Paragraph({ children: [new PageBreak()] }));
+
+            // Доклады
+            for (const section of sections) {
+                if (!section) continue;
+
                 docChildren.push(new Paragraph({
                     children: [new TextRun({
-                        text: report.title || '',
-                        bold: true,
-                        size: titleFontSize,
+                        text: section.name || '',
+                        bold: sectionTitleFontWeight === 'bold',
+                        size: sectionTitleFontSize,
                         font: s.font_family,
-                        color: titleColor
+                        color: sectionTitleColor
                     })],
                     alignment: AlignmentType.CENTER,
-                    heading: HeadingLevel.HEADING_3,
-                    spacing: { before: 160, after: 80 }
+                    heading: HeadingLevel.HEADING_2,
+                    spacing: { before: sectionTitleMarginTop, after: sectionTitleMarginBottom }
                 }));
 
-                // Авторы
-                let authorsText = report.author_name || '';
-                if (report.coauthors && report.coauthors.length > 0) {
-                    const coauthorNames = report.coauthors.map(c => c.name).filter(n => n);
-                    if (coauthorNames.length > 0) {
-                        authorsText += `, ${coauthorNames.join(', ')}`;
-                    }
-                }
-                if (authorsText) {
-                    docChildren.push(new Paragraph({
-                        children: [new TextRun({ text: authorsText, italics: true, size: authorsFontSize, color: authorsColor, font: s.font_family })],
-                        alignment: authorsTextAlign === 'center' ? AlignmentType.CENTER : AlignmentType.LEFT,
-                        spacing: { after: authorsMarginBottom }
-                    }));
-                }
+                const reports = section.reports || [];
+                for (const report of reports) {
+                    if (!report) continue;
 
-                // Аннотация
-                if (report.abstract) {
+                    // Заголовок доклада
                     docChildren.push(new Paragraph({
-                        children: [new TextRun({ text: "Аннотация", bold: abstractFontWeight === 'bold', size: abstractFontSize, color: abstractColor, font: s.font_family })],
-                        spacing: { after: 10 }
+                        children: [new TextRun({
+                            text: report.title || '',
+                            bold: true,
+                            size: titleFontSize,
+                            font: s.font_family,
+                            color: titleColor
+                        })],
+                        alignment: AlignmentType.CENTER,
+                        heading: HeadingLevel.HEADING_3,
+                        spacing: { before: 160, after: 80 }
                     }));
 
-                    const abstractLines = report.abstract.split(/\r?\n/);
-                    for (const line of abstractLines) {
-                        if (line.trim()) {
-                            docChildren.push(new Paragraph({
-                                children: [new TextRun({ text: line, size: abstractFontSize, color: abstractColor, font: s.font_family })],
-                                spacing: { after: 5 },
-                                alignment: AlignmentType.JUSTIFIED,
-                                indent: { left: 720, right: 720, firstLine: 720 }
-                            }));
-                        } else {
-                            docChildren.push(new Paragraph({ spacing: { after: 5 } }));
+                    // Авторы
+                    let authorsText = report.author_name || '';
+                    if (report.coauthors && report.coauthors.length > 0) {
+                        const coauthorNames = report.coauthors.map(c => c.name).filter(n => n);
+                        if (coauthorNames.length > 0) {
+                            authorsText += `, ${coauthorNames.join(', ')}`;
                         }
                     }
-                    docChildren.push(new Paragraph({ spacing: { after: abstractMarginBottom } }));
-                }
+                    if (authorsText) {
+                        docChildren.push(new Paragraph({
+                            children: [new TextRun({ text: authorsText, italics: true, size: authorsFontSize, color: authorsColor, font: s.font_family })],
+                            alignment: authorsTextAlign === 'center' ? AlignmentType.CENTER : AlignmentType.LEFT,
+                            spacing: { after: authorsMarginBottom }
+                        }));
+                    }
 
-                // Ключевые слова
-                if (report.keywords) {
-                    docChildren.push(new Paragraph({
-                        children: [
-                            new TextRun({ text: "Ключевые слова: ", bold: keywordsFontWeight === 'bold', size: keywordsFontSize, color: keywordsColor, font: s.font_family }),
-                            new TextRun({ text: report.keywords, italics: true, size: keywordsFontSize, color: keywordsColor, font: s.font_family })
-                        ],
-                        spacing: { after: keywordsMarginBottom }
-                    }));
-                }
+                    // Аннотация
+                    if (report.abstract) {
+                        docChildren.push(new Paragraph({
+                            children: [new TextRun({ text: "Аннотация", bold: abstractFontWeight === 'bold', size: abstractFontSize, color: abstractColor, font: s.font_family })],
+                            spacing: { after: 10 }
+                        }));
 
-                // Контент
-                if (report.content && Array.isArray(report.content)) {
-                    for (const block of report.content) {
-                        if (!block) continue;
-
-                        if (block.type === 'text' && block.content) {
-                            const structuredContent = htmlToStructuredContent(block.content);
-                            for (const item of structuredContent) {
-                                if (item.type === 'paragraph') {
-                                    docChildren.push(new Paragraph({
-                                        children: [new TextRun({ text: item.content, size: textFontSize, color: textColor, font: s.font_family })],
-                                        spacing: { after: textMarginBottom },
-                                        alignment: AlignmentType.JUSTIFIED,
-                                        indent: { firstLine: 720 }
-                                    }));
-                                } else if (item.type === 'heading') {
-                                    docChildren.push(new Paragraph({
-                                        children: [new TextRun({ text: item.content, bold: true, size: textFontSize, color: sectionTitleColor, font: s.font_family })],
-                                        spacing: { before: textMarginBottom, after: textMarginBottom / 2 }
-                                    }));
-                                } else if (item.type === 'listItem') {
-                                    docChildren.push(new Paragraph({
-                                        children: [
-                                            new TextRun({ text: `${item.bullet} `, size: textFontSize, color: textColor, font: s.font_family }),
-                                            new TextRun({ text: item.content, size: textFontSize, color: textColor, font: s.font_family })
-                                        ],
-                                        spacing: { after: textMarginBottom / 2 },
-                                        indent: { left: 720 }
-                                    }));
-                                }
-                            }
-                        }
-
-                        // Таблица
-                        if (block.type === 'table' && block.data && block.data.length > 0) {
-                            const tableData = block.data || [];
-                            const headers = block.headers || [];
-                            const mergedCells = block.mergedCells || {};
-                            const hasHeaders = headers.length > 0 && headers.some(h => h && h.trim());
-                            
-                            const numRows = tableData.length;
-                            const numCols = Math.max(headers.length, ...tableData.map(row => row?.length || 0));
-                            
-                            const borderStyle = { style: BorderStyle.SINGLE, size: 1, color: tableBorderColor };
-                            const cellBorders = { top: borderStyle, bottom: borderStyle, left: borderStyle, right: borderStyle };
-                            
-                            const shouldRenderCell = (row, col) => {
-                                for (const [key, info] of Object.entries(mergedCells)) {
-                                    const [startRow, startCol] = key.split('-').map(Number);
-                                    if (row >= startRow && row < startRow + info.rowspan && col >= startCol && col < startCol + info.colspan) {
-                                        return startRow === row && startCol === col;
-                                    }
-                                }
-                                return true;
-                            };
-                            
-                            const getMerge = (row, col) => {
-                                for (const [key, info] of Object.entries(mergedCells)) {
-                                    const [startRow, startCol] = key.split('-').map(Number);
-                                    if (row === startRow && col === startCol) {
-                                        return { rowSpan: info.rowspan, colSpan: info.colspan };
-                                    }
-                                }
-                                return { rowSpan: 1, colSpan: 1 };
-                            };
-                            
-                            const getCellValue = (row, col) => {
-                                for (const [key, info] of Object.entries(mergedCells)) {
-                                    const [startRow, startCol] = key.split('-').map(Number);
-                                    if (row >= startRow && row < startRow + info.rowspan && col >= startCol && col < startCol + info.colspan) {
-                                        return info.value !== undefined ? info.value : (tableData[startRow]?.[startCol] || '');
-                                    }
-                                }
-                                const value = tableData[row]?.[col];
-                                return value !== undefined && value !== null ? String(value) : '';
-                            };
-                            
-                            const tableRows = [];
-                            
-                            if (hasHeaders) {
-                                const headerCells = [];
-                                for (let col = 0; col < numCols; col++) {
-                                    headerCells.push(new TableCell({
-                                        children: [new Paragraph({ children: [new TextRun({ text: headers[col] || '', bold: true, size: textFontSize, font: s.font_family, color: textColor })] })],
-                                        shading: { fill: tableHeaderBg },
-                                        borders: cellBorders
-                                    }));
-                                }
-                                tableRows.push(new TableRow({ children: headerCells }));
-                            }
-                            
-                            for (let row = 0; row < numRows; row++) {
-                                const cells = [];
-                                for (let col = 0; col < numCols; col++) {
-                                    if (!shouldRenderCell(row, col)) continue;
-                                    const { rowSpan, colSpan } = getMerge(row, col);
-                                    const cellValue = getCellValue(row, col);
-                                   cells.push(new TableCell({
-    children: [new Paragraph({ 
-        children: [new TextRun({ text: cellValue, size: textFontSize, font: s.font_family, color: textColor })],
-        alignment: safeString(s.table_cell_text_align, 'center') === 'center' 
-            ? AlignmentType.CENTER 
-            : AlignmentType.LEFT
-    })],
-    rowSpan: rowSpan,
-    columnSpan: colSpan,
-    borders: cellBorders
-}));
-                                }
-                                if (cells.length > 0) tableRows.push(new TableRow({ children: cells }));
-                            }
-                            
-                            if (tableRows.length > 0) {
-                                docChildren.push(new Table({ rows: tableRows, width: { size: 100, type: WidthType.PERCENTAGE }, margins: { top: tableCellPadding, bottom: tableCellPadding, left: tableCellPadding, right: tableCellPadding } }));
-                            }
-                            
-                            if (block.caption) {
+                        const abstractLines = report.abstract.split(/\r?\n/);
+                        for (const line of abstractLines) {
+                            if (line.trim()) {
                                 docChildren.push(new Paragraph({
-                                    children: [new TextRun({ text: `Таблица ${block.number || ''} — ${block.caption}`, italics: true, size: textFontSize, font: s.font_family, color: textColor })],
-                                    alignment: AlignmentType.CENTER,
-                                    spacing: { before: 10, after: 20 }
+                                    children: [new TextRun({ text: line, size: abstractFontSize, color: abstractColor, font: s.font_family })],
+                                    spacing: { after: 5 },
+                                    alignment: AlignmentType.JUSTIFIED,
+                                    indent: { left: 720, right: 720, firstLine: 720 }
                                 }));
+                            } else {
+                                docChildren.push(new Paragraph({ spacing: { after: 5 } }));
                             }
                         }
-
-                        // Изображение
-                        if (block.type === 'image' && block.src) {
-                            try {
-                                const img = await fetchImageForDocx(block.src);
-                                if (img && img.data && img.data.length > 0) {
-                                    let imgWidth = 400;
-                                    let imgHeight = 300;
-                                    try {
-                                        const blob = new Blob([img.data], { type: img.mime });
-                                        const url = URL.createObjectURL(blob);
-                                        const image = new Image();
-                                        await new Promise((resolve, reject) => {
-                                            image.onload = () => {
-                                                imgHeight = Math.round(imgWidth * (image.height / image.width));
-                                                URL.revokeObjectURL(url);
-                                                resolve();
-                                            };
-                                            image.onerror = () => { URL.revokeObjectURL(url); reject(); };
-                                            image.src = url;
-                                        });
-                                    } catch (err) { imgHeight = 300; }
-                                    
-                                    const imageRun = new ImageRun({ data: img.data, transformation: { width: imgWidth, height: imgHeight }, type: img.mime });
-                                    docChildren.push(new Paragraph({ children: [imageRun], alignment: AlignmentType.CENTER, spacing: { before: imageMarginTop, after: imageMarginBottom / 2 } }));
-                                    if (block.caption) {
-                                        docChildren.push(new Paragraph({ children: [new TextRun({ text: `Рисунок ${block.number || ''} — ${block.caption}`, italics: true, size: textFontSize, font: s.font_family, color: textColor })], alignment: AlignmentType.CENTER, spacing: { before: 5, after: imageMarginBottom / 2 } }));
-                                    }
-                                }
-                            } catch (err) { console.error('Ошибка вставки изображения:', err); }
-                        }
-
-                        // Формула
-                        if (block.type === 'formula') {
-                            const formulaText = block.formulaString || block.latexString || block.content || '';
-                            if (formulaText) {
-                                const formattedFormula = formatLatexToText(formulaText);
-                                docChildren.push(new Paragraph({
-                                    children: [new TextRun({ text: formattedFormula, italics: true, size: formulaFontSize, font: 'Cambria Math', color: formulaColor })],
-                                    alignment: formulaTextAlign === 'center' ? AlignmentType.CENTER : AlignmentType.LEFT,
-                                    spacing: { before: 20, after: 10 }
-                                }));
-                                if (block.number) {
-                                    docChildren.push(new Paragraph({
-                                        children: [new TextRun({ text: `(${block.number})`, size: textFontSize, font: s.font_family, color: textColor })],
-                                        alignment: AlignmentType.CENTER,
-                                        spacing: { before: 5, after: 15 }
-                                    }));
-                                }
-                            }
-                        }
+                        docChildren.push(new Paragraph({ spacing: { after: abstractMarginBottom } }));
                     }
-                }
 
-                if (report.additional_info) {
-                    const lines = report.additional_info.split(/\r?\n/);
-                    for (const line of lines) {
-                        if (line.trim()) {
-                            docChildren.push(new Paragraph({
-                                children: [new TextRun({ text: line, size: textFontSize, italics: true, color: textColor, font: s.font_family })],
-                                spacing: { after: 10 }
-                            }));
-                        }
-                    }
-                }
-
-                let literatureText = report.literature || '';
-                if (Array.isArray(literatureText)) literatureText = literatureText.join('\n');
-                if (typeof literatureText === 'object') literatureText = JSON.stringify(literatureText, null, 2);
-
-                if (literatureText && literatureText.trim()) {
-                    docChildren.push(new Paragraph({
-                        children: [new TextRun({ text: "Список литературы", bold: true, size: referencesFontSize, color: referencesColor, font: s.font_family })],
-                        spacing: { before: 60, after: 20 }
-                    }));
-                    const items = literatureText.split(/\r?\n/);
-                    let litNum = 1;
-                    for (const item of items) {
-                        if (item && item.trim()) {
-                            docChildren.push(new Paragraph({
-                                children: [
-                                    new TextRun({ text: `${litNum}. `, size: referencesFontSize, color: referencesColor, font: s.font_family }),
-                                    new TextRun({ text: item.trim(), size: referencesFontSize, color: referencesColor, font: s.font_family })
-                                ],
-                                spacing: { after: 8 },
-                                indent: { hanging: 360 }
-                            }));
-                            litNum++;
-                        }
-                    }
-                }
-
-                docChildren.push(new Paragraph({ children: [new PageBreak()] }));
-            }
-        }
-
-        const doc = new Document({
-    styles: {
-        default: {
-            document: {
-                run: {
-                    font: s.font_family || "Times New Roman",
-                    size: 24  // 12 pt по умолчанию
-                }
-            }
-        },
-        paragraphStyles: [
-            {
-                id: "TableOfContents",
-                name: "Table of Contents",
-                basedOn: "Normal",
-                next: "Normal",
-                run: {
-                    size: 36,        // ← 16 pt (32 полупункта) — ИЗМЕНИТЕ ЭТО ЗНАЧЕНИЕ
-                    font: s.font_family || "Times New Roman",
-                    color: "000000"
-                },
-                paragraph: {
-                    spacing: { 
-                        before: 60, 
-                        after: 60 
-                    }
-                }
-            },
-            {
-                id: "TableOfContentsTitle",
-                name: "Table of Contents Title",
-                basedOn: "Normal",
-                next: "Normal",
-                run: {
-                    size: 48,        // ← 24 pt для заголовка "СОДЕРЖАНИЕ"
-                    font: s.font_family || "Times New Roman",
-                    bold: true,
-                    color: "000000"
-                },
-                paragraph: {
-                    spacing: { 
-                        before: 200, 
-                        after: 200 
-                    }
-                }
-            }
-        ]
-    },
-    sections: [{
-        properties: {
-            page: {
-                margin: { 
-                    top: 720, 
-                    right: 720, 
-                    bottom: 720, 
-                    left: 720 
-                }
-            },
-            footers: {
-                default: new Footer({
-                    children: [
-                        new Paragraph({
+                    // Ключевые слова
+                    if (report.keywords) {
+                        docChildren.push(new Paragraph({
                             children: [
-                                new TextRun({
-                                    text: `${conference.title || 'Сборник материалов'} | Страница `,
-                                    font: s.font_family || "Times New Roman",
-                                    size: 20  // 10 pt для footer
-                                }),
-                                new TextRun({ 
-                                    children: [PageNumber.CURRENT],
-                                    font: s.font_family || "Times New Roman",
-                                    size: 20
-                                }),
-                                new TextRun({ 
-                                    text: ` из `,
-                                    font: s.font_family || "Times New Roman",
-                                    size: 20
-                                }),
-                                new TextRun({ 
-                                    children: [PageNumber.TOTAL_PAGES],
-                                    font: s.font_family || "Times New Roman",
-                                    size: 20
-                                })
+                                new TextRun({ text: "Ключевые слова: ", bold: keywordsFontWeight === 'bold', size: keywordsFontSize, color: keywordsColor, font: s.font_family }),
+                                new TextRun({ text: report.keywords, italics: true, size: keywordsFontSize, color: keywordsColor, font: s.font_family })
                             ],
-                            alignment: AlignmentType.CENTER
-                        })
-                    ]
-                })
-            }
-        },
-        children: docChildren
-    }]
-});
-        const blob = await Packer.toBlob(doc);
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        const fileName = `${(conference.title || 'conference').replace(/[^а-яА-Яa-zA-Z0-9]/g, '_')}_сборник_материалов.docx`;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+                            spacing: { after: keywordsMarginBottom }
+                        }));
+                    }
 
-    } catch (error) {
-        console.error('Ошибка генерации DOCX:', error);
-        alert('Ошибка при формировании сборника DOCX: ' + (error.message || 'Неизвестная ошибка'));
-    } finally {
-        setIsGenerating(false);
-    }
-};
+                    // Контент
+                    if (report.content && Array.isArray(report.content)) {
+                        for (const block of report.content) {
+                            if (!block) continue;
+
+                            if (block.type === 'text' && block.content) {
+                                const structuredContent = htmlToStructuredContent(block.content);
+                                for (const item of structuredContent) {
+                                    if (item.type === 'paragraph') {
+                                        docChildren.push(new Paragraph({
+                                            children: [new TextRun({ text: item.content, size: textFontSize, color: textColor, font: s.font_family })],
+                                            spacing: { after: textMarginBottom },
+                                            alignment: AlignmentType.JUSTIFIED,
+                                            indent: { firstLine: 720 }
+                                        }));
+                                    } else if (item.type === 'heading') {
+                                        docChildren.push(new Paragraph({
+                                            children: [new TextRun({ text: item.content, bold: true, size: textFontSize, color: sectionTitleColor, font: s.font_family })],
+                                            spacing: { before: textMarginBottom, after: textMarginBottom / 2 }
+                                        }));
+                                    } else if (item.type === 'listItem') {
+                                        docChildren.push(new Paragraph({
+                                            children: [
+                                                new TextRun({ text: `${item.bullet} `, size: textFontSize, color: textColor, font: s.font_family }),
+                                                new TextRun({ text: item.content, size: textFontSize, color: textColor, font: s.font_family })
+                                            ],
+                                            spacing: { after: textMarginBottom / 2 },
+                                            indent: { left: 720 }
+                                        }));
+                                    }
+                                }
+                            }
+
+                            // Таблица
+                            if (block.type === 'table' && block.data && block.data.length > 0) {
+                                const tableData = block.data || [];
+                                const headers = block.headers || [];
+                                const mergedCells = block.mergedCells || {};
+                                const hasHeaders = headers.length > 0 && headers.some(h => h && h.trim());
+                                
+                                const numRows = tableData.length;
+                                const numCols = Math.max(headers.length, ...tableData.map(row => row?.length || 0));
+                                
+                                const borderStyle = { style: BorderStyle.SINGLE, size: 1, color: tableBorderColor };
+                                const cellBorders = { top: borderStyle, bottom: borderStyle, left: borderStyle, right: borderStyle };
+                                
+                                const shouldRenderCell = (row, col) => {
+                                    for (const [key, info] of Object.entries(mergedCells)) {
+                                        const [startRow, startCol] = key.split('-').map(Number);
+                                        if (row >= startRow && row < startRow + info.rowspan && col >= startCol && col < startCol + info.colspan) {
+                                            return startRow === row && startCol === col;
+                                        }
+                                    }
+                                    return true;
+                                };
+                                
+                                const getMerge = (row, col) => {
+                                    for (const [key, info] of Object.entries(mergedCells)) {
+                                        const [startRow, startCol] = key.split('-').map(Number);
+                                        if (row === startRow && col === startCol) {
+                                            return { rowSpan: info.rowspan, colSpan: info.colspan };
+                                        }
+                                    }
+                                    return { rowSpan: 1, colSpan: 1 };
+                                };
+                                
+                                const getCellValue = (row, col) => {
+                                    for (const [key, info] of Object.entries(mergedCells)) {
+                                        const [startRow, startCol] = key.split('-').map(Number);
+                                        if (row >= startRow && row < startRow + info.rowspan && col >= startCol && col < startCol + info.colspan) {
+                                            return info.value !== undefined ? info.value : (tableData[startRow]?.[startCol] || '');
+                                        }
+                                    }
+                                    const value = tableData[row]?.[col];
+                                    return value !== undefined && value !== null ? String(value) : '';
+                                };
+                                
+                                const tableRows = [];
+                                
+                                if (hasHeaders) {
+                                    const headerCells = [];
+                                    for (let col = 0; col < numCols; col++) {
+                                        headerCells.push(new TableCell({
+                                            children: [new Paragraph({ children: [new TextRun({ text: headers[col] || '', bold: true, size: textFontSize, font: s.font_family, color: textColor })] })],
+                                            shading: { fill: tableHeaderBg },
+                                            borders: cellBorders
+                                        }));
+                                    }
+                                    tableRows.push(new TableRow({ children: headerCells }));
+                                }
+                                
+                                for (let row = 0; row < numRows; row++) {
+                                    const cells = [];
+                                    for (let col = 0; col < numCols; col++) {
+                                        if (!shouldRenderCell(row, col)) continue;
+                                        const { rowSpan, colSpan } = getMerge(row, col);
+                                        const cellValue = getCellValue(row, col);
+                                        cells.push(new TableCell({
+                                            children: [new Paragraph({ 
+                                                children: [new TextRun({ text: cellValue, size: textFontSize, font: s.font_family, color: textColor })],
+                                                alignment: AlignmentType.CENTER
+                                            })],
+                                            rowSpan: rowSpan,
+                                            columnSpan: colSpan,
+                                            borders: cellBorders
+                                        }));
+                                    }
+                                    if (cells.length > 0) tableRows.push(new TableRow({ children: cells }));
+                                }
+                                
+                                if (tableRows.length > 0) {
+                                    docChildren.push(new Table({ rows: tableRows, width: { size: 100, type: WidthType.PERCENTAGE }, margins: { top: tableCellPadding, bottom: tableCellPadding, left: tableCellPadding, right: tableCellPadding } }));
+                                }
+                                
+                                if (block.caption) {
+                                    docChildren.push(new Paragraph({
+                                        children: [new TextRun({ text: `Таблица ${block.number || ''} — ${block.caption}`, italics: true, size: textFontSize, font: s.font_family, color: textColor })],
+                                        alignment: AlignmentType.CENTER,
+                                        spacing: { before: 10, after: 20 }
+                                    }));
+                                }
+                            }
+
+                            // Изображение
+                            if (block.type === 'image' && block.src) {
+                                try {
+                                    const img = await fetchImageForDocx(block.src);
+                                    if (img && img.data && img.data.length > 0) {
+                                        let imgWidth = 400;
+                                        let imgHeight = 300;
+                                        try {
+                                            const blob = new Blob([img.data], { type: img.mime });
+                                            const url = URL.createObjectURL(blob);
+                                            const image = new Image();
+                                            await new Promise((resolve, reject) => {
+                                                image.onload = () => {
+                                                    imgHeight = Math.round(imgWidth * (image.height / image.width));
+                                                    URL.revokeObjectURL(url);
+                                                    resolve();
+                                                };
+                                                image.onerror = () => { URL.revokeObjectURL(url); reject(); };
+                                                image.src = url;
+                                            });
+                                        } catch (err) { imgHeight = 300; }
+                                        
+                                        const imageRun = new ImageRun({ data: img.data, transformation: { width: imgWidth, height: imgHeight }, type: img.mime });
+                                        docChildren.push(new Paragraph({ children: [imageRun], alignment: AlignmentType.CENTER, spacing: { before: imageMarginTop, after: imageMarginBottom / 2 } }));
+                                        if (block.caption) {
+                                            docChildren.push(new Paragraph({ children: [new TextRun({ text: `Рисунок ${block.number || ''} — ${block.caption}`, italics: true, size: textFontSize, font: s.font_family, color: textColor })], alignment: AlignmentType.CENTER, spacing: { before: 5, after: imageMarginBottom / 2 } }));
+                                        }
+                                    }
+                                } catch (err) { console.error('Ошибка вставки изображения:', err); }
+                            }
+
+                            // Формула
+                            if (block.type === 'formula') {
+                                const formulaText = block.formulaString || block.latexString || block.content || '';
+                                if (formulaText) {
+                                    const formattedFormula = formatLatexToText(formulaText);
+                                    docChildren.push(new Paragraph({
+                                        children: [new TextRun({ text: formattedFormula, italics: true, size: formulaFontSize, font: 'Cambria Math', color: formulaColor })],
+                                        alignment: formulaTextAlign === 'center' ? AlignmentType.CENTER : AlignmentType.LEFT,
+                                        spacing: { before: 20, after: 10 }
+                                    }));
+                                    if (block.number) {
+                                        docChildren.push(new Paragraph({
+                                            children: [new TextRun({ text: `(${block.number})`, size: textFontSize, font: s.font_family, color: textColor })],
+                                            alignment: AlignmentType.CENTER,
+                                            spacing: { before: 5, after: 15 }
+                                        }));
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (report.additional_info) {
+                        const lines = report.additional_info.split(/\r?\n/);
+                        for (const line of lines) {
+                            if (line.trim()) {
+                                docChildren.push(new Paragraph({
+                                    children: [new TextRun({ text: line, size: textFontSize, italics: true, color: textColor, font: s.font_family })],
+                                    spacing: { after: 10 }
+                                }));
+                            }
+                        }
+                    }
+
+                    let literatureText = report.literature || '';
+                    if (Array.isArray(literatureText)) literatureText = literatureText.join('\n');
+                    if (typeof literatureText === 'object') literatureText = JSON.stringify(literatureText, null, 2);
+
+                    if (literatureText && literatureText.trim()) {
+                        docChildren.push(new Paragraph({
+                            children: [new TextRun({ text: "Список литературы", bold: true, size: referencesFontSize, color: referencesColor, font: s.font_family })],
+                            spacing: { before: 60, after: 20 }
+                        }));
+                        const items = literatureText.split(/\r?\n/);
+                        let litNum = 1;
+                        for (const item of items) {
+                            if (item && item.trim()) {
+                                docChildren.push(new Paragraph({
+                                    children: [
+                                        new TextRun({ text: `${litNum}. `, size: referencesFontSize, color: referencesColor, font: s.font_family }),
+                                        new TextRun({ text: item.trim(), size: referencesFontSize, color: referencesColor, font: s.font_family })
+                                    ],
+                                    spacing: { after: 8 },
+                                    indent: { hanging: 360 }
+                                }));
+                                litNum++;
+                            }
+                        }
+                    }
+
+                    docChildren.push(new Paragraph({ children: [new PageBreak()] }));
+                }
+            }
+
+            const doc = new Document({
+                styles: {
+                    default: {
+                        document: {
+                            run: {
+                                font: s.font_family || "Times New Roman",
+                                size: 24
+                            }
+                        }
+                    },
+                    paragraphStyles: [
+                        {
+                            id: "TableOfContents",
+                            name: "Table of Contents",
+                            basedOn: "Normal",
+                            next: "Normal",
+                            run: {
+                                size: 36,
+                                font: s.font_family || "Times New Roman",
+                                color: "000000"
+                            },
+                            paragraph: {
+                                spacing: { before: 60, after: 60 }
+                            }
+                        },
+                        {
+                            id: "TableOfContentsTitle",
+                            name: "Table of Contents Title",
+                            basedOn: "Normal",
+                            next: "Normal",
+                            run: {
+                                size: 48,
+                                font: s.font_family || "Times New Roman",
+                                bold: true,
+                                color: "000000"
+                            },
+                            paragraph: {
+                                spacing: { before: 200, after: 200 }
+                            }
+                        }
+                    ]
+                },
+                sections: [{
+                    properties: {
+                        page: {
+                            margin: { top: 720, right: 720, bottom: 720, left: 720 }
+                        },
+                        footers: {
+                            default: new Footer({
+                                children: [
+                                    new Paragraph({
+                                        children: [
+                                            new TextRun({
+                                                text: `${conference.title || 'Сборник материалов'} | Страница `,
+                                                font: s.font_family || "Times New Roman",
+                                                size: 20
+                                            }),
+                                            new TextRun({ 
+                                                children: [PageNumber.CURRENT],
+                                                font: s.font_family || "Times New Roman",
+                                                size: 20
+                                            }),
+                                            new TextRun({ 
+                                                text: ` из `,
+                                                font: s.font_family || "Times New Roman",
+                                                size: 20
+                                            }),
+                                            new TextRun({ 
+                                                children: [PageNumber.TOTAL_PAGES],
+                                                font: s.font_family || "Times New Roman",
+                                                size: 20
+                                            })
+                                        ],
+                                        alignment: AlignmentType.CENTER
+                                    })
+                                ]
+                            })
+                        }
+                    },
+                    children: docChildren
+                }]
+            });
+            
+            const blob = await Packer.toBlob(doc);
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            const fileName = `${(conference.title || 'conference').replace(/[^а-яА-Яa-zA-Z0-9]/g, '_')}_сборник_материалов.docx`;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+        } catch (error) {
+            console.error('Ошибка генерации DOCX:', error);
+            alert('Ошибка при формировании сборника DOCX: ' + (error.message || 'Неизвестная ошибка'));
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
     // ========== УСЛОВНЫЙ РЕНДЕРИНГ ==========
     if (loading) {
         return <div className="section-reports-loading">Загрузка принятых докладов...</div>;
@@ -1240,46 +1227,558 @@ const generateDOCX = async (conference, sections, styles) => {
                 </div>
             </div>
 
-            {/* МОДАЛЬНОЕ ОКНО ПРЕДПРОСМОТРА */}
-            {showPreview && previewConference && (
-                <div className="preview-modal-overlay" onClick={closePreview}>
-                    <div className="preview-modal" onClick={(e) => e.stopPropagation()}>
-                        <div className="preview-modal-header">
-                            <h2>Предпросмотр сборника</h2>
-                            <button className="close-modal-btn" onClick={closePreview}>✕</button>
-                        </div>
-                        <div className="preview-modal-content" style={{ backgroundColor: getPreviewStyle('page_background', '#ffffff'), padding: `${getPreviewStyle('container_padding', 40)}px`, fontFamily: getPreviewStyle('font_family', 'Times New Roman, serif') }}>
-                            <div className="preview-title-page">
-                                <div className="preview-title-page-content">
-                                    <h1 style={{ fontSize: `${getPreviewStyle('title_font_size', 32)}px`, fontWeight: getPreviewStyle('title_font_weight', 'bold'), color: getPreviewStyle('title_color', '#000000'), textAlign: getPreviewStyle('title_text_align', 'center'), marginBottom: `${getPreviewStyle('title_margin_bottom', 30)}px` }}>{previewConference.title}</h1>
-                                    <h3>СБОРНИК МАТЕРИАЛОВ</h3>
-                                    <p>{previewConference.location || 'Место проведения не указано'}</p>
-                                    <p>{formatDate(previewConference.start_date)}</p>
+            {/* МОДАЛЬНОЕ ОКНО ПРЕДПРОСМОТРА - С ПРИМЕНЕНИЕМ СТИЛЕЙ ИЗ БД */}
+        {/* МОДАЛЬНОЕ ОКНО ПРЕДПРОСМОТРА - С ПРОКРУТКОЙ И KATEX */}
+{/* МОДАЛЬНОЕ ОКНО ПРЕДПРОСМОТРА - С ТАБЛИЦАМИ, УВЕЛИЧЕННЫМ ШРИФТОМ И НУМЕРАЦИЕЙ */}
+{showPreview && previewConference && (
+    <div className="preview-modal-overlay" onClick={closePreview}>
+        <div className="preview-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="preview-modal-header">
+                <h2>📄 Предпросмотр сборника</h2>
+                <button className="close-modal-btn" onClick={closePreview}>✕</button>
+            </div>
+            <div className="preview-modal-body" style={{
+                flex: 1,
+                overflowY: 'auto',
+                padding: '20px',
+                maxHeight: 'calc(90vh - 140px)',
+                minHeight: '300px',
+                backgroundColor: '#f5f5f5'
+            }}>
+                <div className="preview-modal-content" style={{ 
+                    backgroundColor: getPreviewStyle('page_background', '#ffffff'), 
+                    padding: `${getPreviewStyle('container_padding', 60)}px`,
+                    fontFamily: getPreviewStyle('font_family', 'Times New Roman, serif'),
+                    maxWidth: '210mm',
+                    margin: '0 auto',
+                    minHeight: '297mm',
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.05)'
+                }}>
+                    {/* ТИТУЛЬНАЯ СТРАНИЦА */}
+                    <div className="preview-title-page" style={{ textAlign: 'center', marginBottom: '40px' }}>
+                        <h1 style={{ 
+                            fontSize: `${(getPreviewStyle('title_font_size', 32) * 2)}px`, 
+                            fontWeight: getPreviewStyle('title_font_weight', 'bold'), 
+                            color: getPreviewStyle('title_color', '#000000'), 
+                            textAlign: getPreviewStyle('title_text_align', 'center'), 
+                            marginBottom: `${(getPreviewStyle('title_margin_bottom', 30) * 2)}px` 
+                        }}>
+                            {previewConference.title}
+                        </h1>
+                        <h3 style={{ fontSize: '40px', marginBottom: '40px' }}>СБОРНИК МАТЕРИАЛОВ</h3>
+                        <p style={{ fontSize: '32px', marginBottom: '10px' }}>{previewConference.location || 'Место проведения не указано'}</p>
+                        <p style={{ fontSize: '32px' }}>{formatDate(previewConference.start_date)}</p>
+                    </div>
+
+                    {/* РАЗРЫВ СТРАНИЦЫ */}
+                    <div style={{ pageBreakAfter: 'always', borderBottom: '2px dashed #ccc', margin: '30px 0' }}></div>
+
+                    {/* ОГЛАВЛЕНИЕ */}
+                    <div className="preview-toc" style={{ marginBottom: '40px' }}>
+                        <h2 style={{ 
+                            fontSize: `${(getPreviewStyle('section_title_font_size', 24) * 2)}px`,
+                            fontWeight: 'bold',
+                            textAlign: 'center',
+                            color: getPreviewStyle('section_title_color', '#000000'),
+                            marginBottom: '60px'
+                        }}>
+                            СОДЕРЖАНИЕ
+                        </h2>
+                        <div className="preview-toc-list">
+                            {previewSections.map((section, sIdx) => (
+                                <div key={section.id} className="preview-toc-section" style={{ marginBottom: '30px' }}>
+                                    <div className="preview-toc-section-title" style={{ 
+                                        fontWeight: 'bold', 
+                                        fontSize: `${(getPreviewStyle('text_font_size', 14) * 2)}px`,
+                                        color: getPreviewStyle('text_color', '#333333'),
+                                        marginBottom: '10px',
+                                        borderBottom: '1px solid #ddd',
+                                        paddingBottom: '5px'
+                                    }}>
+                                        {sIdx + 1}. {section.name}
+                                    </div>
+                                    <div className="preview-toc-reports" style={{ paddingLeft: '40px' }}>
+                                        {(section.reports || []).map((report, rIdx) => (
+                                            <div key={report.report_id} className="preview-toc-report" style={{ 
+                                                fontSize: `${(getPreviewStyle('text_font_size', 14) * 2)}px`,
+                                                color: getPreviewStyle('text_color', '#333333'),
+                                                marginBottom: '6px',
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center'
+                                            }}>
+                                                <span style={{ flex: 1 }}>{sIdx + 1}.{rIdx + 1} {report.title}</span>
+                                                <span style={{ 
+                                                    color: getPreviewStyle('references_color', '#666666'),
+                                                    minWidth: '40px',
+                                                    textAlign: 'right'
+                                                }}>
+                                                    {rIdx + 1}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="page-break"></div>
-                            <div className="preview-toc">
-                                <h2>СОДЕРЖАНИЕ</h2>
-                                <div className="preview-toc-list">
-                                    {previewSections.map((section, sIdx) => (
-                                        <div key={section.id} className="preview-toc-section">
-                                            <div className="preview-toc-section-title">{sIdx + 1}. {section.name}</div>
-                                            <div className="preview-toc-reports">{(section.reports || []).map((report, rIdx) => (<div key={report.report_id} className="preview-toc-report">{sIdx + 1}.{rIdx + 1} {report.title}<span className="preview-toc-authors">{report.author_name}{report.coauthors?.length > 0 && ` и др.`}</span></div>))}</div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* РАЗРЫВ СТРАНИЦЫ */}
+                    <div style={{ pageBreakAfter: 'always', borderBottom: '2px dashed #ccc', margin: '30px 0' }}></div>
+
+                    {/* ВСЕ СТАТЬИ */}
+                    <div className="preview-articles">
+                        {previewSections.map((section) => {
+                            const reports = section.reports || [];
+                            if (reports.length === 0) return null;
+
+                            return (
+                                <div key={section.id} className="preview-section" style={{ marginBottom: '80px' }}>
+                                    <h2 style={{ 
+                                        fontSize: `${(getPreviewStyle('section_title_font_size', 24) * 2)}px`,
+                                        fontWeight: getPreviewStyle('section_title_font_weight', 'bold'),
+                                        color: getPreviewStyle('section_title_color', '#000000'),
+                                        textAlign: 'center',
+                                        marginTop: `${(getPreviewStyle('section_title_margin_top', 30) * 2)}px`,
+                                        marginBottom: `${(getPreviewStyle('section_title_margin_bottom', 20) * 2)}px`
+                                    }}>
+                                        {section.name}
+                                    </h2>
+
+                                    {reports.map((report, index) => (
+                                        <div key={report.report_id} className="preview-report" style={{ 
+                                            marginBottom: '100px',
+                                            paddingBottom: '60px',
+                                            borderBottom: index === reports.length - 1 ? 'none' : `2px solid ${getPreviewStyle('table_border_color', '#ddd')}`
+                                        }}>
+                                            {/* Заголовок доклада */}
+                                            <h3 style={{ 
+                                                fontSize: `${(getPreviewStyle('title_font_size', 22) * 2)}px`,
+                                                fontWeight: 'bold',
+                                                color: getPreviewStyle('title_color', '#000000'),
+                                                textAlign: getPreviewStyle('title_text_align', 'center'),
+                                                marginBottom: '30px'
+                                            }}>
+                                                {report.title}
+                                            </h3>
+
+                                            {/* Авторы */}
+                                            <div style={{ 
+                                                fontSize: `${(getPreviewStyle('authors_font_size', 16) * 2)}px`,
+                                                fontWeight: getPreviewStyle('authors_font_weight', '400'),
+                                                color: getPreviewStyle('authors_color', '#333333'),
+                                                textAlign: getPreviewStyle('authors_text_align', 'center'),
+                                                marginBottom: `${(getPreviewStyle('authors_margin_bottom', 20) * 2)}px`
+                                            }}>
+                                                {report.author_name}
+                                                {report.coauthors && report.coauthors.length > 0 && (
+                                                    <span>, {report.coauthors.map(c => c.name).join(', ')}</span>
+                                                )}
+                                            </div>
+
+                                            {/* Аннотация */}
+                                            {report.abstract && (
+                                                <div style={{ 
+                                                    marginBottom: `${(getPreviewStyle('abstract_margin_bottom', 25) * 2)}px`
+                                                }}>
+                                                    <div style={{ 
+                                                        fontSize: `${(getPreviewStyle('abstract_font_size', 14) * 2)}px`,
+                                                        fontWeight: getPreviewStyle('abstract_font_weight', 'bold'),
+                                                        color: getPreviewStyle('abstract_color', '#333333'),
+                                                        marginBottom: '10px'
+                                                    }}>
+                                                        Аннотация:
+                                                    </div>
+                                                    <div style={{ 
+                                                        fontSize: `${(getPreviewStyle('abstract_font_size', 14) * 2)}px`,
+                                                        lineHeight: getPreviewStyle('abstract_line_height', 1.6),
+                                                        color: getPreviewStyle('abstract_color', '#333333'),
+                                                        textAlign: 'justify'
+                                                    }}>
+                                                        {report.abstract}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Ключевые слова */}
+                                            {report.keywords && (
+                                                <div style={{ 
+                                                    marginBottom: `${(getPreviewStyle('keywords_margin_bottom', 25) * 2)}px`
+                                                }}>
+                                                    <span style={{ 
+                                                        fontSize: `${(getPreviewStyle('keywords_font_size', 14) * 2)}px`,
+                                                        fontWeight: getPreviewStyle('keywords_font_weight', 'bold'),
+                                                        color: getPreviewStyle('keywords_color', '#e67e22')
+                                                    }}>
+                                                        Ключевые слова:
+                                                    </span>
+                                                    <span style={{ 
+                                                        fontSize: `${(getPreviewStyle('keywords_font_size', 14) * 2)}px`,
+                                                        color: getPreviewStyle('keywords_color', '#e67e22')
+                                                    }}>
+                                                        {report.keywords}
+                                                    </span>
+                                                </div>
+                                            )}
+
+                                            {/* КОНТЕНТ */}
+                                            {report.content && Array.isArray(report.content) && (
+                                                <div className="preview-content">
+                                                    {report.content.map((block, blockIndex) => {
+                                                        switch (block.type) {
+                                                            case 'text':
+                                                                return (
+                                                                    <div key={block.id || blockIndex} style={{ 
+                                                                        fontSize: `${(getPreviewStyle('text_font_size', 14) * 2)}px`,
+                                                                        lineHeight: getPreviewStyle('text_line_height', 1.6),
+                                                                        color: getPreviewStyle('text_color', '#333333'),
+                                                                        marginBottom: `${(getPreviewStyle('text_margin_bottom', 15) * 2)}px`,
+                                                                        textAlign: 'justify',
+                                                                        fontFamily: getPreviewStyle('font_family', 'Times New Roman, serif')
+                                                                    }}>
+                                                                        <div dangerouslySetInnerHTML={{ __html: block.content }} />
+                                                                    </div>
+                                                                );
+
+                                                            case 'table': {
+                                                                const mergedCells = block.mergedCells || {};
+                                                                const rotatedCells = block.rotatedCells || {};
+                                                                const tableData = block.data || [];
+                                                                const rows = tableData.length;
+                                                                const cols = tableData[0]?.length || 0;
+
+                                                                const shouldRenderCell = (row, col) => {
+                                                                    for (const [key, info] of Object.entries(mergedCells)) {
+                                                                        const [startRow, startCol] = key.split('-').map(Number);
+                                                                        if (row >= startRow && row < startRow + info.rowspan &&
+                                                                            col >= startCol && col < startCol + info.colspan) {
+                                                                            return startRow === row && startCol === col;
+                                                                        }
+                                                                    }
+                                                                    return true;
+                                                                };
+
+                                                                const getCellValue = (row, col) => {
+                                                                    for (const [key, info] of Object.entries(mergedCells)) {
+                                                                        const [startRow, startCol] = key.split('-').map(Number);
+                                                                        if (row >= startRow && row < startRow + info.rowspan &&
+                                                                            col >= startCol && col < startCol + info.colspan) {
+                                                                            return info.value || tableData[startRow]?.[startCol] || '';
+                                                                        }
+                                                                    }
+                                                                    return tableData[row]?.[col] || '';
+                                                                };
+
+                                                                const getSpan = (row, col) => {
+                                                                    for (const [key, info] of Object.entries(mergedCells)) {
+                                                                        const [startRow, startCol] = key.split('-').map(Number);
+                                                                        if (row === startRow && col === startCol) {
+                                                                            return { rowSpan: info.rowspan, colSpan: info.colspan };
+                                                                        }
+                                                                    }
+                                                                    return { rowSpan: 1, colSpan: 1 };
+                                                                };
+
+                                                                const isRotated = (row, col) => {
+                                                                    return rotatedCells[`${row}-${col}`] || false;
+                                                                };
+
+                                                                const hasHeaders = block.headers &&
+                                                                                    block.headers.length > 0 &&
+                                                                                    block.headers.some(header => header && header.trim() !== '');
+
+                                                                return (
+                                                                    <div key={block.id || blockIndex} style={{ margin: '40px 0' }}>
+                                                                        <div style={{ 
+                                                                            textAlign: 'center', 
+                                                                            fontWeight: '600',
+                                                                            marginBottom: '20px',
+                                                                            fontSize: `${(getPreviewStyle('text_font_size', 14) * 2)}px`,
+                                                                            color: getPreviewStyle('text_color', '#333333'),
+                                                                            fontFamily: getPreviewStyle('font_family', 'Times New Roman, serif')
+                                                                        }}>
+                                                                            Таблица {block.number || blockIndex + 1} — {block.caption || ''}
+                                                                        </div>
+                                                                        <div style={{ overflowX: 'auto' }}>
+                                                                            <table style={{
+                                                                                borderCollapse: 'collapse',
+                                                                                width: '100%',
+                                                                                border: `2px solid ${getPreviewStyle('table_border_color', '#000000')}`,
+                                                                                fontSize: `${(getPreviewStyle('text_font_size', 14) * 2)}px`,
+                                                                                fontFamily: getPreviewStyle('font_family', 'Times New Roman, serif')
+                                                                            }}>
+                                                                                {hasHeaders && (
+                                                                                    <thead>
+                                                                                        <tr>
+                                                                                            {block.headers.map((header, i) => (
+                                                                                                <th key={i} style={{
+                                                                                                    border: `2px solid ${getPreviewStyle('table_border_color', '#000000')}`,
+                                                                                                    padding: `${(getPreviewStyle('table_cell_padding', 8) * 2)}px`,
+                                                                                                    backgroundColor: getPreviewStyle('table_header_bg', '#f8f9fa'),
+                                                                                                    fontWeight: '600',
+                                                                                                    textAlign: 'center',
+                                                                                                    color: getPreviewStyle('text_color', '#333333')
+                                                                                                }}>
+                                                                                                    {header || ''}
+                                                                                                </th>
+                                                                                            ))}
+                                                                                        </tr>
+                                                                                    </thead>
+                                                                                )}
+                                                                                <tbody>
+                                                                                    {Array.from({ length: rows }).map((_, rowIndex) => {
+                                                                                        let hasVisibleCells = false;
+                                                                                        for (let colIndex = 0; colIndex < cols; colIndex++) {
+                                                                                            if (shouldRenderCell(rowIndex, colIndex)) {
+                                                                                                hasVisibleCells = true;
+                                                                                                break;
+                                                                                            }
+                                                                                        }
+                                                                                        if (!hasVisibleCells) return null;
+
+                                                                                        return (
+                                                                                            <tr key={rowIndex}>
+                                                                                                {Array.from({ length: cols }).map((_, colIndex) => {
+                                                                                                    if (!shouldRenderCell(rowIndex, colIndex)) {
+                                                                                                        return null;
+                                                                                                    }
+
+                                                                                                    const { rowSpan, colSpan } = getSpan(rowIndex, colIndex);
+                                                                                                    const cellValue = getCellValue(rowIndex, colIndex);
+                                                                                                    const rotated = isRotated(rowIndex, colIndex);
+
+                                                                                                    return (
+                                                                                                        <td
+                                                                                                            key={`${rowIndex}-${colIndex}`}
+                                                                                                            rowSpan={rowSpan}
+                                                                                                            colSpan={colSpan}
+                                                                                                            style={{
+                                                                                                                border: `2px solid ${getPreviewStyle('table_border_color', '#000000')}`,
+                                                                                                                padding: rotated ? '8px' : `${(getPreviewStyle('table_cell_padding', 8) * 2)}px`,
+                                                                                                                textAlign: 'center',
+                                                                                                                verticalAlign: 'middle',
+                                                                                                                color: getPreviewStyle('text_color', '#333333'),
+                                                                                                                ...(rotated && {
+                                                                                                                    writingMode: 'vertical-rl',
+                                                                                                                    textOrientation: 'mixed',
+                                                                                                                    whiteSpace: 'nowrap',
+                                                                                                                    minWidth: '60px',
+                                                                                                                    height: 'auto'
+                                                                                                                })
+                                                                                                            }}
+                                                                                                        >
+                                                                                                            {rotated ? (
+                                                                                                                <div style={{ display: 'inline-block', transform: 'rotate(0deg)' }}>
+                                                                                                                    {cellValue}
+                                                                                                                </div>
+                                                                                                            ) : (
+                                                                                                                cellValue
+                                                                                                            )}
+                                                                                                        </td>
+                                                                                                    );
+                                                                                                })}
+                                                                                            </tr>
+                                                                                        );
+                                                                                    })}
+                                                                                </tbody>
+                                                                            </table>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            }
+
+                                                            case 'image': {
+                                                                return (
+                                                                    <div key={block.id || blockIndex} style={{
+                                                                        textAlign: block.align || 'center',
+                                                                        margin: `${(getPreviewStyle('image_margin_top', 20) * 2)}px 0 ${(getPreviewStyle('image_margin_bottom', 20) * 2)}px 0`
+                                                                    }}>
+                                                                        <img 
+                                                                            src={block.src} 
+                                                                            alt={block.caption || ''} 
+                                                                            style={{ 
+                                                                                maxWidth: getPreviewStyle('image_max_width', '100%'),
+                                                                                width: block.width || 'auto',
+                                                                                height: 'auto'
+                                                                            }} 
+                                                                        />
+                                                                        <div style={{
+                                                                            marginTop: '16px',
+                                                                            fontSize: `${(getPreviewStyle('text_font_size', 14) * 2)}px`,
+                                                                            color: getPreviewStyle('text_color', '#333333'),
+                                                                            textAlign: 'center',
+                                                                            fontFamily: getPreviewStyle('font_family', 'Times New Roman, serif')
+                                                                        }}>
+                                                                            Рисунок {block.number || blockIndex + 1} — {block.caption || ''}
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            }
+
+                                                            case 'formula': {
+                                                                const formulaText = block.formulaString || block.content || '';
+                                                                const cleanFormula = formulaText
+                                                                    .replace(/\\\\/g, '\\')
+                                                                    .replace(/\\\[|\\\]|\\\(|\\\)/g, '');
+                                                                
+                                                                return (
+                                                                    <div key={block.id || blockIndex} style={{
+                                                                        textAlign: getPreviewStyle('formula_text_align', 'center'),
+                                                                        margin: '40px 0',
+                                                                        padding: '30px 0',
+                                                                        overflowX: 'auto'
+                                                                    }}>
+                                                                        <div style={{
+                                                                            fontSize: `${(getPreviewStyle('formula_font_size', 18) * 2)}px`,
+                                                                            fontFamily: '"Times New Roman", "Cambria Math", serif',
+                                                                            padding: '20px',
+                                                                            color: getPreviewStyle('formula_color', '#333333')
+                                                                        }}>
+                                                                            {cleanFormula && (() => {
+                                                                                try {
+                                                                                    const html = katex.renderToString(cleanFormula, {
+                                                                                        throwOnError: false,
+                                                                                        displayMode: true
+                                                                                    });
+                                                                                    return <span dangerouslySetInnerHTML={{ __html: html }} />;
+                                                                                } catch (e) {
+                                                                                    console.error('Ошибка рендеринга формулы:', e);
+                                                                                    return <span style={{ fontFamily: '"Times New Roman", serif' }}>{cleanFormula}</span>;
+                                                                                }
+                                                                            })()}
+                                                                        </div>
+                                                                        <div style={{
+                                                                            marginTop: '20px',
+                                                                            textAlign: 'center',
+                                                                            fontSize: '24px',
+                                                                            color: getPreviewStyle('references_color', '#666666'),
+                                                                            fontStyle: 'italic',
+                                                                            fontFamily: getPreviewStyle('font_family', 'Times New Roman, serif')
+                                                                        }}>
+                                                                            Формула {block.number || blockIndex + 1}
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            }
+
+                                                            default:
+                                                                return null;
+                                                        }
+                                                    })}
+                                                </div>
+                                            )}
+
+                                            {/* Дополнительная информация */}
+                                            {report.additional_info && (
+                                                <div style={{ 
+                                                    marginTop: '30px',
+                                                    padding: '20px',
+                                                    backgroundColor: '#f9f9f9',
+                                                    borderRadius: '10px'
+                                                }}>
+                                                    <strong style={{ 
+                                                        fontSize: `${(getPreviewStyle('text_font_size', 14) * 2)}px`,
+                                                        color: getPreviewStyle('text_color', '#333333')
+                                                    }}>
+                                                        Дополнительная информация:
+                                                    </strong>
+                                                    <p style={{ 
+                                                        margin: '10px 0 0 0',
+                                                        fontSize: `${(getPreviewStyle('text_font_size', 14) * 2)}px`,
+                                                        color: getPreviewStyle('text_color', '#333333')
+                                                    }}>
+                                                        {report.additional_info}
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            {/* Список литературы */}
+                                            {report.literature && (
+                                                <div style={{ 
+                                                    marginTop: '50px',
+                                                    paddingTop: '30px',
+                                                    borderTop: `2px solid ${getPreviewStyle('table_border_color', '#eee')}`
+                                                }}>
+                                                    <div style={{ 
+                                                        fontSize: `${(getPreviewStyle('references_font_size', 13) * 2)}px`,
+                                                        fontWeight: 'bold',
+                                                        color: getPreviewStyle('references_color', '#666666'),
+                                                        marginBottom: '20px',
+                                                        fontFamily: getPreviewStyle('font_family', 'Times New Roman, serif')
+                                                    }}>
+                                                        Список литературы
+                                                    </div>
+                                                    <div style={{ 
+                                                        fontSize: `${(getPreviewStyle('references_font_size', 13) * 2)}px`,
+                                                        lineHeight: getPreviewStyle('references_line_height', 1.6),
+                                                        color: getPreviewStyle('references_color', '#666666'),
+                                                        whiteSpace: 'pre-wrap',
+                                                        fontFamily: getPreviewStyle('font_family', 'Times New Roman', 'serif')
+                                                    }}>
+                                                        {report.literature}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
-                            </div>
-                                                    </div>
-                        <div className="preview-modal-footer">
-                            <button className="preview-close-btn" onClick={closePreview}>Закрыть</button>
-                            <button className="preview-generate-docx-btn" onClick={async () => { const styles = await fetchConferenceStyles(previewConference.id); generateDOCX(previewConference, previewSections, styles); closePreview(); }}>📝 Скачать DOCX</button>
-                        </div>
-                    </div> 
-                </div>     
-            )}             
-        </>               
-    );                    
-};                    
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
 
+            <div className="preview-modal-footer" style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '12px',
+                padding: '15px 25px',
+                borderTop: '2px solid #f0f0f0',
+                flexShrink: 0,
+                backgroundColor: '#fff',
+                borderRadius: '0 0 12px 12px'
+            }}>
+                <button className="preview-close-btn" onClick={closePreview} style={{
+                    padding: '10px 24px',
+                    backgroundColor: '#ecf0f1',
+                    color: '#7f8c8d',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '15px',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                }}>
+                    Закрыть
+                </button>
+                <button 
+                    className="preview-generate-docx-btn" 
+                    onClick={async () => { 
+                        const styles = await fetchConferenceStyles(previewConference.id); 
+                        generateDOCX(previewConference, previewSections, styles); 
+                        closePreview(); 
+                    }}
+                    disabled={isGenerating}
+                    style={{
+                        padding: '10px 24px',
+                        backgroundColor: '#f39c12',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '15px',
+                        fontWeight: '500',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                    }}
+                >
+                    {isGenerating ? '⏳ Генерация...' : '📝 Скачать DOCX'}
+                </button>
+            </div>
+        </div>
+    </div>
+)}
+        </>
+    );
+};
 
 export default ReportAll;
