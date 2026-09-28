@@ -7,11 +7,13 @@ const pool = require('./db');
 // Настройка CORS для React
 
 app.use(cors({
-   origin: [
+    origin: [
         "http://localhost:3000",
+        "https://gruppa.site",              // ← твой новый домен
+        "https://www.gruppa.site",          // ← на случай www-версии
         "https://diplom-lld7m9ok3-monterinas-projects.vercel.app",
-        "https://diplom-*.vercel.app",  // разрешить все vercel.app поддомены
-        /\.vercel\.app$/  // регулярное выражение для любых subdomain.vercel.app
+        "https://diplom-*.vercel.app",
+        /\.vercel\.app$/
     ],
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
