@@ -48,7 +48,7 @@ const loadConferenceStyles = async (conferenceId) => {
   setLoadingStyles(true);
   try {
     console.log(`🔍 Загрузка стилей для конференции ${conferenceId}...`);
-    const response = await fetch(`https://diplom-j6uo.onrender.com/api/conferences/${conferenceId}/styles`);
+    const response = await fetch(`https://gruppa.site/api/conferences/${conferenceId}/styles`);
     const data = await response.json();
     
     console.log('📦 Ответ от сервера (styles):', data);
@@ -190,7 +190,7 @@ useEffect(() => {
   const fetchConferences = async () => {
     setLoadingConferences(true);
     try {
-      const response = await fetch('https://diplom-j6uo.onrender.com/api/available-conferences');
+      const response = await fetch('https://gruppa.site/api/available-conferences');
       const data = await response.json();
       
       if (response.ok) {
@@ -222,7 +222,7 @@ useEffect(() => {
     
     setLoadingSections(true);
     try {
-      const response = await fetch(`https://diplom-j6uo.onrender.com/api/sections?conferenceId=${conferenceId}`);
+      const response = await fetch(`https://gruppa.site/api/sections?conferenceId=${conferenceId}`);
       const data = await response.json();
       
       if (response.ok) {
@@ -256,7 +256,7 @@ useEffect(() => {
   
   const loadConferenceTemplate = async (conferenceId) => {
     try {
-      const response = await fetch(`https://diplom-j6uo.onrender.com/api/conferences/${conferenceId}/template`);
+      const response = await fetch(`https://gruppa.site/api/conferences/${conferenceId}/template`);
       const data = await response.json();
       if (data.success) {
         setConferenceTemplate(data.template);
@@ -268,7 +268,7 @@ useEffect(() => {
   };
   
   const loadTemplate = async () => {
-    const response = await fetch(`https://diplom-j6uo.onrender.com/api/conferences/${formData.conferenceId}/template`);
+    const response = await fetch(`https://gruppa.site/api/conferences/${formData.conferenceId}/template`);
     const data = await response.json();
     if (data.success) {
       setTemplate(data.template);
@@ -703,7 +703,7 @@ const handleSubmit = async (e) => {
     
     console.log('📤 ПОЛНЫЕ ДАННЫЕ ДЛЯ ОТПРАВКИ:', JSON.stringify(requestData, null, 2));
     
-    const response = await fetch('https://diplom-j6uo.onrender.com/api/reports', {
+    const response = await fetch('https://gruppa.site/api/reports', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
