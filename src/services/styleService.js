@@ -1,5 +1,5 @@
 // src/services/styleService.js
-const API_URL = process.env.REACT_APP_API_URL || 'https://diplom-j6uo.onrender.com/api';
+const API_URL = process.env.REACT_APP_API_URL || 'https://gruppa.site/api';
 
 export const styleService = {
     // Получить стили конференции
