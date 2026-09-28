@@ -68,7 +68,7 @@ const ReportAll = () => {
             
             try {
                 setLoading(true);
-                const response = await fetch(`https://diplom-j6uo.onrender.com/api/admin/conferences/accepted-reports/${userId}`);
+                const response = await fetch(`https://gruppa.site/api/admin/conferences/accepted-reports/${userId}`);
                 
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -85,7 +85,7 @@ const ReportAll = () => {
                                     const reportsWithFullContent = await Promise.all(
                                         (section.reports || []).map(async (report) => {
                                             try {
-                                                const versionResponse = await fetch(`https://diplom-j6uo.onrender.com/api/reports/${report.report_id}`);
+                                                const versionResponse = await fetch(`https://gruppa.site/api/reports/${report.report_id}`);
                                                 if (versionResponse.ok) {
                                                     const versionData = await versionResponse.json();
                                                     if (versionData.success && versionData.report) {
@@ -148,7 +148,7 @@ const ReportAll = () => {
     // ========== ПОЛУЧЕНИЕ СТИЛЕЙ КОНФЕРЕНЦИИ ==========
     const fetchConferenceStyles = async (conferenceId) => {
         try {
-            const response = await fetch(`https://diplom-j6uo.onrender.com/api/conferences/${conferenceId}/styles`);
+            const response = await fetch(`https://gruppa.site/api/conferences/${conferenceId}/styles`);
             const data = await response.json();
             if (data.success && data.styles) {
                 return data.styles;
@@ -385,9 +385,9 @@ const ReportAll = () => {
                     } else if (src) {
                         let fullUrl = src;
                         if (src.startsWith('/')) {
-                            fullUrl = `https://diplom-j6uo.onrender.com${src}`;
+                            fullUrl = `https://gruppa.site${src}`;
                         } else if (!src.startsWith('http')) {
-                            fullUrl = `https://diplom-j6uo.onrender.com/${src}`;
+                            fullUrl = `https://gruppa.site/${src}`;
                         }
                         const resp = await fetch(fullUrl);
                         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);

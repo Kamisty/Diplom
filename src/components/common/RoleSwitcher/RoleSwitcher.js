@@ -114,7 +114,7 @@ const RoleSwitcher = ({ closeDropdown }) => {
       });
       
       // ✅ ИСПРАВЛЕНО: используем API_BASE_URL вместо localhost
-      const response = await fetch(`https://diplom-j6uo.onrender.com/api/user/add-role`, {
+      const response = await fetch(`https://gruppa.site/api/user/add-role`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

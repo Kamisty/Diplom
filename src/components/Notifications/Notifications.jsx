@@ -12,7 +12,7 @@ const Notifications = () => {
         if (!userId) return;
         
         try {
-            const response = await fetch(`https://diplom-j6uo.onrender.com/api/notifications?userId=${userId}`);
+            const response = await fetch(`https://gruppa.site/api/notifications?userId=${userId}`);
             const data = await response.json();
             
             if (data.success) {
@@ -29,7 +29,7 @@ const Notifications = () => {
         if (!userId) return;
         
         try {
-            const response = await fetch(`https://diplom-j6uo.onrender.com/api/notifications/unread-count?userId=${userId}`);
+            const response = await fetch(`https://gruppa.site/api/notifications/unread-count?userId=${userId}`);
             const data = await response.json();
             
             if (data.success) {
@@ -42,7 +42,7 @@ const Notifications = () => {
     
     const markAsRead = async (id) => {
         try {
-            await fetch(`https://diplom-j6uo.onrender.com/api/notifications/${id}/read`, {
+            await fetch(`https://gruppa.site/api/notifications/${id}/read`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -58,7 +58,7 @@ const Notifications = () => {
     
     const markAllAsRead = async () => {
         try {
-            await fetch(`https://diplom-j6uo.onrender.com/api/notifications/read-all`, {
+            await fetch(`https://gruppa.site/api/notifications/read-all`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId })

@@ -80,7 +80,7 @@ const StyleEditor = ({ conferenceId, onSave, onClose, embedded = false }) => {
     const loadStyles = async () => {
       try {
         console.log(`🔍 Загрузка стилей для конференции ${conferenceId}...`);
-        const response = await fetch(`https://diplom-j6uo.onrender.com/api/conferences/${conferenceId}/styles`);
+        const response = await fetch(`https://gruppa.site/api/conferences/${conferenceId}/styles`);
         const data = await response.json();
         
         console.log('📦 Получены стили:', data);
@@ -179,7 +179,7 @@ const StyleEditor = ({ conferenceId, onSave, onClose, embedded = false }) => {
       
       console.log('💾 Сохранение стилей:', cleanStyles);
       
-      const response = await fetch(`https://diplom-j6uo.onrender.com/api/conferences/${conferenceId}/styles`, {
+      const response = await fetch(`https://gruppa.site/api/conferences/${conferenceId}/styles`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
