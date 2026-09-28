@@ -22,26 +22,6 @@ app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
 
-
-
-
-
-
-
-
-
-// ============================================
-<<<<<<< HEAD
-// МАРШРУТЫ ДЛЯ СТИЛЕЙ КОНФЕРЕНЦИЙ (ИСПРАВЛЕННАЯ ВЕРСИЯ)
-// ============================================
-
-
-=======
-// МАРШРУТЫ ДЛЯ СТИЛЕЙ КОНФЕРЕНЦИЙ (ДИНАМИЧЕСКИЙ)
-// ============================================
-
->>>>>>> df18bd5f3327ab2f0895a2bea64b770c1f85d465
-// Получить стили конференции (GET)
 app.get('/api/conferences/:conferenceId/styles', async (req, res) => {
     const { conferenceId } = req.params;
     console.log('🔍 GET стили для конференции:', conferenceId);
@@ -70,16 +50,15 @@ app.post('/api/conferences/:conferenceId/styles', async (req, res) => {
     
     console.log('💾 POST сохранение стилей для конференции:', conferenceId);
     console.log('📦 Полученные поля:', Object.keys(styles));
-<<<<<<< HEAD
+
     
     // ✅ УДАЛЯЕМ ВСЕ ЛИШНИЕ ПОЛЯ
     delete styles.updated_at;
     delete styles.created_at;
     delete styles.id;
-=======
+
     console.log('📦 Количество полей:', Object.keys(styles).length);
->>>>>>> df18bd5f3327ab2f0895a2bea64b770c1f85d465
-    
+
     try {
         const conferenceIdInt = parseInt(conferenceId);
         
@@ -99,14 +78,9 @@ app.post('/api/conferences/:conferenceId/styles', async (req, res) => {
             [conferenceIdInt]
         );
         
-<<<<<<< HEAD
-        // ✅ СПИСОК КОЛОНОК БЕЗ updated_at, created_at, id
-        const allColumns = [
-=======
         // ВСЕ ПОЛЯ ТАБЛИЦЫ (без id, created_at, updated_at)
         const allColumns = [
             'conference_id',
->>>>>>> df18bd5f3327ab2f0895a2bea64b770c1f85d465
             'page_background', 'container_padding', 'font_family',
             'title_font_size', 'title_font_weight', 'title_color', 'title_text_align', 'title_margin_bottom',
             'authors_font_size', 'authors_font_weight', 'authors_color', 'authors_text_align', 'authors_margin_bottom',
@@ -120,9 +94,7 @@ app.post('/api/conferences/:conferenceId/styles', async (req, res) => {
             'references_font_size', 'references_line_height', 'references_color',
             'created_by'
         ];
-<<<<<<< HEAD
-=======
-        
+
         if (existing.rows.length === 0) {
             // Динамический INSERT
             const columnNames = allColumns.join(', ');
@@ -164,8 +136,7 @@ app.post('/api/conferences/:conferenceId/styles', async (req, res) => {
             await pool.query(updateQuery, updateValues);
             console.log('✅ Стили обновлены для конференции', conferenceIdInt);
         }
->>>>>>> df18bd5f3327ab2f0895a2bea64b770c1f85d465
-        
+  
         if (existing.rows.length === 0) {
             // INSERT
             const columnsWithId = ['conference_id', ...allColumns];
@@ -238,15 +209,13 @@ app.post('/api/conferences/:conferenceId/styles', async (req, res) => {
         }
     } catch (error) {
         console.error('❌ Ошибка сохранения стилей:', error);
-<<<<<<< HEAD
+
         res.status(500).json({ 
             success: false, 
             error: error.message,
             details: error.stack 
         });
-=======
-        res.status(500).json({ success: false, error: error.message });
->>>>>>> df18bd5f3327ab2f0895a2bea64b770c1f85d465
+
     }
 });
 
@@ -4832,8 +4801,6 @@ app.delete('/api/reports/:reportId', async (req, res) => {
 // В вашем серверном файле (например, server.js или routes/conferenceStyles.js)
 
 
-<<<<<<< HEAD
-=======
 // // ============================================
 // // МАРШРУТЫ ДЛЯ СТИЛЕЙ КОНФЕРЕНЦИЙ
 // // ============================================
@@ -5086,8 +5053,6 @@ app.delete('/api/reports/:reportId', async (req, res) => {
 // });
 
 // app.use('/api', stylesRouter);
-
->>>>>>> df18bd5f3327ab2f0895a2bea64b770c1f85d465
 
 // ============================================
 // ЗАПУСК СЕРВЕРА
