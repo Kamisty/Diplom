@@ -40,7 +40,7 @@ const ManageConferences = () => {
       console.log('📤 Загрузка конференций для userId:', userIdFromStorage);
       
       // ✅ Формируем URL с параметром userId
-      let url = 'https://gruppa.site/api/conferences';
+      let url = 'https://api.gruppa.site/api/conferences';
       if (userIdFromStorage) {
         url += `?userId=${userIdFromStorage}`;
       }
@@ -134,7 +134,7 @@ const ManageConferences = () => {
   const handleDelete = async (id) => {
     if (window.confirm('Вы уверены, что хотите удалить эту конференцию?')) {
       try {
-        const response = await fetch(`https://gruppa.site/api/conferences/${id}`, {
+        const response = await fetch(`https://api.gruppa.site/api/conferences/${id}`, {
           method: 'DELETE'
         });
         
