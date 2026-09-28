@@ -136,7 +136,7 @@ const Register = () => {
     console.log('📦 Отправка данных на сервер:', userData);
 
     try {
-      const response = await fetch('https://gruppa.site/api/register', {
+      const response = await fetch('https://api.gruppa.site/api/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

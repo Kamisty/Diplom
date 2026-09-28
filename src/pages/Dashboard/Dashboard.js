@@ -36,7 +36,7 @@ const Dashboard = () => {
       
       // ✅ Используем прямое сравнение вместо isActiveRole для избежания лишних зависимостей
       if (activeRole === ROLES.AUTHOR) {
-        const reportsResponse = await fetch(`https://gruppa.site/api/reports/user/${userId}`);
+        const reportsResponse = await fetch(`https://api.gruppa.site/api/reports/user/${userId}`);
         const reportsData = await reportsResponse.json();
         if (reportsData.success) {
           setStats(prev => ({ ...prev, myReports: reportsData.reports?.length || 0 }));
@@ -44,7 +44,7 @@ const Dashboard = () => {
       }
       
       if (activeRole === ROLES.ADMIN) {
-        const confResponse = await fetch('https://gruppa.site/api/conferences');
+        const confResponse = await fetch('https://api.gruppa.site/api/conferences');
         const confData = await confResponse.json();
         if (confData.success) {
           setStats(prev => ({ ...prev, activeConferences: confData.conferences?.length || 0 }));
@@ -52,7 +52,7 @@ const Dashboard = () => {
       }
       
       if (activeRole === ROLES.REVIEWER) {
-        const reviewsResponse = await fetch(`https://gruppa.site/api/reviews/pending/${userId}`);
+        const reviewsResponse = await fetch(`https://api.gruppa.site/api/reviews/pending/${userId}`);
         const reviewsData = await reviewsResponse.json();
         if (reviewsData.success) {
           setStats(prev => ({ ...prev, pendingReviews: reviewsData.count || 0 }));

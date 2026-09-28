@@ -34,7 +34,7 @@ const ReportDetail = () => {
     
     try {
       console.log(`🔍 Загрузка стилей для конференции ${conferenceId}...`);
-      const response = await fetch(`https://gruppa.site/api/conferences/${conferenceId}/styles`);
+      const response = await fetch(`https://api.gruppa.site/api/conferences/${conferenceId}/styles`);
       const data = await response.json();
       
       console.log('📦 Ответ стилей:', data);
@@ -57,7 +57,7 @@ const ReportDetail = () => {
   // Загрузка рецензии для автора (просмотр)
   const loadReviewForAuthor = useCallback(async () => {
     try {
-      const response = await fetch(`https://gruppa.site/api/reviews/by-report/${id}`);
+      const response = await fetch(`https://api.gruppa.site/api/reviews/by-report/${id}`);
       const data = await response.json();
       
       if (response.ok && data.success && data.review) {
@@ -75,7 +75,7 @@ const ReportDetail = () => {
   const loadReport = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(`https://gruppa.site/api/reports/${id}`);
+      const response = await fetch(`https://api.gruppa.site/api/reports/${id}`);
       const data = await response.json();
       
       if (response.ok && data.success) {
@@ -112,7 +112,7 @@ const ReportDetail = () => {
   const loadExistingReview = useCallback(async () => {
     try {
       const userId = user?.user_id || user?.id;
-      const response = await fetch(`https://gruppa.site/api/reviews/report/${id}/reviewer/${userId}`);
+      const response = await fetch(`https://api.gruppa.site/api/reviews/report/${id}/reviewer/${userId}`);
       const data = await response.json();
       
       if (response.ok && data.success && data.review) {
@@ -164,7 +164,7 @@ const ReportDetail = () => {
     try {
       const userId = user?.user_id || user?.id;
       
-      const response = await fetch('https://gruppa.site/api/reviews', {
+      const response = await fetch('https://api.gruppa.site/api/reviews', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

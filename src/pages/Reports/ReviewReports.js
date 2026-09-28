@@ -24,7 +24,7 @@ const ReviewReports = () => {
       console.log('Загрузка докладов для рецензирования, рецензент ID:', user.id);
       
       // ✅ ИСПРАВЛЕНО: Загружаем доклады, назначенные на рецензирование
-      const response = await fetch(`https://gruppa.site/api/reports/for-review/${user.id}`);
+      const response = await fetch(`https://api.gruppa.site/api/reports/for-review/${user.id}`);
       const data = await response.json();
       
       console.log('Получены доклады для рецензирования:', data);

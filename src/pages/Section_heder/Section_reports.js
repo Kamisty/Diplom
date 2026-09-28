@@ -24,7 +24,7 @@ const SectionReports = () => {
         if (!sectionId) return;
         
         try {
-            const response = await fetch(`https://gruppa.site/api/reports/section/${sectionId}`);
+            const response = await fetch(`https://api.gruppa.site/api/reports/section/${sectionId}`);
             const data = await response.json();
 
             if (response.ok && data.success) {
@@ -32,7 +32,7 @@ const SectionReports = () => {
                 // Загружаем назначения для этих докладов
                 const assignmentsData = {};
                 for (const report of data.reports) {
-                    const assignResponse = await fetch(`https://gruppa.site/api/reviews/report/${report.id}/reviewers`);
+                    const assignResponse = await fetch(`https://api.gruppa.site/api/reviews/report/${report.id}/reviewers`);
                     if (assignResponse.ok) {
                         const assignData = await assignResponse.json();
                         assignmentsData[report.id] = assignData.reviewers || [];
@@ -58,7 +58,7 @@ const SectionReports = () => {
             setLoading(true);
             const userId = user?.user_id || user?.id;
             
-            const response = await fetch(`https://gruppa.site/api/sections/head/${userId}`);
+            const response = await fetch(`https://api.gruppa.site/api/sections/head/${userId}`);
             const data = await response.json();
 
             if (response.ok && data.success) {
@@ -80,7 +80,7 @@ const SectionReports = () => {
     // Загрузить список рецензентов
     const fetchReviewers = useCallback(async () => {
         try {
-            const response = await fetch('https://gruppa.site/api/users/reviewers');
+            const response = await fetch('https://api.gruppa.site/api/users/reviewers');
             const data = await response.json();
             
             if (response.ok && data.success) {
@@ -117,7 +117,7 @@ const SectionReports = () => {
 
         setAssigning(true);
         try {
-            const response = await fetch('https://gruppa.site/api/reviews/assign', {
+            const response = await fetch('https://api.gruppa.site/api/reviews/assign', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -165,7 +165,7 @@ const SectionReports = () => {
 
         setChangingStatus(true);
         try {
-            const response = await fetch(`https://gruppa.site/api/reports/${selectedReport.id}/status`, {
+            const response = await fetch(`https://api.gruppa.site/api/reports/${selectedReport.id}/status`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',

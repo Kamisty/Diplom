@@ -55,7 +55,7 @@ const AssignSectionHeads = () => {
         return;
       }
       
-      const url = `https://gruppa.site/api/conferences?userId=${userId}`;
+      const url = `https://api.gruppa.site/api/conferences?userId=${userId}`;
       console.log('📡 Запрос:', url);
       
       const response = await fetch(url);
@@ -92,7 +92,7 @@ const AssignSectionHeads = () => {
   const fetchSectionHeads = useCallback(async () => {
     try {
       setLoadingHeads(true);
-      const response = await fetch('https://gruppa.site/api/users/section-heads');
+      const response = await fetch('https://api.gruppa.site/api/users/section-heads');
       
       if (!response.ok) {
         throw new Error('Не удалось загрузить руководителей');
@@ -117,13 +117,13 @@ const AssignSectionHeads = () => {
   // Загрузка секций и назначений
   const loadSectionsAndAssignments = useCallback(async (conferenceId) => {
     try {
-      const sectionsResponse = await fetch(`https://gruppa.site/api/conferences/${conferenceId}/sections`);
+      const sectionsResponse = await fetch(`https://api.gruppa.site/api/conferences/${conferenceId}/sections`);
       const sectionsData = await sectionsResponse.json();
       
       console.log('Загруженные секции:', sectionsData);
       
       if (sectionsData.success && Array.isArray(sectionsData.sections)) {
-        const assignmentsResponse = await fetch(`https://gruppa.site/api/section-assignments?conferenceId=${conferenceId}`);
+        const assignmentsResponse = await fetch(`https://api.gruppa.site/api/section-assignments?conferenceId=${conferenceId}`);
         let assignments = [];
         
         if (assignmentsResponse.ok) {
@@ -184,7 +184,7 @@ const AssignSectionHeads = () => {
     setError(null);
     
     try {
-      const response = await fetch('https://gruppa.site/api/section-assignments', {
+      const response = await fetch('https://api.gruppa.site/api/section-assignments', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -107,7 +107,7 @@ const CreateConference = () => {
 
       console.log('Отправка данных на сервер:', conferenceData);
 
-      const response = await fetch('https://gruppa.site/api/conferences', {
+      const response = await fetch('https://api.gruppa.site/api/conferences', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
